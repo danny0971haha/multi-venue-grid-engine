@@ -107,3 +107,14 @@ test("snapshot export/import is deterministic JSON without live class instances"
   assert.equal(first, second);
   assert.equal(first.includes('"schemaVersion":"phase1-simulator-1"'), true);
 });
+
+test("stale snapshot blocks risk increase and survives restart", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  simulator.planEntries();
+  simulator.markSnapshotStale();
+  assert.equal(simulator.canIncreaseRisk(), false);
+  assert.equal(simulator.getAccount().equityUsd, null);
+  const restored = DeterministicSimulator.fromSnapshot(simulator.exportSnapshot());
+  assert.equal(restored.canIncreaseRisk(), false);
+  assert.equal(restored.getAccount().equityUsd, null);
+});

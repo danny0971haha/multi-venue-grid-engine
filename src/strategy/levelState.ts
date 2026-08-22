@@ -16,7 +16,13 @@ export function isMutationDependentTransition(from: GridLevelState, to: GridLeve
   if (from === "IDLE" && to === "ENTRY_SUBMITTING") {
     return false;
   }
+  if (from === "ENTRY_SUBMITTING" && to === "IDLE") {
+    return false;
+  }
   if (from === "POSITION_OPEN" && to === "EXIT_SUBMITTING") {
+    return false;
+  }
+  if (from === "EXIT_SUBMITTING" && to === "POSITION_OPEN") {
     return false;
   }
   if (from === "ENTRY_WORKING" && to === "CANCEL_PENDING") {

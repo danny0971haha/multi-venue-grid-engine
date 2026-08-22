@@ -189,3 +189,151 @@ test("P1-S10 position delta without execution -> no invented execution", () => {
   assert.equal(simulator.listExecutions().length, 0);
   assert.equal(simulator.getAccount().equityUsd, null);
 });
+
+test("NOT_SENT is distinct from REJECTED and UNKNOWN", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const result = simulator.submit(intent.intentId, "NOT_SENT");
+  assert.equal(result.kind, "NOT_SENT");
+  assert.equal(simulator.level("B1").state, "IDLE");
+  assert.equal(simulator.listOpenOrders().length, 0);
+  assert.equal(simulator.possibleExposure().unknownSubmissions.length, 0);
+});
+
+test("timeout-like placement is UNKNOWN, not REJECTED", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B2");
+  const result = simulator.submit(intent.intentId, "UNKNOWN");
+  assert.equal(result.kind, "UNKNOWN");
+  assert.notEqual(result.kind, "REJECTED");
+  if (result.kind === "UNKNOWN") {
+    assert.equal(result.requestFingerprint.includes(intent.intentId), true);
+  }
+  assert.equal(simulator.level("B2").state, "RECONCILING");
+  assert.equal(simulator.listOpenOrders().length, 0);
+});
+
+test("cancel NOT_SENT is not treated as REJECTED", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const placed = simulator.submit(intent.intentId, "ACK");
+  assert.equal(placed.kind, "ACK");
+  if (placed.kind !== "ACK") {
+    throw new Error("expected ACK");
+  }
+  const result = simulator.requestCancel(placed.ack.exchangeOrderId, "NOT_SENT");
+  assert.equal(result.kind, "NOT_SENT");
+  assert.equal(simulator.level("B1").state, "ENTRY_WORKING");
+  assert.equal(simulator.listOpenOrders().length, 1);
+});
+
+test("cancel/fill race: fill then cancel keeps execution evidence", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const placed = simulator.submit(intent.intentId, "ACK");
+  assert.equal(placed.kind, "ACK");
+  if (placed.kind !== "ACK") {
+    throw new Error("expected ACK");
+  }
+  simulator.applyExecution({
+    exchangeOrderId: placed.ack.exchangeOrderId,
+    quantity: "0.01",
+    price: "99.4",
+  });
+  assert.equal(simulator.level("B1").state, "POSITION_OPEN");
+  const cancelled = simulator.requestCancel(placed.ack.exchangeOrderId, "ACK");
+  assert.equal(cancelled.kind, "ACK");
+  assert.equal(simulator.level("B1").state, "POSITION_OPEN");
+  assert.equal(simulator.listExecutions().length, 1);
+  assert.ok(simulator.level("B1").exitIntentId);
+});
+
+test("cancel/fill race: late execution after cancel ACK still counts as fill", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const placed = simulator.submit(intent.intentId, "ACK");
+  assert.equal(placed.kind, "ACK");
+  if (placed.kind !== "ACK") {
+    throw new Error("expected ACK");
+  }
+  const cancelled = simulator.requestCancel(placed.ack.exchangeOrderId, "ACK");
+  assert.equal(cancelled.kind, "ACK");
+  assert.equal(simulator.level("B1").state, "IDLE");
+  simulator.applyExecution({
+    exchangeOrderId: placed.ack.exchangeOrderId,
+    quantity: "0.01",
+    price: "99.4",
+  });
+  assert.equal(simulator.level("B1").state, "POSITION_OPEN");
+  assert.equal(simulator.listExecutions().length, 1);
+  assert.equal(simulator.level("B1").executedQuantity, "0.01");
+});
+
+test("partial fill then cancel remaining preserves executed quantity", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const placed = simulator.submit(intent.intentId, "ACK");
+  assert.equal(placed.kind, "ACK");
+  if (placed.kind !== "ACK") {
+    throw new Error("expected ACK");
+  }
+  simulator.applyExecution({
+    exchangeOrderId: placed.ack.exchangeOrderId,
+    quantity: "0.004",
+    price: "99.4",
+  });
+  const cancelled = simulator.requestCancel(placed.ack.exchangeOrderId, "ACK");
+  assert.equal(cancelled.kind, "ACK");
+  const level = simulator.level("B1");
+  assert.equal(level.state, "POSITION_OPEN");
+  assert.equal(level.executedQuantity, "0.004");
+  assert.equal(level.remainingQuantity, "0");
+  assert.equal(simulator.listExecutions().length, 1);
+  assert.ok(level.exitIntentId);
+});
+
+test("possible exposure reserves remaining qty and never invents zero", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const placed = simulator.submit(intent.intentId, "ACK");
+  assert.equal(placed.kind, "ACK");
+  if (placed.kind !== "ACK") {
+    throw new Error("expected ACK");
+  }
+  simulator.applyExecution({
+    exchangeOrderId: placed.ack.exchangeOrderId,
+    quantity: "0.004",
+    price: "99.4",
+  });
+  const exposure = simulator.possibleExposure();
+  assert.equal(exposure.ownedWorkingRiskIncreasing.length, 1);
+  assert.equal(exposure.ownedWorkingRiskIncreasing[0]?.quantity, "0.006");
+  assert.equal(exposure.signedPosition, "0.004");
+  assert.equal(
+    exposure.ownedWorkingRiskIncreasing.every((item) => item.quantity !== "0"),
+    true,
+  );
+});
+
+test("weighted execution price uses decimal notional, not IEEE number", () => {
+  const simulator = DeterministicSimulator.create(testInit());
+  const intent = plannedEntry(simulator, "B1");
+  const placed = simulator.submit(intent.intentId, "ACK");
+  assert.equal(placed.kind, "ACK");
+  if (placed.kind !== "ACK") {
+    throw new Error("expected ACK");
+  }
+  simulator.applyExecution({
+    executionId: "px-a",
+    exchangeOrderId: placed.ack.exchangeOrderId,
+    quantity: "0.004",
+    price: "99.4",
+  });
+  simulator.applyExecution({
+    executionId: "px-b",
+    exchangeOrderId: placed.ack.exchangeOrderId,
+    quantity: "0.006",
+    price: "99.6",
+  });
+  assert.equal(simulator.level("B1").weightedExecutionPrice, "99.52");
+});

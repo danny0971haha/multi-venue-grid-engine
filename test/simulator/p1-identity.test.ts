@@ -76,14 +76,13 @@ test("P1-I06 owned duplicate -> deterministic survivor/cleanup plan", () => {
   }
   const duplicate = simulator.injectOwnedDuplicate("B1", "99.4", "0.01");
   const plan = simulator.planDuplicateCleanup("B1");
-  assert.equal(plan.disposition, "CANCEL_OWNED_DUPLICATE");
-  assert.equal(
-    plan.survivorExchangeOrderId < duplicate ||
-      plan.survivorExchangeOrderId === placed.ack.exchangeOrderId,
-    true,
+  const expected = [placed.ack.exchangeOrderId, duplicate].sort((left, right) =>
+    left < right ? -1 : left > right ? 1 : 0,
   );
+  assert.equal(plan.disposition, "CANCEL_OWNED_DUPLICATE");
+  assert.equal(plan.survivorExchangeOrderId, expected[0]);
+  assert.deepEqual(plan.cancelExchangeOrderIds, expected.slice(1));
   assert.equal(plan.cancelExchangeOrderIds.includes(plan.survivorExchangeOrderId), false);
-  assert.equal(plan.cancelExchangeOrderIds.length, 1);
 });
 
 test("P1-I07 owned + unowned duplicate price -> unowned never selected for cancel", () => {

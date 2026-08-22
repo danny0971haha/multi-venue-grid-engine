@@ -104,11 +104,19 @@ test("P1-G05 min-notional infeasible without envelope expansion", () => {
 
 test("exit targets walk one step toward anchor", () => {
   assert.equal(exitTarget("B5"), "B4");
+  assert.equal(exitTarget("B4"), "B3");
+  assert.equal(exitTarget("B3"), "B2");
+  assert.equal(exitTarget("B2"), "B1");
   assert.equal(exitTarget("B1"), "ANCHOR");
   assert.equal(exitTarget("S5"), "S4");
+  assert.equal(exitTarget("S4"), "S3");
+  assert.equal(exitTarget("S3"), "S2");
+  assert.equal(exitTarget("S2"), "S1");
   assert.equal(exitTarget("S1"), "ANCHOR");
   assert.equal(theoreticalExitPrice("100", "B5"), "97.6");
+  assert.equal(theoreticalExitPrice("100", "B4"), "98.2");
   assert.equal(theoreticalExitPrice("100", "B1"), "100");
+  assert.equal(theoreticalExitPrice("100", "S5"), "102.4");
   assert.equal(theoreticalExitPrice("100", "S1"), "100");
   assert.equal(ALL_LEVELS.length, 10);
 });

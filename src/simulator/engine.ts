@@ -520,7 +520,40 @@ export class DeterministicSimulator {
     if (order.ownership !== "OWNED") {
       return { kind: "NOT_SENT", reason: "REFUSES_UNOWNED_CANCEL" };
     }
+    if (outcome === "NOT_SENT") {
+      return { kind: "NOT_SENT", reason: "LOCAL_GATE" };
+    }
+
     const level = order.logicalLevelId === null ? undefined : this.levels.get(order.logicalLevelId);
+    const hasExecution = decimalCmp(order.executedQuantity, "0") > 0;
+    const remainingIsZero = decimalIsZero(order.remainingQuantity);
+
+    if (hasExecution && remainingIsZero) {
+      order.presentInOpenBook = false;
+      if (outcome === "UNKNOWN") {
+        this.riskIncreaseBlocked = true;
+        return {
+          kind: "UNKNOWN",
+          reason: "CANCEL_UNKNOWN",
+          requestFingerprint: `cancel:${exchangeOrderId}`,
+          lastKnownMeta: this.meta("cancel"),
+        };
+      }
+      if (outcome !== "ACK") {
+        return {
+          kind: "REJECTED",
+          code: "CANCEL_REJECTED",
+          message: "Simulator rejected cancel",
+          meta: this.meta("cancel"),
+        };
+      }
+      return {
+        kind: "ACK",
+        ack: { exchangeOrderId, cancelled: true },
+        meta: this.meta("cancel"),
+      };
+    }
+
     if (level !== undefined) {
       this.setState(level, "CANCEL_PENDING", "LOCAL");
     }
@@ -537,6 +570,9 @@ export class DeterministicSimulator {
       };
     }
     if (outcome !== "ACK") {
+      if (level !== undefined) {
+        this.setState(level, this.workingStateAfterRejectedCancel(order), "REJECTED");
+      }
       return {
         kind: "REJECTED",
         code: "CANCEL_REJECTED",
@@ -546,9 +582,16 @@ export class DeterministicSimulator {
     }
     order.status = "CANCELLED";
     order.presentInOpenBook = false;
-    if (level !== undefined && order.logicalLevelId !== null) {
-      this.setState(level, order.purpose === "GRID_EXIT" ? "POSITION_OPEN" : "IDLE", "ACK");
+    order.remainingQuantity = "0";
+    if (level !== undefined) {
+      level.remainingQuantity = "0";
       level.workingExchangeOrderId = null;
+      if (hasExecution && order.purpose === "GRID_ENTRY") {
+        this.setState(level, "POSITION_OPEN", "ACK");
+        this.ensureExitIntent(level);
+      } else {
+        this.setState(level, order.purpose === "GRID_EXIT" ? "POSITION_OPEN" : "IDLE", "ACK");
+      }
     }
     return {
       kind: "ACK",
@@ -699,7 +742,7 @@ export class DeterministicSimulator {
       .map((level) => ({
         logicalLevelId: level.logicalLevelId,
         price: level.normalizedEntryPrice,
-        quantity: level.remainingQuantity ?? "0",
+        quantity: reservedWorkingQuantity(level),
       }));
     const unknownSubmissions = [...this.unknownWrites.values()]
       .filter((write) => write.purpose === "GRID_ENTRY")
@@ -941,6 +984,13 @@ export class DeterministicSimulator {
       [...this.levels.values()].some((level) => level.state === "RECONCILING");
   }
 
+  private workingStateAfterRejectedCancel(order: InternalOrder): GridLevelState {
+    if (decimalCmp(order.executedQuantity, "0") > 0) {
+      return order.purpose === "GRID_EXIT" ? "EXIT_PARTIAL" : "ENTRY_PARTIAL";
+    }
+    return order.purpose === "GRID_EXIT" ? "EXIT_WORKING" : "ENTRY_WORKING";
+  }
+
   private entryIntents(): OrderIntent[] {
     return [...this.intents.values()].filter((intent) => intent.purpose === "GRID_ENTRY");
   }
@@ -1055,6 +1105,16 @@ export function requestFingerprint(venue: VenueId, market: MarketId, intent: Ord
     intent.purpose,
     intent.leaseGeneration,
   ].join("|");
+}
+
+function reservedWorkingQuantity(level: LevelView): DecimalString {
+  if (level.remainingQuantity !== null) {
+    return level.remainingQuantity;
+  }
+  if (level.originalQuantity !== null) {
+    return level.originalQuantity;
+  }
+  throw new Error("MISSING_WORKING_QUANTITY");
 }
 
 function remainingAfter(original: DecimalString, executed: DecimalString): DecimalString {

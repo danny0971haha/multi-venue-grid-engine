@@ -3,9 +3,11 @@ import test from "node:test";
 
 import { frozenExperimentConfig } from "../../src/domain/config.js";
 import {
+  leaseGenerationToString,
   makeClientOrderId,
   makeIntentId,
   makeScopeKey,
+  parseLeaseGeneration,
   parseScopeKey,
 } from "../../src/domain/ids.js";
 
@@ -75,4 +77,11 @@ test("frozen v0.1 experiment configuration is exact", () => {
     drawdownFromStartLimitUsd: "10",
     boundaryBufferFraction: "0.01",
   });
+});
+
+test("lease generation is a lossless non-negative integer string", () => {
+  const generation = parseLeaseGeneration("7");
+  assert.equal(leaseGenerationToString(generation), "7");
+  assert.throws(() => parseLeaseGeneration("-1"), /INVALID_LEASE_GENERATION/);
+  assert.throws(() => parseLeaseGeneration("1.5"), /INVALID_LEASE_GENERATION/);
 });
