@@ -7,9 +7,6 @@ import type {
 } from "../domain/enums.js";
 import {
   ALL_LEVELS,
-  makeClientOrderId,
-  makeIntentId,
-  makeScopeKey,
   type AnchorEpoch,
   type ClientOrderId,
   type ExchangeOrderId,
@@ -18,14 +15,17 @@ import {
   type GridLogicalLevelId,
   type IntentId,
   type MarketId,
+  makeClientOrderId,
+  makeIntentId,
+  makeScopeKey,
   type RunId,
   type ScopeKey,
   type VenueId,
 } from "../domain/ids.js";
 import {
   classifyOwnership,
-  planOwnedDuplicateCleanup,
   type DuplicateCleanupPlan,
+  planOwnedDuplicateCleanup,
 } from "../domain/ownership.js";
 import type {
   AccountSnapshot,
@@ -40,6 +40,8 @@ import type {
   VenueWriteResult,
 } from "../domain/types.js";
 import {
+  type DecimalRounding,
+  type DecimalString,
   decimalAdd,
   decimalCmp,
   decimalDiv,
@@ -47,24 +49,22 @@ import {
   decimalMul,
   decimalSub,
   parseDecimalString,
-  type DecimalRounding,
-  type DecimalString,
 } from "../math/decimal.js";
 import {
   evaluateGridQuantity,
+  type NormalizedLevel,
   normalizeTheoreticalGrid,
   oppositeSide,
   theoreticalExitPrice,
   theoreticalGrid,
-  type NormalizedLevel,
 } from "../strategy/geometry.js";
+import { assertTransition } from "../strategy/levelState.js";
 import {
   assessEnvelopeFeasibility,
+  type MarketRules,
   normalizePrice,
   normalizeQuantity,
-  type MarketRules,
 } from "../strategy/marketRules.js";
-import { assertTransition } from "../strategy/levelState.js";
 import { assertValidSimulatorSnapshot } from "./snapshot.js";
 
 export { SIMULATOR_SCHEMA_VERSION, SnapshotImportError } from "./snapshot.js";
@@ -232,7 +232,6 @@ export class DeterministicSimulator {
     const valid = assertValidSimulatorSnapshot(snapshot);
     const simulator = new DeterministicSimulator(valid.init);
     simulator.entriesPlanned = valid.entriesPlanned;
-    simulator.riskIncreaseBlocked = valid.riskIncreaseBlocked;
     simulator.executionGap = valid.executionGap;
     simulator.snapshotStale = valid.snapshotStale;
     simulator.orderSeq = valid.orderSeq;
@@ -261,6 +260,10 @@ export class DeterministicSimulator {
     for (const unknown of valid.unknownWrites) {
       simulator.unknownWrites.set(unknown.intentId, unknown);
     }
+    for (const order of simulator.orders.values()) {
+      order.ownership = simulator.classifyObserved(order);
+    }
+    simulator.riskIncreaseBlocked = valid.riskIncreaseBlocked || simulator.hasDerivedRiskBlockers();
     return simulator;
   }
 
@@ -804,23 +807,7 @@ export class DeterministicSimulator {
   }
 
   canIncreaseRisk(): boolean {
-    if (this.riskIncreaseBlocked || this.executionGap || this.snapshotStale) {
-      return false;
-    }
-    if (this.unknownWrites.size > 0) {
-      return false;
-    }
-    if (
-      [...this.levels.values()].some(
-        (level) => level.state === "RECONCILING" || level.state === "ERROR_REQUIRES_RECONCILIATION",
-      )
-    ) {
-      return false;
-    }
-    if ([...this.orders.values()].some((order) => this.classifyObserved(order) === "AMBIGUOUS")) {
-      return false;
-    }
-    return true;
+    return !this.riskIncreaseBlocked && !this.hasDerivedRiskBlockers();
   }
 
   exportSnapshot(): SimulatorSnapshot {
@@ -842,7 +829,10 @@ export class DeterministicSimulator {
         };
       }),
       intents: [...this.intents.values()],
-      orders: [...this.orders.values()].map((order) => ({ ...order })),
+      orders: [...this.orders.values()].map((order) => ({
+        ...order,
+        ownership: this.classifyObserved(order),
+      })),
       executions: [...this.executions.values()],
       unknownWrites: [...this.unknownWrites.values()],
       position: this.position,
@@ -1020,12 +1010,24 @@ export class DeterministicSimulator {
   }
 
   private refreshRiskBlock(): void {
-    this.riskIncreaseBlocked =
-      this.unknownWrites.size > 0 ||
-      this.executionGap ||
-      this.snapshotStale ||
-      [...this.levels.values()].some((level) => level.state === "RECONCILING") ||
-      [...this.orders.values()].some((order) => this.classifyObserved(order) === "AMBIGUOUS");
+    this.riskIncreaseBlocked = this.hasDerivedRiskBlockers();
+  }
+
+  private hasDerivedRiskBlockers(): boolean {
+    if (this.executionGap || this.snapshotStale) {
+      return true;
+    }
+    if (this.unknownWrites.size > 0) {
+      return true;
+    }
+    if (
+      [...this.levels.values()].some(
+        (level) => level.state === "RECONCILING" || level.state === "ERROR_REQUIRES_RECONCILIATION",
+      )
+    ) {
+      return true;
+    }
+    return [...this.orders.values()].some((order) => this.classifyObserved(order) === "AMBIGUOUS");
   }
 
   private seedIdleTerminalLevels(quantity: DecimalString): void {
@@ -1131,25 +1133,60 @@ export class DeterministicSimulator {
   }
 
   private ownershipEvidence() {
+    const currentIntents = [...this.intents.values()].filter((intent) =>
+      this.isCurrentScopeIntent(intent),
+    );
     return {
       currentScopeKey: this.scopeKey,
       currentAnchorEpoch: this.init.anchorEpoch,
       knownClientOrderIds: new Set(
-        [...this.intents.values()]
+        currentIntents
           .map((intent) => intent.clientOrderId)
           .filter((value): value is ClientOrderId => value !== null),
       ),
       knownExchangeOrderIds: new Set(
         [...this.orders.values()]
-          .filter((order) => order.ownership === "OWNED")
+          .filter((order) => this.hasProvenAuthorityLinkage(order))
           .map((order) => order.exchangeOrderId),
       ),
       clientOrderEpochById: new Map(
-        [...this.intents.values()]
+        currentIntents
           .filter((intent) => intent.clientOrderId !== null)
           .map((intent) => [intent.clientOrderId as ClientOrderId, intent.anchorEpoch]),
       ),
     };
+  }
+
+  private isCurrentScopeIntent(intent: OrderIntent): boolean {
+    return (
+      intent.experimentId === this.init.experimentId &&
+      intent.runId === this.init.runId &&
+      intent.scopeKey === this.scopeKey &&
+      intent.anchorEpoch === this.init.anchorEpoch
+    );
+  }
+
+  private hasProvenAuthorityLinkage(order: InternalOrder): boolean {
+    if (order.intentId === null) {
+      return false;
+    }
+    const intent = this.intents.get(order.intentId);
+    if (intent === undefined || !this.isCurrentScopeIntent(intent)) {
+      return false;
+    }
+    if (order.clientOrderId === null || order.clientOrderId !== intent.clientOrderId) {
+      return false;
+    }
+    if (order.scopeKey !== intent.scopeKey || order.anchorEpoch !== intent.anchorEpoch) {
+      return false;
+    }
+    if (order.logicalLevelId !== intent.logicalLevelId) {
+      return false;
+    }
+    if (order.purpose !== intent.purpose || order.side !== intent.side) {
+      return false;
+    }
+    return decimalCmp(order.originalQuantity, intent.quantity) === 0;
   }
 
   private observeOrder(exchangeOrderId: ExchangeOrderId): ExchangeOrderObservation {
