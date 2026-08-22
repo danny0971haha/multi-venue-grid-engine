@@ -18,8 +18,12 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "scan:secrets": "node scripts/check-secrets.mjs",
-    "test": "tsx --test test/bootstrap/*.test.ts",
+    "test": "tsx --test test/bootstrap/*.test.ts test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts",
+    "test:phase1": "tsx --test test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.10",
