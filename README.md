@@ -2,13 +2,13 @@
 
 Independent, from-scratch multi-exchange perpetual-grid trading engine.
 
-## Project status
+## Current status
 
-**Phase 0 toolchain baseline only. No live trading is authorized.**
+**Architecture and implementation-contract baseline only. The next authorized implementation work is Phase 0. Live exchange writes are not authorized.**
 
-This repository is intentionally independent. It must not be created as a GitHub fork of another trading bot, and it must not copy unlicensed third-party source code. Public projects may be used for behavioral research and architectural comparison only.
+This repository is deliberately independent. Third-party projects may be researched for public behavior and architecture, but source code must not be copied unless a compatible license is independently verified and the user separately authorizes the import.
 
-## v0.1 experiment envelope
+## Frozen v0.1 experiment envelope
 
 | Parameter | Value |
 |---|---:|
@@ -21,40 +21,42 @@ This repository is intentionally independent. It must not be created as a GitHub
 | Grid half-band | ±3.0% from anchor |
 | Daily loss hard halt | 5 USDT |
 | Drawdown-from-start hard halt | 10 USDT |
+| Boundary buffer | 1.0% beyond active grid boundary |
 | Live venues in first canary | 1 |
 
-The objective of v0.1 is **execution correctness and operational safety**, not profitability.
+The objective of v0.1 is execution correctness, recovery correctness, state integrity, and bounded risk. It is not an optimization exercise for short-term PnL.
 
-## Phase 0 commands
+## Authoritative document map
 
-The toolchain is pinned to Node.js `26.5.0` and npm `11.17.0`. Install and verify the current
-baseline with:
+Read in this order:
 
-```bash
-npm ci
-npm run ci
-npm run dry-run
-```
+1. `AGENTS.md` — binding agent behavior and safety rules.
+2. `docs/EXPERIMENT_SPEC.md` — authoritative numerical experiment envelope.
+3. `docs/ARCHITECTURE.md` — component boundaries and system topology.
+4. `docs/DOMAIN_CONTRACTS.md` — canonical identities, observations, intents, and state semantics.
+5. `docs/VENUE_ADAPTER_CONTRACT.md` — exchange capability and ACK/REJECT/UNKNOWN semantics.
+6. `docs/RISK_PERSISTENCE_CONTRACT.md` — fail-closed risk, halt, lease, and durable-state protocol.
+7. `docs/IMPLEMENTATION_CONTRACT.md` — phase sequence and phase boundaries.
+8. `docs/PHASE_0_CONTRACT.md` — exact first task to hand to an implementation AI.
+9. `docs/TEST_FAULT_MATRIX.md` — required test and process-crash matrix.
+10. `docs/ACCEPTANCE_GATES.md` — independent PASS / REJECT / BLOCKED gates.
+11. `docs/EVIDENCE_TEMPLATE.md` — mandatory checkpoint evidence packet.
+12. `docs/REVIEW_CHANGE_PROTOCOL.md` — contract-change and review workflow.
+13. `docs/THIRD_PARTY_BOUNDARY.md` — source/research boundary.
 
-`npm run dry-run` is the only runtime entry point in Phase 0. It reports
-`liveExchangeWritesEnabled: false`; any configured mode other than `dry-run` fails closed. Phase 0
-contains no exchange adapter or exchange write implementation.
+If documents appear to conflict, the implementation agent must not guess. Follow the precedence rules in `docs/REVIEW_CHANGE_PROTOCOL.md` and stop with a contract-change request when the conflict is material.
 
-## Read first
+## v0.1 non-goals
 
-1. `AGENTS.md` — binding instructions for implementation agents.
-2. `docs/ARCHITECTURE.md` — target architecture and domain model.
-3. `docs/EXPERIMENT_SPEC.md` — frozen 100U experiment contract.
-4. `docs/IMPLEMENTATION_CONTRACT.md` — phased work plan and prohibited changes.
-5. `docs/ACCEPTANCE_GATES.md` — PASS / REJECT criteria.
-6. `docs/EVIDENCE_TEMPLATE.md` — exact evidence packet required for independent review.
-7. `docs/THIRD_PARTY_BOUNDARY.md` — rules for independent reimplementation.
-
-## Non-goals for v0.1
-
+- no live exchange writes in the initial implementation contract;
 - no adaptive grid shifting;
 - no automatic restart after a hard risk halt;
-- no multi-venue live capital allocation;
+- no simultaneous multi-venue live capital allocation;
+- no cross-venue arbitrage strategy in v0.1;
 - no live dashboard mutation controls;
-- no optimization for short-term PnL;
-- no copying third-party trading-bot source code.
+- no optimization that weakens safety or reconciliation semantics;
+- no copying third-party bot source code.
+
+## Immediate next action
+
+An implementation AI should read `AI_START_HERE.md`, create `experiment/v0.1-phase0`, implement **Phase 0 only**, then stop and return the complete evidence packet for independent review.
