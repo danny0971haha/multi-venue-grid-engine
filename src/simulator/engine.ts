@@ -45,6 +45,7 @@ import {
   decimalDiv,
   decimalIsZero,
   decimalMul,
+  decimalSub,
   parseDecimalString,
   type DecimalRounding,
   type DecimalString,
@@ -63,7 +64,10 @@ import {
   normalizeQuantity,
   type MarketRules,
 } from "../strategy/marketRules.js";
-import { assertTransition, isRiskIncreasingState } from "../strategy/levelState.js";
+import { assertTransition } from "../strategy/levelState.js";
+import { assertValidSimulatorSnapshot } from "./snapshot.js";
+
+export { SIMULATOR_SCHEMA_VERSION, SnapshotImportError } from "./snapshot.js";
 
 export type SimulatorInit = {
   experimentId: ExperimentId;
@@ -111,10 +115,17 @@ export type LevelView = {
   originalQuantity: DecimalString | null;
   executedQuantity: DecimalString;
   remainingQuantity: DecimalString | null;
+  openInventory: DecimalString;
+  entryExecutedQuantity: DecimalString;
+  exitExecutedQuantity: DecimalString;
   executionIds: ExecutionId[];
   weightedExecutionPrice: DecimalString | null;
   entryIntentId: IntentId | null;
   exitIntentId: IntentId | null;
+  entryMutationSequence: string;
+  exitMutationSequence: string;
+  entryIntentTerminal: boolean;
+  exitIntentTerminal: boolean;
   workingExchangeOrderId: ExchangeOrderId | null;
 };
 
@@ -218,31 +229,36 @@ export class DeterministicSimulator {
   }
 
   static fromSnapshot(snapshot: SimulatorSnapshot): DeterministicSimulator {
-    const simulator = new DeterministicSimulator(snapshot.init);
-    simulator.entriesPlanned = snapshot.entriesPlanned;
-    simulator.riskIncreaseBlocked = snapshot.riskIncreaseBlocked;
-    simulator.executionGap = snapshot.executionGap;
-    simulator.snapshotStale = snapshot.snapshotStale;
-    simulator.orderSeq = snapshot.orderSeq;
-    simulator.executionSeq = snapshot.executionSeq;
-    simulator.position = snapshot.position;
-    simulator.account = snapshot.account;
-    for (const level of snapshot.levels) {
-      simulator.levels.set(level.logicalLevelId, {
+    const valid = assertValidSimulatorSnapshot(snapshot);
+    const simulator = new DeterministicSimulator(valid.init);
+    simulator.entriesPlanned = valid.entriesPlanned;
+    simulator.riskIncreaseBlocked = valid.riskIncreaseBlocked;
+    simulator.executionGap = valid.executionGap;
+    simulator.snapshotStale = valid.snapshotStale;
+    simulator.orderSeq = valid.orderSeq;
+    simulator.executionSeq = valid.executionSeq;
+    simulator.position = valid.position;
+    simulator.account = valid.account;
+    for (const logicalLevelId of ALL_LEVELS) {
+      const level = valid.levels.find((item) => item.logicalLevelId === logicalLevelId);
+      if (level === undefined) {
+        throw new Error(`MISSING_LEVEL:${logicalLevelId}`);
+      }
+      simulator.levels.set(logicalLevelId, {
         ...level,
         executionIds: [...level.executionIds],
       });
     }
-    for (const intent of snapshot.intents) {
+    for (const intent of valid.intents) {
       simulator.intents.set(intent.intentId, intent);
     }
-    for (const order of snapshot.orders) {
+    for (const order of valid.orders) {
       simulator.orders.set(order.exchangeOrderId, { ...order });
     }
-    for (const execution of snapshot.executions) {
+    for (const execution of valid.executions) {
       simulator.executions.set(execution.executionId, execution);
     }
-    for (const unknown of snapshot.unknownWrites) {
+    for (const unknown of valid.unknownWrites) {
       simulator.unknownWrites.set(unknown.intentId, unknown);
     }
     return simulator;
@@ -276,21 +292,30 @@ export class DeterministicSimulator {
     if (quantityFit.status === "INFEASIBLE") {
       return quantityFit;
     }
-    if (this.entriesPlanned || this.hasLiveExposure()) {
-      return { status: "PLANNED", intents: this.entryIntents() };
+    if (this.entriesPlanned) {
+      if (this.canIncreaseRisk()) {
+        this.seedIdleTerminalLevels(quantity);
+      }
+      return { status: "PLANNED", intents: this.currentEntryIntents() };
+    }
+    if (!this.canIncreaseRisk()) {
+      return { status: "PLANNED", intents: [] };
     }
 
     const intents: OrderIntent[] = [];
-    for (const level of geometry.normalized) {
+    for (const levelGeometry of geometry.normalized) {
+      const level = this.requireLevel(levelGeometry.logicalLevelId);
+      const sequence = nextSequence(level.entryMutationSequence);
       const intent = this.createIntent({
-        logicalLevelId: level.logicalLevelId,
+        logicalLevelId: levelGeometry.logicalLevelId,
         purpose: "GRID_ENTRY",
-        side: level.side,
-        price: level.normalizedPrice,
+        side: levelGeometry.side,
+        price: levelGeometry.normalizedPrice,
         quantity,
         reduceOnly: false,
-        sequence: "1",
+        sequence,
       });
+      this.assignEntryIntent(level, intent, sequence);
       intents.push(intent);
     }
     this.entriesPlanned = true;
@@ -301,6 +326,9 @@ export class DeterministicSimulator {
     const intent = this.requireIntent(intentId);
     const levelId = this.requireLevelId(intent.logicalLevelId);
     const level = this.requireLevel(levelId);
+    if (this.isIntentTerminal(level, intent.purpose, intent.intentId)) {
+      return { kind: "NOT_SENT", reason: "INTENT_TERMINAL" };
+    }
     if (intent.purpose === "GRID_ENTRY") {
       this.setState(level, "ENTRY_SUBMITTING", "LOCAL");
     } else if (intent.purpose === "GRID_EXIT") {
@@ -317,6 +345,7 @@ export class DeterministicSimulator {
       return { kind: "NOT_SENT", reason: "LOCAL_GATE" };
     }
     if (outcome === "REJECTED") {
+      this.markPurposeTerminal(level, intent.purpose);
       if (intent.purpose === "GRID_ENTRY") {
         this.setState(level, "IDLE", "REJECTED");
       } else if (intent.purpose === "GRID_EXIT") {
@@ -517,7 +546,7 @@ export class DeterministicSimulator {
     if (order === undefined) {
       return { kind: "NOT_SENT", reason: "ORDER_NOT_FOUND" };
     }
-    if (order.ownership !== "OWNED") {
+    if (this.classifyObserved(order) !== "OWNED") {
       return { kind: "NOT_SENT", reason: "REFUSES_UNOWNED_CANCEL" };
     }
     if (outcome === "NOT_SENT") {
@@ -586,11 +615,12 @@ export class DeterministicSimulator {
     if (level !== undefined) {
       level.remainingQuantity = "0";
       level.workingExchangeOrderId = null;
-      if (hasExecution && order.purpose === "GRID_ENTRY") {
+      this.markPurposeTerminal(level, order.purpose);
+      if (!decimalIsZero(level.openInventory)) {
         this.setState(level, "POSITION_OPEN", "ACK");
         this.ensureExitIntent(level);
       } else {
-        this.setState(level, order.purpose === "GRID_EXIT" ? "POSITION_OPEN" : "IDLE", "ACK");
+        this.setState(level, "IDLE", "ACK");
       }
     }
     return {
@@ -689,7 +719,7 @@ export class DeterministicSimulator {
     const owned = [...this.orders.values()]
       .filter(
         (order) =>
-          order.ownership === "OWNED" &&
+          this.classifyObserved(order) === "OWNED" &&
           order.logicalLevelId === logicalLevelId &&
           order.presentInOpenBook,
       )
@@ -701,7 +731,7 @@ export class DeterministicSimulator {
     const owned = [...this.orders.values()]
       .filter(
         (order) =>
-          order.ownership === "OWNED" &&
+          this.classifyObserved(order) === "OWNED" &&
           order.price !== null &&
           decimalCmp(order.price, price) === 0 &&
           order.presentInOpenBook,
@@ -751,7 +781,7 @@ export class DeterministicSimulator {
         price: write.price,
         quantity: write.quantity,
       }));
-    const proposedRiskIncreasing = this.entryIntents()
+    const proposedRiskIncreasing = this.currentEntryIntents()
       .filter((intent) => {
         const levelId = intent.logicalLevelId;
         if (levelId === null) {
@@ -787,7 +817,7 @@ export class DeterministicSimulator {
     ) {
       return false;
     }
-    if ([...this.orders.values()].some((order) => order.ownership === "AMBIGUOUS")) {
+    if ([...this.orders.values()].some((order) => this.classifyObserved(order) === "AMBIGUOUS")) {
       return false;
     }
     return true;
@@ -804,10 +834,13 @@ export class DeterministicSimulator {
       snapshotStale: this.snapshotStale,
       orderSeq: this.orderSeq,
       executionSeq: this.executionSeq,
-      levels: [...this.levels.values()].map((level) => ({
-        ...level,
-        executionIds: [...level.executionIds],
-      })),
+      levels: ALL_LEVELS.map((logicalLevelId) => {
+        const level = this.requireLevel(logicalLevelId);
+        return {
+          ...level,
+          executionIds: [...level.executionIds],
+        };
+      }),
       intents: [...this.intents.values()],
       orders: [...this.orders.values()].map((order) => ({ ...order })),
       executions: [...this.executions.values()],
@@ -843,10 +876,17 @@ export class DeterministicSimulator {
       originalQuantity: null,
       executedQuantity: "0",
       remainingQuantity: null,
+      openInventory: "0",
+      entryExecutedQuantity: "0",
+      exitExecutedQuantity: "0",
       executionIds: [],
       weightedExecutionPrice: null,
       entryIntentId: null,
       exitIntentId: null,
+      entryMutationSequence: "0",
+      exitMutationSequence: "0",
+      entryIntentTerminal: true,
+      exitIntentTerminal: true,
       workingExchangeOrderId: null,
     };
   }
@@ -911,8 +951,10 @@ export class DeterministicSimulator {
         (item) => item.exchangeOrderId === order.exchangeOrderId,
       ),
     );
+    this.applyInventory(level, order.purpose, execution.quantity);
     if (order.purpose === "GRID_ENTRY") {
       if (decimalIsZero(order.remainingQuantity)) {
+        this.markPurposeTerminal(level, "GRID_ENTRY");
         this.setState(level, "POSITION_OPEN", "OBSERVATION");
         this.ensureExitIntent(level);
         level.workingExchangeOrderId = null;
@@ -923,8 +965,14 @@ export class DeterministicSimulator {
     }
     if (order.purpose === "GRID_EXIT") {
       if (decimalIsZero(order.remainingQuantity)) {
-        this.setState(level, "IDLE", "OBSERVATION");
+        this.markPurposeTerminal(level, "GRID_EXIT");
         level.workingExchangeOrderId = null;
+        if (decimalIsZero(level.openInventory)) {
+          this.setState(level, "IDLE", "OBSERVATION");
+        } else {
+          this.setState(level, "POSITION_OPEN", "OBSERVATION");
+          this.ensureExitIntent(level);
+        }
       } else {
         this.setState(level, "EXIT_PARTIAL", "OBSERVATION");
       }
@@ -932,19 +980,25 @@ export class DeterministicSimulator {
   }
 
   private ensureExitIntent(level: MutableLevel): void {
-    if (level.exitIntentId !== null) {
+    if (level.exitIntentId !== null && !level.exitIntentTerminal) {
       return;
     }
+    if (decimalIsZero(level.openInventory)) {
+      return;
+    }
+    const sequence = nextSequence(level.exitMutationSequence);
     const intent = this.createIntent({
       logicalLevelId: level.logicalLevelId,
       purpose: "GRID_EXIT",
       side: oppositeSide(level.logicalLevelId),
       price: level.normalizedExitPrice,
-      quantity: level.originalQuantity ?? this.init.quantity,
+      quantity: level.openInventory,
       reduceOnly: true,
-      sequence: "exit-1",
+      sequence,
     });
     level.exitIntentId = intent.intentId;
+    level.exitMutationSequence = sequence;
+    level.exitIntentTerminal = false;
   }
 
   private applyFillToPosition(side: "BUY" | "SELL", quantity: DecimalString): void {
@@ -965,23 +1019,108 @@ export class DeterministicSimulator {
     level.state = next;
   }
 
-  private hasLiveExposure(): boolean {
-    return [...this.levels.values()].some(
-      (level) =>
-        isRiskIncreasingState(level.state) ||
-        level.state === "POSITION_OPEN" ||
-        level.state === "EXIT_SUBMITTING" ||
-        level.state === "EXIT_WORKING" ||
-        level.state === "EXIT_PARTIAL",
-    );
-  }
-
   private refreshRiskBlock(): void {
     this.riskIncreaseBlocked =
       this.unknownWrites.size > 0 ||
       this.executionGap ||
       this.snapshotStale ||
-      [...this.levels.values()].some((level) => level.state === "RECONCILING");
+      [...this.levels.values()].some((level) => level.state === "RECONCILING") ||
+      [...this.orders.values()].some((order) => this.classifyObserved(order) === "AMBIGUOUS");
+  }
+
+  private seedIdleTerminalLevels(quantity: DecimalString): void {
+    for (const level of this.levels.values()) {
+      if (level.state !== "IDLE" || !level.entryIntentTerminal) {
+        continue;
+      }
+      if (!decimalIsZero(level.openInventory)) {
+        continue;
+      }
+      this.resetLevelForNewCycle(level);
+      const sequence = nextSequence(level.entryMutationSequence);
+      const intent = this.createIntent({
+        logicalLevelId: level.logicalLevelId,
+        purpose: "GRID_ENTRY",
+        side: level.logicalLevelId.startsWith("B") ? "BUY" : "SELL",
+        price: level.normalizedEntryPrice,
+        quantity,
+        reduceOnly: false,
+        sequence,
+      });
+      this.assignEntryIntent(level, intent, sequence);
+    }
+  }
+
+  private assignEntryIntent(level: MutableLevel, intent: OrderIntent, sequence: string): void {
+    level.entryIntentId = intent.intentId;
+    level.entryMutationSequence = sequence;
+    level.entryIntentTerminal = false;
+  }
+
+  private resetLevelForNewCycle(level: MutableLevel): void {
+    level.exitIntentId = null;
+    level.exitIntentTerminal = true;
+    level.entryExecutedQuantity = "0";
+    level.exitExecutedQuantity = "0";
+    level.openInventory = "0";
+    level.executionIds = [];
+    level.originalQuantity = null;
+    level.executedQuantity = "0";
+    level.remainingQuantity = null;
+    level.weightedExecutionPrice = null;
+    level.workingExchangeOrderId = null;
+  }
+
+  private applyInventory(
+    level: MutableLevel,
+    purpose: IntentPurpose,
+    quantity: DecimalString,
+  ): void {
+    if (purpose === "GRID_ENTRY") {
+      level.entryExecutedQuantity = decimalAdd(level.entryExecutedQuantity, quantity);
+    } else if (purpose === "GRID_EXIT") {
+      level.exitExecutedQuantity = decimalAdd(level.exitExecutedQuantity, quantity);
+    }
+    if (decimalCmp(level.exitExecutedQuantity, level.entryExecutedQuantity) > 0) {
+      throw new Error("NEGATIVE_OPEN_INVENTORY");
+    }
+    level.openInventory = decimalSub(level.entryExecutedQuantity, level.exitExecutedQuantity);
+  }
+
+  private markPurposeTerminal(level: MutableLevel, purpose: IntentPurpose): void {
+    if (purpose === "GRID_ENTRY") {
+      level.entryIntentTerminal = true;
+    } else if (purpose === "GRID_EXIT") {
+      level.exitIntentTerminal = true;
+    }
+  }
+
+  private isIntentTerminal(
+    level: MutableLevel,
+    purpose: IntentPurpose,
+    intentId: IntentId,
+  ): boolean {
+    if (purpose === "GRID_ENTRY") {
+      return level.entryIntentId === intentId && level.entryIntentTerminal;
+    }
+    if (purpose === "GRID_EXIT") {
+      return level.exitIntentId === intentId && level.exitIntentTerminal;
+    }
+    return false;
+  }
+
+  private currentEntryIntents(): OrderIntent[] {
+    const intents: OrderIntent[] = [];
+    for (const level of this.levels.values()) {
+      if (level.entryIntentId === null || level.entryIntentTerminal) {
+        continue;
+      }
+      const intent = this.intents.get(level.entryIntentId);
+      if (intent !== undefined) {
+        intents.push(intent);
+      }
+    }
+    return intents;
   }
 
   private workingStateAfterRejectedCancel(order: InternalOrder): GridLevelState {
@@ -989,10 +1128,6 @@ export class DeterministicSimulator {
       return order.purpose === "GRID_EXIT" ? "EXIT_PARTIAL" : "ENTRY_PARTIAL";
     }
     return order.purpose === "GRID_EXIT" ? "EXIT_WORKING" : "ENTRY_WORKING";
-  }
-
-  private entryIntents(): OrderIntent[] {
-    return [...this.intents.values()].filter((intent) => intent.purpose === "GRID_ENTRY");
   }
 
   private ownershipEvidence() {
@@ -1105,6 +1240,13 @@ export function requestFingerprint(venue: VenueId, market: MarketId, intent: Ord
     intent.purpose,
     intent.leaseGeneration,
   ].join("|");
+}
+
+function nextSequence(current: string): string {
+  if (!/^\d+$/.test(current)) {
+    throw new Error("INVALID_MUTATION_SEQUENCE");
+  }
+  return (BigInt(current) + 1n).toString(10);
 }
 
 function reservedWorkingQuantity(level: LevelView): DecimalString {

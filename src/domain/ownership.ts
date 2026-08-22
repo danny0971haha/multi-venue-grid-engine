@@ -47,13 +47,7 @@ export function classifyOwnership(
   ) {
     return "OWNED";
   }
-  if (observed.clientOrderId === null && observed.exchangeOrderId === null) {
-    return "AMBIGUOUS";
-  }
-  if (observed.clientOrderId === null && observed.exchangeOrderId !== null) {
-    return "AMBIGUOUS";
-  }
-  return "UNOWNED";
+  return "AMBIGUOUS";
 }
 
 export type DuplicateCleanupPlan = {

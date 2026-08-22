@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { V01_EXPERIMENT_CONFIG } from "../../src/domain/config.js";
 import { ALL_LEVELS } from "../../src/domain/ids.js";
+import { parseDecimalString } from "../../src/math/decimal.js";
 import {
   buildGridGeometry,
   exitTarget,
@@ -33,7 +34,9 @@ test("P1-G01 anchor 100 exact ten levels", () => {
   const levels = theoreticalGrid("100");
   assert.equal(levels.length, 10);
   for (const level of levels) {
-    assert.equal(level.theoreticalPrice, exactAnchor100[level.logicalLevelId]);
+    const mathematical = exactAnchor100[level.logicalLevelId];
+    assert.equal(level.theoreticalPrice, parseDecimalString(mathematical));
+    assert.equal(parseDecimalString(mathematical), parseDecimalString(level.theoreticalPrice));
   }
 });
 

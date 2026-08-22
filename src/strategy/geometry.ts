@@ -4,7 +4,6 @@ import {
   decimalMul,
   decimalSub,
   parseDecimalString,
-  toTenthString,
 } from "../math/decimal.js";
 import type { DecimalString } from "../math/decimal.js";
 import { ALL_LEVELS, assertGridLogicalLevelId, type GridLogicalLevelId } from "../domain/ids.js";
@@ -154,5 +153,5 @@ export function requireLevel(value: string): GridLogicalLevelId {
 }
 
 function formatGeometryPrice(value: DecimalString): DecimalString {
-  return toTenthString(value);
+  return parseDecimalString(value);
 }

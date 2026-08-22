@@ -62,6 +62,14 @@ export function parseDecimalString(value: string): DecimalString {
   return toCanonicalString(parsed);
 }
 
+export function isCanonicalDecimalString(value: string): boolean {
+  try {
+    return parseDecimalString(value) === value;
+  } catch {
+    return false;
+  }
+}
+
 export function decimalAdd(left: DecimalString, right: DecimalString): DecimalString {
   return toCanonicalString(asDecimal(left).plus(asDecimal(right)));
 }
