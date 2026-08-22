@@ -5,6 +5,8 @@ on:
     branches:
       - "**"
   pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -15,7 +17,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Clean install, static checks, tests, and secret scan
+    name: Clean install, static checks, tests, secret scan, and dry-run
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,16 +30,33 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Install pinned npm
-        run: npm install --global npm@11.17.0
-
       - name: Verify pinned toolchain
         run: |
-          test "$(node --version)" = "v26.5.0"
-          test "$(npm --version)" = "11.17.0"
+          test "$(node --version)" = "v22.23.2"
+          test "$(npm --version)" = "10.9.8"
+          node --version
+          npm --version
 
       - name: Clean install from lockfile
         run: npm ci
 
-      - name: Run Phase 0 checks
-        run: npm run ci
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Secret scan
+        run: npm run scan:secrets
+
+      - name: Dry-run
+        run: npm run dry-run
