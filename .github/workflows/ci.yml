@@ -1,0 +1,43 @@
+name: Phase 0 CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase0-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Clean install, static checks, tests, and secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install pinned npm
+        run: npm install --global npm@11.17.0
+
+      - name: Verify pinned toolchain
+        run: |
+          test "$(node --version)" = "v26.5.0"
+          test "$(npm --version)" = "11.17.0"
+
+      - name: Clean install from lockfile
+        run: npm ci
+
+      - name: Run Phase 0 checks
+        run: npm run ci

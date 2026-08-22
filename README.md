@@ -4,7 +4,7 @@ Independent, from-scratch multi-exchange perpetual-grid trading engine.
 
 ## Project status
 
-**Architecture / implementation-contract stage only. No live trading is authorized.**
+**Phase 0 toolchain baseline only. No live trading is authorized.**
 
 This repository is intentionally independent. It must not be created as a GitHub fork of another trading bot, and it must not copy unlicensed third-party source code. Public projects may be used for behavioral research and architectural comparison only.
 
@@ -24,6 +24,21 @@ This repository is intentionally independent. It must not be created as a GitHub
 | Live venues in first canary | 1 |
 
 The objective of v0.1 is **execution correctness and operational safety**, not profitability.
+
+## Phase 0 commands
+
+The toolchain is pinned to Node.js `26.5.0` and npm `11.17.0`. Install and verify the current
+baseline with:
+
+```bash
+npm ci
+npm run ci
+npm run dry-run
+```
+
+`npm run dry-run` is the only runtime entry point in Phase 0. It reports
+`liveExchangeWritesEnabled: false`; any configured mode other than `dry-run` fails closed. Phase 0
+contains no exchange adapter or exchange write implementation.
 
 ## Read first
 

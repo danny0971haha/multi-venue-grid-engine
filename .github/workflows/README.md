@@ -1,5 +1,7 @@
-# CI placeholder
+# CI
 
-The implementation agent must replace this placeholder with an actual CI workflow in Phase 0 after selecting and pinning the project toolchain.
+`ci.yml` is the Phase 0 baseline workflow. It performs a clean lockfile install, formatting and
+lint checks, typechecking, tests, a repository secret scan, and a production TypeScript build.
 
-Required CI checks are defined in `docs/ACCEPTANCE_GATES.md`.
+It runs for every branch push and pull request. Required acceptance checks remain defined in
+`docs/ACCEPTANCE_GATES.md`; an independent reviewer owns the Gate 0 decision.
