@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import { canonicalSerializeToUtf8 } from "../../src/persistence/canonical-json.js";
+import {
+  CanonicalJsonError,
+  canonicalSerializeToUtf8,
+} from "../../src/persistence/canonical-json.js";
 import {
   buildDurableEnvelope,
   EnvelopeValidationError,
@@ -194,4 +197,147 @@ test("generation is not accepted as a JavaScript number", () => {
   if (!result.ok) {
     assert.ok(result.reasonCodes.includes("INVALID_GENERATION"));
   }
+});
+
+test("C9 stateful getter cannot make buildDurableEnvelope return inconsistent bytes", () => {
+  let getterCalls = 0;
+  const payload = {
+    get marker() {
+      getterCalls += 1;
+      return getterCalls === 1 ? "first" : "second";
+    },
+    levels: 10,
+    notionalUsd: "100",
+  };
+  try {
+    buildDurableEnvelope({
+      ...fixtureFields(),
+      payload,
+    });
+    assert.fail("expected accessor rejection");
+  } catch (error) {
+    assert.ok(error instanceof CanonicalJsonError);
+    assert.equal(error.reasonCode, "ACCESSOR_PROPERTY");
+  }
+  assert.equal(getterCalls, 0);
+});
+
+test("C10 buildDurableEnvelope observes a normal payload once and uses a detached snapshot", () => {
+  const payload = {
+    levels: 10,
+    marker: "phase2a-canonical-vector",
+    notionalUsd: "100",
+  };
+  let ownKeysCalls = 0;
+  let descriptorCalls = 0;
+  const proxied = new Proxy(payload, {
+    ownKeys(target) {
+      ownKeysCalls += 1;
+      return Reflect.ownKeys(target);
+    },
+    getOwnPropertyDescriptor(target, key) {
+      descriptorCalls += 1;
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  const built = buildDurableEnvelope({
+    ...fixtureFields(),
+    payload: proxied,
+  });
+  assert.equal(ownKeysCalls, 1);
+  assert.equal(descriptorCalls, 3);
+  assert.notEqual(built.envelope.payload, proxied);
+  assert.deepEqual(built.envelope.payload, payload);
+});
+
+test("C11 mutating the original payload after build does not alter returned envelope data", () => {
+  const payload = {
+    levels: 10,
+    marker: "phase2a-canonical-vector",
+    notionalUsd: "100",
+    nested: { inner: 1 },
+  };
+  const built = buildDurableEnvelope({
+    ...fixtureFields(),
+    payload,
+  });
+  const payloadSha256 = built.envelope.payloadSha256;
+  const envelopeSha256 = built.envelope.envelopeSha256;
+  const fullBytes = Buffer.from(built.fullEnvelopeBytes);
+  payload.levels = 99;
+  payload.nested.inner = 99;
+  payload.marker = "mutated";
+  assert.equal(built.envelope.payload.levels, 10);
+  assert.equal(built.envelope.payload.nested.inner, 1);
+  assert.equal(built.envelope.payload.marker, "phase2a-canonical-vector");
+  assert.equal(built.envelope.payloadSha256, payloadSha256);
+  assert.equal(built.envelope.envelopeSha256, envelopeSha256);
+  assert.deepEqual(built.fullEnvelopeBytes, fullBytes);
+});
+
+test("C12 returned fullEnvelopeBytes always pass parseAndValidateDurableEnvelope", () => {
+  const built = buildDurableEnvelope(fixtureFields());
+  const result = parseAndValidateDurableEnvelope(built.fullEnvelopeBytes);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.envelope.envelopeSha256, built.envelope.envelopeSha256);
+    assert.deepEqual(result.canonicalBytes, built.fullEnvelopeBytes);
+  }
+});
+
+test("C13 returned payload is not reference-equal to the caller payload or nested objects", () => {
+  const nested = { inner: 1 };
+  const payload = {
+    levels: 10,
+    marker: "phase2a-canonical-vector",
+    notionalUsd: "100",
+    nested,
+  };
+  const built = buildDurableEnvelope({
+    ...fixtureFields(),
+    payload,
+  });
+  assert.notEqual(built.envelope.payload, payload);
+  assert.notEqual(built.envelope.payload.nested, nested);
+  assert.deepEqual(built.envelope.payload.nested, { inner: 1 });
+});
+
+test("C14 malformed runtime scalar field types fail with stable validation codes", () => {
+  const cases: Array<{ override: Record<string, unknown>; reasonCode: string }> = [
+    { override: { schemaVersion: "1" }, reasonCode: "UNSUPPORTED_SCHEMA" },
+    {
+      override: {
+        kind: {
+          toString() {
+            return "risk-state";
+          },
+        },
+      },
+      reasonCode: "INVALID_KIND",
+    },
+    { override: { scopeKey: 123 }, reasonCode: "INVALID_SCOPE" },
+    { override: { storeGeneration: 1 }, reasonCode: "INVALID_GENERATION" },
+    { override: { previousEnvelopeSha256: 0 }, reasonCode: "INVALID_PREVIOUS_HASH" },
+  ];
+  for (const testCase of cases) {
+    try {
+      buildDurableEnvelope({
+        ...fixtureFields(),
+        ...testCase.override,
+      } as unknown as ReturnType<typeof fixtureFields>);
+      assert.fail(`expected ${testCase.reasonCode}`);
+    } catch (error) {
+      assert.ok(error instanceof EnvelopeValidationError);
+      assert.equal(error.reasonCode, testCase.reasonCode);
+    }
+  }
+});
+
+test("C15 existing literal canonical vectors remain exact", () => {
+  const built = buildDurableEnvelope(fixtureFields());
+  assert.equal(built.payloadCanonicalBytes.toString("utf8"), CANONICAL_PAYLOAD_BYTES);
+  assert.equal(built.envelope.payloadSha256, PAYLOAD_SHA256);
+  assert.equal(built.envelopeHashInputBytes.toString("utf8"), CANONICAL_ENVELOPE_HASH_INPUT_BYTES);
+  assert.equal(built.envelope.envelopeSha256, ENVELOPE_SHA256);
+  assert.equal(built.fullEnvelopeBytes.toString("utf8"), FULL_ENVELOPE_BYTES);
 });

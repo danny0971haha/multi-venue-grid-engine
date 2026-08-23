@@ -149,3 +149,90 @@ test("safe integer metadata numbers are emitted without exponent or trailing new
   assert.equal(bytes, '{"count":0,"schemaVersion":1}');
   assert.equal(bytes.endsWith("\n"), false);
 });
+
+function assertCanonicalCode(value: unknown, reasonCode: string): void {
+  try {
+    canonicalSerialize(value);
+    assert.fail(`expected ${reasonCode}`);
+  } catch (error) {
+    assert.ok(error instanceof CanonicalJsonError);
+    assert.equal(error.reasonCode, reasonCode);
+  }
+}
+
+test("C1 array with Symbol own property is rejected", () => {
+  const value = [1, 2];
+  Object.defineProperty(value, Symbol("hidden"), { value: "meta" });
+  assertCanonicalCode(value, "SYMBOL_VALUE");
+});
+
+test("C2 array with non-enumerable hidden own property is rejected", () => {
+  const value = [1, 2];
+  Object.defineProperty(value, "hidden", { value: "meta", enumerable: false });
+  assertCanonicalCode(value, "EXTRA_ARRAY_PROPERTY");
+});
+
+test("C3 array with enumerable extra string property is rejected", () => {
+  const value = [1, 2];
+  Object.defineProperty(value, "extra", { value: "meta", enumerable: true });
+  assertCanonicalCode(value, "EXTRA_ARRAY_PROPERTY");
+});
+
+test("C4 array index getter is rejected and getter is not invoked", () => {
+  let getterCalls = 0;
+  const value: unknown[] = [];
+  Object.defineProperty(value, "0", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error("array index getter invoked");
+    },
+  });
+  assertCanonicalCode(value, "ACCESSOR_PROPERTY");
+  assert.equal(getterCalls, 0);
+});
+
+test("C5 enumerable object getter is rejected and getter is not invoked", () => {
+  let getterCalls = 0;
+  const value = {
+    get marker() {
+      getterCalls += 1;
+      throw new Error("object getter invoked");
+    },
+  };
+  assertCanonicalCode(value, "ACCESSOR_PROPERTY");
+  assert.equal(getterCalls, 0);
+});
+
+test("C6 object setter-only accessor descriptor is rejected", () => {
+  const value = {};
+  Object.defineProperty(value, "marker", {
+    enumerable: true,
+    configurable: true,
+    set() {
+      throw new Error("object setter invoked");
+    },
+  });
+  assertCanonicalCode(value, "ACCESSOR_PROPERTY");
+});
+
+test("C7 non-enumerable object data property is rejected", () => {
+  const value = { visible: 1 };
+  Object.defineProperty(value, "hidden", { value: 2, enumerable: false });
+  assertCanonicalCode(value, "NON_ENUMERABLE_PROPERTY");
+});
+
+test("C8 nested accessor is rejected without invocation", () => {
+  let getterCalls = 0;
+  const value = {
+    nested: {
+      get inner() {
+        getterCalls += 1;
+        throw new Error("nested getter invoked");
+      },
+    },
+  };
+  assertCanonicalCode(value, "ACCESSOR_PROPERTY");
+  assert.equal(getterCalls, 0);
+});
