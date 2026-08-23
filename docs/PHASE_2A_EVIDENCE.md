@@ -17,6 +17,8 @@ BASE_SHA=31cfe078c09a15d4906b56fb64731449ca1c598a
 BASE_TREE=7cbb90ebee0897132df6e0c23b27b1ae33c12e2f
 IMPLEMENTATION_HEAD=90a3ad21a79d307d24e54ae12211135b982250b2
 IMPLEMENTATION_TREE=1f44d384408a996d5e64df8304eb336fbb9124f0
+FORMAT_FIX_HEAD=626ca5b2a0d0f7b8304bb36dd9901503e5911697
+FORMAT_FIX_TREE=d76d027582a0cdb7e6ebf7e4d738204e85f9acc8
 WORKTREE_CLEAN_BEFORE=YES
 WORKTREE_CLEAN_AFTER=YES
 ```
@@ -65,6 +67,8 @@ db115082f47ad122f6e108a14c0b1a01814b732c feat(persistence): add canonical durabl
 ab4287167196960c9a33bbe6703bfb927724eba9 feat(persistence): add exact-pair inspection
 9a04f14e9be9ac9f84d40cdb62ea5bcea696727f test(persistence): add canonical and P2-D inspection matrix
 90a3ad21a79d307d24e54ae12211135b982250b2 fix(persistence): reject UTF-8 BOM and bind envelope validation errors
+365f7da090c1e5319815688a773c9388ae97d91f docs(review): bind phase 2a evidence
+626ca5b2a0d0f7b8304bb36dd9901503e5911697 fix(persistence): apply biome format to exact-pair inspection
 ```
 
 `git diff --name-status 31cfe078c09a15d4906b56fb64731449ca1c598a...90a3ad21a79d307d24e54ae12211135b982250b2`:
@@ -111,7 +115,7 @@ LINT_RESULT=biome lint clean, 39 files
 
 FORMAT_CHECK_COMMAND=npm run format:check
 FORMAT_CHECK_EXIT=0
-FORMAT_CHECK_RESULT=biome format clean
+FORMAT_CHECK_RESULT=biome format failed on 90a3ad2 exact-pair-inspection wrapping; clean after 626ca5b
 
 TEST_COMMAND=npm test
 TEST_EXIT=0
