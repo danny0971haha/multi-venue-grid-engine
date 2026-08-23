@@ -231,8 +231,6 @@ node --import tsx --test test/simulator/p1-corrective-7.test.ts
 
 ## 13. Final SHA / tree
 
-Independent review must bind the exact final branch HEAD after this document is pushed.
-
 ```text
 BASE_SHA=5a58f3aa4585137e809decd19d4dc4be83045ead
 BASE_TREE=39a9edf58146d45e2c0848cd219cc239447a526d
@@ -240,18 +238,27 @@ IMPLEMENTATION_SHA=66567d9d20beb3031eee2b2069db61b288dc0d2e
 IMPLEMENTATION_TREE=fa90c58567512a749d6cb2c40fcab0b4931f7f4b
 TEST_SHA=924188385defc5d7770484c3f4413d2953932e9d
 TEST_TREE=3b3484c69e7ac22bbd275ff6e388ad8d14117efd
+DOCS_BIND_SHA=e60c935cd988629d225a4d91e9bfd7f0ffc7451f
+DOCS_BIND_TREE=c53e9bca46a4f026d48fc89d332329f5a8f29656
 ```
+
+The evidence commit that records these identities is the current review HEAD after this file is updated.
 
 ## 14. Exact branch-push CI evidence
 
 Corrective 6 CI placeholders are not valid evidence for this candidate.
 
+Branch-push CI on `e60c935cd988629d225a4d91e9bfd7f0ffc7451f`:
+
 ```text
-CI_RUN_ID=<branch-push run whose headSha equals FINAL_HEAD_SHA>
-CI_HEAD_SHA=<FINAL_HEAD_SHA>
-CI_CONCLUSION=<from that run>
+RUN_ID=32652963043
+RUN_URL=https://github.com/danny0971haha/multi-venue-grid-engine/actions/runs/32652963043
+HEAD_SHA=e60c935cd988629d225a4d91e9bfd7f0ffc7451f
 EVENT=push
+CONCLUSION=success
 ```
+
+A later evidence-only commit may move branch HEAD. Independent review must bind the exact final HEAD and the exact branch-push run whose `headSha` equals that HEAD. The PR body and handoff packet use that later run, not this bind-commit run.
 
 ## 15. Known limitations
 
