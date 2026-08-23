@@ -8,6 +8,19 @@ This contract defines the implementation sequence for the independent multi-venu
 
 No phase in this initial contract authorizes live exchange writes.
 
+**Independent-review status (narrowly additive, 2026-08-23):**
+
+```text
+GATE_0=PASS
+GATE_1=PASS
+ACCEPTED_PHASE_1_HEAD=31cfe078c09a15d4906b56fb64731449ca1c598a
+AUTHORIZED_CHECKPOINT=PHASE_2A_ONLY
+PHASE_2B_AUTHORIZED=NO
+LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
+```
+
+Authoritative Phase 2A rules are in `docs/PHASE_2A_CONTRACT.md`. This file is not otherwise revised.
+
 ## 1. Binding inputs
 
 Implementation must follow:
