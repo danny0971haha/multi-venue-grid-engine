@@ -1,12 +1,9 @@
-import { Buffer } from "node:buffer";
-import { readFile, readdir } from "node:fs/promises";
+import type { Buffer } from "node:buffer";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { DurableEnvelope } from "./durable-envelope.js";
-import {
-  parseAndValidateDurableEnvelope,
-  sha256HexBytes,
-} from "./durable-envelope.js";
+import { parseAndValidateDurableEnvelope, sha256HexBytes } from "./durable-envelope.js";
 
 export const REASON_CODE_CATALOG = [
   "EXACT_PAIR_PROVEN",
@@ -89,9 +86,7 @@ export function sortReasonCodes(codes: readonly string[]): string[] {
   });
 }
 
-export async function inspectExactPair(
-  request: ExactPairInspectRequest,
-): Promise<PairInspection> {
+export async function inspectExactPair(request: ExactPairInspectRequest): Promise<PairInspection> {
   const primaryPath = path.join(request.directory, `${request.stateName}.json`);
   const backupPath = path.join(request.directory, `${request.stateName}.json.bak`);
   const primary = await inspectCopy(primaryPath, "PRIMARY");
@@ -209,9 +204,12 @@ export function formatPairInspectionDiagnostic(inspection: PairInspection): stri
   });
 }
 
-function formatCopyDiagnostic(
-  copy: CopyInspection,
-): { status: string; rawSha256?: string; envelopeSha256?: string; reasonCodes?: string[] } {
+function formatCopyDiagnostic(copy: CopyInspection): {
+  status: string;
+  rawSha256?: string;
+  envelopeSha256?: string;
+  reasonCodes?: string[];
+} {
   if (copy.status === "VALID") {
     return {
       status: copy.status,
@@ -269,10 +267,7 @@ function classifyLineage(
   envelope: DurableEnvelope<unknown>,
   request: ExactPairInspectRequest,
 ): { status: PairInspection["lineageStatus"] } {
-  if (
-    "expectedGeneration" in request &&
-    request.expectedGeneration !== envelope.storeGeneration
-  ) {
+  if ("expectedGeneration" in request && request.expectedGeneration !== envelope.storeGeneration) {
     return { status: "MISMATCH" };
   }
   if (
