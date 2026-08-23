@@ -63,6 +63,9 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
   if (typeof snapshot.executionGap !== "boolean") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", "EXECUTION_GAP_INVALID");
   }
+  if (snapshot.executionConflict !== undefined && typeof snapshot.executionConflict !== "boolean") {
+    throw new SnapshotImportError("INVALID_SNAPSHOT", "EXECUTION_CONFLICT_INVALID");
+  }
   if (typeof snapshot.snapshotStale !== "boolean") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", "SNAPSHOT_STALE_INVALID");
   }

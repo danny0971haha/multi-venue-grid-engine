@@ -90,13 +90,17 @@ export type SimulatorInit = {
   quantity: DecimalString;
 };
 
+export type OwnedWorkingRiskIncreasing = {
+  exchangeOrderId: ExchangeOrderId;
+  logicalLevelId: GridLogicalLevelId | null;
+  side: "BUY" | "SELL";
+  price: DecimalString | null;
+  quantity: DecimalString;
+};
+
 export type PossibleExposure = {
   signedPosition: DecimalString;
-  ownedWorkingRiskIncreasing: Array<{
-    logicalLevelId: GridLogicalLevelId;
-    price: DecimalString;
-    quantity: DecimalString;
-  }>;
+  ownedWorkingRiskIncreasing: OwnedWorkingRiskIncreasing[];
   unknownSubmissions: Array<{
     intentId: IntentId;
     price: DecimalString | null;
@@ -140,6 +144,7 @@ export type SimulatorSnapshot = {
   entriesPlanned: boolean;
   riskIncreaseBlocked: boolean;
   executionGap: boolean;
+  executionConflict: boolean;
   snapshotStale: boolean;
   orderSeq: number;
   executionSeq: number;
@@ -190,6 +195,7 @@ export class DeterministicSimulator {
   private entriesPlanned = false;
   private riskIncreaseBlocked = false;
   private executionGap = false;
+  private executionConflict = false;
   private snapshotStale = false;
   private orderSeq = 0;
   private executionSeq = 0;
@@ -239,6 +245,7 @@ export class DeterministicSimulator {
     const simulator = new DeterministicSimulator(valid.init);
     simulator.entriesPlanned = valid.entriesPlanned;
     simulator.executionGap = valid.executionGap;
+    simulator.executionConflict = valid.executionConflict === true;
     simulator.snapshotStale = valid.snapshotStale;
     simulator.orderSeq = valid.orderSeq;
     simulator.executionSeq = valid.executionSeq;
@@ -542,16 +549,23 @@ export class DeterministicSimulator {
     quantity: DecimalString;
     price: DecimalString;
   }): ExecutionObservation | null {
+    const quantity = parseDecimalString(input.quantity);
+    const price = parseDecimalString(input.price);
+    if (input.executionId !== undefined) {
+      const existing = this.executions.get(input.executionId);
+      if (existing !== undefined) {
+        if (isExactExecutionReplay(existing, input.exchangeOrderId, quantity, price)) {
+          return existing;
+        }
+        this.executionConflict = true;
+        throw new Error("EXECUTION_ID_CONFLICT");
+      }
+    }
     const order = this.orders.get(input.exchangeOrderId);
     if (order === undefined) {
       throw new Error("UNKNOWN_EXCHANGE_ORDER");
     }
     const executionId = input.executionId ?? this.nextExecutionId();
-    if (this.executions.has(executionId)) {
-      return this.executions.get(executionId) ?? null;
-    }
-    const quantity = parseDecimalString(input.quantity);
-    const price = parseDecimalString(input.price);
     const execution: ExecutionObservation = {
       venue: this.init.venue,
       market: this.init.market,
@@ -819,13 +833,16 @@ export class DeterministicSimulator {
   }
 
   possibleExposure(): PossibleExposure {
-    const ownedWorkingRiskIncreasing = [...this.levels.values()]
-      .filter((level) => level.state === "ENTRY_WORKING" || level.state === "ENTRY_PARTIAL")
-      .map((level) => ({
-        logicalLevelId: level.logicalLevelId,
-        price: level.normalizedEntryPrice,
-        quantity: reservedWorkingQuantity(level),
-      }));
+    const ownedWorkingRiskIncreasing = [...this.orders.values()]
+      .filter((order) => this.isOwnedWorkingRiskIncreasing(order))
+      .map((order) => ({
+        exchangeOrderId: order.exchangeOrderId,
+        logicalLevelId: order.logicalLevelId,
+        side: order.side,
+        price: order.price,
+        quantity: order.remainingQuantity,
+      }))
+      .sort((left, right) => compareExchangeOrderId(left.exchangeOrderId, right.exchangeOrderId));
     const unknownSubmissions = [...this.unknownWrites.values()]
       .filter((write) => write.purpose === "GRID_ENTRY")
       .map((write) => ({
@@ -867,6 +884,7 @@ export class DeterministicSimulator {
       entriesPlanned: this.entriesPlanned,
       riskIncreaseBlocked: this.riskIncreaseBlocked,
       executionGap: this.executionGap,
+      executionConflict: this.executionConflict,
       snapshotStale: this.snapshotStale,
       orderSeq: this.orderSeq,
       executionSeq: this.executionSeq,
@@ -1073,8 +1091,24 @@ export class DeterministicSimulator {
     this.riskIncreaseBlocked = this.hasDerivedRiskBlockers();
   }
 
+  private isOwnedWorkingRiskIncreasing(order: InternalOrder): boolean {
+    if (!order.presentInOpenBook) {
+      return false;
+    }
+    if (this.classifyObserved(order) !== "OWNED") {
+      return false;
+    }
+    if (order.purpose !== "GRID_ENTRY" || order.reduceOnly) {
+      return false;
+    }
+    if (decimalCmp(order.remainingQuantity, "0") <= 0) {
+      return false;
+    }
+    return order.status === "WORKING" || order.status === "PARTIALLY_FILLED";
+  }
+
   private hasDerivedRiskBlockers(): boolean {
-    if (this.executionGap || this.snapshotStale) {
+    if (this.executionGap || this.executionConflict || this.snapshotStale) {
       return true;
     }
     if (this.unknownWrites.size > 0) {
@@ -1383,21 +1417,34 @@ export function requestFingerprint(venue: VenueId, market: MarketId, intent: Ord
   ].join("|");
 }
 
+function isExactExecutionReplay(
+  existing: ExecutionObservation,
+  exchangeOrderId: ExchangeOrderId,
+  quantity: DecimalString,
+  price: DecimalString,
+): boolean {
+  return (
+    existing.exchangeOrderId === exchangeOrderId &&
+    decimalCmp(existing.quantity, quantity) === 0 &&
+    decimalCmp(existing.price, price) === 0
+  );
+}
+
+function compareExchangeOrderId(left: ExchangeOrderId, right: ExchangeOrderId): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
 function nextSequence(current: string): string {
   if (!/^\d+$/.test(current)) {
     throw new Error("INVALID_MUTATION_SEQUENCE");
   }
   return (BigInt(current) + 1n).toString(10);
-}
-
-function reservedWorkingQuantity(level: LevelView): DecimalString {
-  if (level.remainingQuantity !== null) {
-    return level.remainingQuantity;
-  }
-  if (level.originalQuantity !== null) {
-    return level.originalQuantity;
-  }
-  throw new Error("MISSING_WORKING_QUANTITY");
 }
 
 function remainingAfter(original: DecimalString, executed: DecimalString): DecimalString {
