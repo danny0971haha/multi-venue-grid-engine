@@ -70,7 +70,7 @@ import {
   normalizePrice,
   normalizeQuantity,
 } from "../strategy/marketRules.js";
-import { assertValidSimulatorSnapshot } from "./snapshot.js";
+import { assertValidSimulatorSnapshot, isImportableSequenceCounter } from "./snapshot.js";
 
 export { SIMULATOR_SCHEMA_VERSION, SnapshotImportError } from "./snapshot.js";
 
@@ -627,8 +627,16 @@ export class DeterministicSimulator {
     if (input.executionId !== undefined) {
       executionId = input.executionId;
       const generatedSeq = parseGeneratedSequence(executionId, GENERATED_EXECUTION_PREFIX);
-      if (generatedSeq !== null && generatedSeq > nextExecutionSeq) {
-        nextExecutionSeq = generatedSeq;
+      if (generatedSeq !== null) {
+        this.assertCommittedSequenceImportable(
+          "execution",
+          generatedSeq,
+          executionId,
+          order.exchangeOrderId,
+        );
+        if (generatedSeq > nextExecutionSeq) {
+          nextExecutionSeq = generatedSeq;
+        }
       }
     } else {
       this.assertSequenceIncrementable("execution");
@@ -1560,13 +1568,27 @@ export class DeterministicSimulator {
 
   private assertSequenceIncrementable(kind: "order" | "execution"): void {
     const sequence = kind === "order" ? this.orderSeq : this.executionSeq;
-    if (canIncrementSequence(sequence)) {
+    this.assertCommittedSequenceImportable(
+      kind,
+      sequence + 1,
+      null,
+      `${kind}Seq:${String(sequence)}`,
+    );
+  }
+
+  private assertCommittedSequenceImportable(
+    kind: "order" | "execution",
+    committedSequence: number,
+    executionId: ExecutionId | null,
+    exchangeOrderId: ExchangeOrderId,
+  ): void {
+    if (isImportableSequenceCounter(committedSequence)) {
       return;
     }
     this.failIntegrity({
       code: kind === "order" ? "ORDER_SEQ_EXHAUSTED" : "EXECUTION_SEQ_EXHAUSTED",
-      executionId: null,
-      exchangeOrderId: `${kind}Seq:${String(sequence)}`,
+      executionId,
+      exchangeOrderId,
     });
   }
 
@@ -1655,10 +1677,6 @@ const GENERATED_EXECUTION_PREFIX = "sim-exec-";
 
 function formatGeneratedId(prefix: string, sequence: number): string {
   return `${prefix}${String(sequence).padStart(4, "0")}`;
-}
-
-function canIncrementSequence(sequence: number): boolean {
-  return Number.isSafeInteger(sequence) && sequence >= 0 && Number.isSafeInteger(sequence + 1);
 }
 
 function parseGeneratedSequence(id: string, prefix: string): number | null {

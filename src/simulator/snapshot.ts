@@ -787,11 +787,20 @@ function parseGeneratedSequence(id: string, prefix: string): number | null {
   return value;
 }
 
+export function isImportableSequenceCounter(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= 0 &&
+    Number.isSafeInteger(value + 1)
+  );
+}
+
 function assertSafeIncrementableInteger(value: unknown, path: "orderSeq" | "executionSeq"): void {
   if (typeof value !== "number") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", `${path}:NOT_NON_NEGATIVE_INTEGER`);
   }
-  if (!Number.isSafeInteger(value) || value < 0 || !Number.isSafeInteger(value + 1)) {
+  if (!isImportableSequenceCounter(value)) {
     throw new SnapshotImportError(
       path === "orderSeq" ? "ORDER_SEQ_UNSAFE" : "EXECUTION_SEQ_UNSAFE",
       `${path}:NOT_SAFE_INCREMENTABLE_INTEGER`,
