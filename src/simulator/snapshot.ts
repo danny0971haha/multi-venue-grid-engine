@@ -36,6 +36,13 @@ const EXECUTION_INTEGRITY_FAULT_CODES = new Set([
   "EXECUTION_OVERFILL",
   "EXECUTION_ID_COLLISION",
   "ORDER_ID_COLLISION",
+  "EXECUTION_ORDER_MISSING",
+  "EXECUTION_AUTHORITY_UNPROVEN",
+  "EXECUTION_STATE_TRANSITION_INVALID",
+  "EXECUTION_INVENTORY_CONFLICT",
+  "EXECUTION_EFFECT_CALCULATION_FAILURE",
+  "ORDER_SEQ_EXHAUSTED",
+  "EXECUTION_SEQ_EXHAUSTED",
 ]);
 const GENERATED_ORDER_PREFIX = "sim-ord-";
 const GENERATED_EXECUTION_PREFIX = "sim-exec-";
@@ -79,8 +86,8 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
   if (typeof snapshot.snapshotStale !== "boolean") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", "SNAPSHOT_STALE_INVALID");
   }
-  assertNonNegativeInteger(snapshot.orderSeq, "orderSeq");
-  assertNonNegativeInteger(snapshot.executionSeq, "executionSeq");
+  assertSafeIncrementableInteger(snapshot.orderSeq, "orderSeq");
+  assertSafeIncrementableInteger(snapshot.executionSeq, "executionSeq");
 
   const levels = asArray(snapshot.levels, "levels");
   const intents = asArray(snapshot.intents, "intents");
@@ -102,9 +109,9 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
     }
     intentIds.add(intentId);
     intentRecords.set(intentId, record);
-    assertCanonicalOrNull(record.price, `${path}.price`);
-    assertNonNegativeCanonical(record.quantity, `${path}.quantity`);
     assertCurrentScopeIntent(record, init, expectedScopeKey, path);
+    assertLimitPrice(record.price, record.type, `${path}.price`);
+    assertPositiveCanonical(record.quantity, `${path}.quantity`, "NON_POSITIVE_INTENT_QUANTITY");
   }
 
   const orderIds = new Set<string>();
@@ -118,10 +125,12 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
     }
     orderIds.add(exchangeOrderId);
     orderRecords.set(exchangeOrderId, record);
-    assertCanonicalOrNull(record.price, `${path}.price`);
-    const original = assertNonNegativeCanonical(
+    assertOneOf(record.type, ORDER_TYPES, `${path}.type`);
+    assertLimitPrice(record.price, record.type, `${path}.price`);
+    const original = assertPositiveCanonical(
       record.originalQuantity,
       `${path}.originalQuantity`,
+      "NON_POSITIVE_ORIGINAL_QUANTITY",
     );
     const executed = assertNonNegativeCanonical(
       record.executedQuantity,
@@ -143,7 +152,6 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
       throw new SnapshotImportError("QUANTITY_INVARIANT", "REMAINING_MISMATCH");
     }
     assertOneOf(record.side, SIDES, `${path}.side`);
-    assertOneOf(record.type, ORDER_TYPES, `${path}.type`);
     assertOneOf(record.purpose, INTENT_PURPOSES, `${path}.purpose`);
     if (record.ownership !== undefined) {
       assertOneOf(record.ownership, OWNERSHIPS, `${path}.ownership`);
@@ -176,8 +184,8 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
     }
     executionIds.add(executionId);
     executionRecords.set(executionId, record);
-    assertNonNegativeCanonical(record.price, `${path}.price`);
-    assertNonNegativeCanonical(record.quantity, `${path}.quantity`);
+    assertPositiveCanonical(record.price, `${path}.price`, "NON_POSITIVE_EXECUTION_PRICE");
+    assertPositiveCanonical(record.quantity, `${path}.quantity`, "NON_POSITIVE_EXECUTION_QUANTITY");
     assertCanonicalOrNull(record.feeAmount, `${path}.feeAmount`);
     const exchangeOrderId = requireString(record.exchangeOrderId, `${path}.exchangeOrderId`);
     if (!orderIds.has(exchangeOrderId)) {
@@ -748,7 +756,7 @@ function assertGeneratedSequenceNotBehind(
   prefix: string,
   code: string,
 ): void {
-  assertNonNegativeInteger(
+  assertSafeIncrementableInteger(
     sequence,
     prefix === GENERATED_ORDER_PREFIX ? "orderSeq" : "executionSeq",
   );
@@ -779,10 +787,35 @@ function parseGeneratedSequence(id: string, prefix: string): number | null {
   return value;
 }
 
-function assertNonNegativeInteger(value: unknown, path: string): void {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+function assertSafeIncrementableInteger(value: unknown, path: "orderSeq" | "executionSeq"): void {
+  if (typeof value !== "number") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", `${path}:NOT_NON_NEGATIVE_INTEGER`);
   }
+  if (!Number.isSafeInteger(value) || value < 0 || !Number.isSafeInteger(value + 1)) {
+    throw new SnapshotImportError(
+      path === "orderSeq" ? "ORDER_SEQ_UNSAFE" : "EXECUTION_SEQ_UNSAFE",
+      `${path}:NOT_SAFE_INCREMENTABLE_INTEGER`,
+    );
+  }
+}
+
+function assertLimitPrice(value: unknown, type: unknown, path: string): void {
+  if (type === "LIMIT") {
+    assertPositiveCanonical(value, path, "NON_POSITIVE_LIMIT_PRICE");
+    return;
+  }
+  if (value === null) {
+    return;
+  }
+  assertPositiveCanonical(value, path, "NON_POSITIVE_LIMIT_PRICE");
+}
+
+function assertPositiveCanonical(value: unknown, path: string, code: string): DecimalString {
+  const canonical = assertCanonical(value, path);
+  if (decimalCmp(canonical, "0") <= 0) {
+    throw new SnapshotImportError(code, `${path}:NOT_POSITIVE`);
+  }
+  return canonical;
 }
 
 function assertCanonical(value: unknown, path: string): DecimalString {
