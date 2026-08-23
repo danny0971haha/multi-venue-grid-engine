@@ -103,6 +103,7 @@ export function buildDurableEnvelope<T>(fields: DurableEnvelopeFields<T>): Built
   }
 
   const payloadCanonicalBytes = canonicalSerialize(fields.payload);
+  const detachedPayload = JSON.parse(payloadCanonicalBytes.toString("utf8")) as T;
   const payloadSha256 = sha256HexBytes(payloadCanonicalBytes);
   const envelopeHashInput = {
     schemaVersion: fields.schemaVersion,
@@ -111,11 +112,10 @@ export function buildDurableEnvelope<T>(fields: DurableEnvelopeFields<T>): Built
     storeGeneration: fields.storeGeneration,
     previousEnvelopeSha256: fields.previousEnvelopeSha256,
     payloadSha256,
-    payload: fields.payload,
+    payload: detachedPayload,
   };
   const envelopeHashInputBytes = canonicalSerialize(envelopeHashInput);
   const envelopeSha256 = sha256HexBytes(envelopeHashInputBytes);
-  const payload = JSON.parse(payloadCanonicalBytes.toString("utf8")) as T;
   const envelope: DurableEnvelope<T> = {
     schemaVersion: fields.schemaVersion,
     kind: fields.kind,
@@ -123,7 +123,7 @@ export function buildDurableEnvelope<T>(fields: DurableEnvelopeFields<T>): Built
     storeGeneration: fields.storeGeneration,
     previousEnvelopeSha256: fields.previousEnvelopeSha256,
     payloadSha256,
-    payload,
+    payload: detachedPayload,
     envelopeSha256,
   };
   return {
@@ -276,16 +276,22 @@ export function parseAndValidateDurableEnvelope(
 }
 
 function validateEnvelopeFields<T>(fields: DurableEnvelopeFields<T>): string | null {
+  if (typeof fields.schemaVersion !== "number" || !Number.isInteger(fields.schemaVersion)) {
+    return "UNSUPPORTED_SCHEMA";
+  }
   if (fields.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
     return "UNSUPPORTED_SCHEMA";
   }
-  if (!KIND_PATTERN.test(fields.kind)) {
+  if (typeof fields.kind !== "string" || !KIND_PATTERN.test(fields.kind)) {
     return "INVALID_KIND";
   }
-  if (!SCOPE_PATTERN.test(fields.scopeKey)) {
+  if (typeof fields.scopeKey !== "string" || !SCOPE_PATTERN.test(fields.scopeKey)) {
     return "INVALID_SCOPE";
   }
-  if (!GENERATION_PATTERN.test(fields.storeGeneration)) {
+  if (
+    typeof fields.storeGeneration !== "string" ||
+    !GENERATION_PATTERN.test(fields.storeGeneration)
+  ) {
     return "INVALID_GENERATION";
   }
   if (!previousHashMatchesGeneration(fields.storeGeneration, fields.previousEnvelopeSha256)) {
