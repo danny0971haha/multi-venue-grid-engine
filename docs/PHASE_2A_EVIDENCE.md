@@ -28,9 +28,15 @@ Corrective commits relative to the rejected candidate:
 8f1805c105d671ba9ef4b1abd7c76313e9dd21d8 fix(persistence): reject hidden and accessor canonical properties
 e34540c1451dfe64756c361656738ad087497a98 fix(persistence): build envelopes from a single detached payload snapshot
 d381422ca5959498154fb61265ed6f6f7a2aeb5b test(persistence): cover descriptor and single-snapshot adversarial cases
+b3137f1a6108683db81c3d555fc742c0a6812dda docs(review): bind Phase 2A Corrective 1 evidence
 ```
 
-Exact `FINAL_HEAD` / `FINAL_TREE` after this evidence commit, and exact branch-push CI, are recorded in the following `docs(review)` commit. This file does not leave CI fields as `PENDING`.
+```text
+EVIDENCE_BIND_HEAD=b3137f1a6108683db81c3d555fc742c0a6812dda
+EVIDENCE_BIND_TREE=9f13b3813f9dbde9b135300c2d88931d25b8a2dd
+```
+
+The SHA-recording commit that follows this edit becomes the pushed review HEAD. Independent review must bind that final HEAD and the branch-push run whose `headSha` equals it.
 
 ## 2. Toolchain
 
@@ -231,9 +237,22 @@ N/A Phase 2A
 
 ## 14. CI evidence
 
-This evidence-bind commit is recorded before the branch-push that produces GitHub Actions. Exact `CI_RUN_ID`, `CI_EVENT=push`, `CI_HEAD_SHA`, and `CI_CONCLUSION` for the final review HEAD are written in the subsequent `docs(review): record exact final SHA and exact branch-push CI` commit after that run exists. No field in this section is set to `PENDING`.
+Pinned-runtime proof is GitHub Actions on `ubuntu-latest` with `.node-version` (`v22.23.2` / npm `10.9.8`). Local `npm ci` EBADENGINE is not a pinned pass.
 
-Pinned-runtime `npm ci` authority is GitHub Actions (`node-version-file: .node-version`, required `v22.23.2` / `10.9.8`), not the local workstation.
+Branch-push CI for the evidence-bind commit:
+
+```text
+CI_RUN_ID=32656601169
+CI_RUN_URL=https://github.com/danny0971haha/multi-venue-grid-engine/actions/runs/32656601169
+CI_EVENT=push
+CI_HEAD_SHA=b3137f1a6108683db81c3d555fc742c0a6812dda
+CI_CONCLUSION=success
+CI_JOB=Clean install, static checks, tests, secret scan, and dry-run
+CI_JOB_CONCLUSION=success
+NPM_CI_PINNED_RUNTIME=PASS_ON_GITHUB_ACTIONS
+```
+
+The subsequent SHA-recording commit moves branch HEAD. Independent review must bind the exact final HEAD and the exact push run whose `headSha` equals that HEAD. This section does not use `PENDING`.
 
 ## 15. Unresolved risks
 
