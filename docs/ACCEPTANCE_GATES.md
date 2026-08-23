@@ -12,13 +12,14 @@ BLOCKED
 
 Green CI is necessary but never sufficient. No gate in this document authorizes live exchange writes.
 
-**Independent-review status (narrowly additive, 2026-08-23):**
+**Independent-review status (narrowly additive, 2026-08-24):**
 
 ```text
 GATE_0=PASS
 GATE_1=PASS
 GATE_2=NOT_REVIEWED
 PHASE_2A=REVIEW_CANDIDATE
+PHASE_2A_CORRECTIVE_1=REVIEW_CANDIDATE
 PHASE_2B_AUTHORIZED=NO
 ```
 

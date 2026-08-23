@@ -85,6 +85,33 @@ Project-owned deterministic JSON subset. This implementation does **not** claim 
 
 Own symbol keys and non-plain objects are rejected. Array holes and extra own properties on arrays are rejected.
 
+Own-property descriptors are the authority for this subset. Canonicalization uses `Object.getOwnPropertyDescriptors` and `Reflect.ownKeys` on that descriptor snapshot. `Object.keys()` alone is not a complete own-property set.
+
+For an accepted plain object:
+
+- prototype is `Object.prototype` or `null`;
+- no symbol own key;
+- every accepted string key is an own data property;
+- accessor descriptors (`get` or `set`) are rejected before invocation;
+- values are read from `descriptor.value` only;
+- non-enumerable string data properties are rejected;
+- dangerous keys remain rejected;
+- keys remain UTF-16 code-unit sorted;
+- canonicalization does not mutate the caller object;
+- nested objects use the same rules.
+
+For an accepted array:
+
+- prototype is exactly `Array.prototype`;
+- own keys are only `"length"` and canonical indices `"0"` through `String(length-1)`;
+- no symbols, extra string properties, non-enumerable extra properties, or holes;
+- each element index is an own enumerable data property;
+- accessor indices are rejected without calling the getter;
+- `length` has the normal array length descriptor (`writable: true`, `enumerable: false`, `configurable: false`, data value);
+- hidden metadata is not ignored.
+
+Arbitrary malicious `Proxy` traps are an unverified limitation, not a claimed hostile-object guarantee.
+
 ### 3.2 Stored-byte exact match
 
 When reading stored bytes:
@@ -156,6 +183,8 @@ fullEnvelopeBytes =
 ```
 
 Do not include `envelopeSha256` recursively in its own hash input.
+
+`buildDurableEnvelope` canonicalizes `fields.payload` exactly once, JSON-parses those canonical bytes into a detached snapshot, and uses that snapshot for envelope hash input, the returned envelope payload, and `fullEnvelopeBytes`. It does not observe the caller-owned payload again. Runtime scalar fields (`schemaVersion`, `kind`, `scopeKey`, `storeGeneration`, `previousEnvelopeSha256`) are type-checked before regex tests so values are not accepted by `RegExp` string coercion.
 
 ### 4.1 Field validation
 
