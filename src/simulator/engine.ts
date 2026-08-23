@@ -31,6 +31,7 @@ import {
 } from "../domain/ownership.js";
 
 export type { OrderAuthorityLink } from "../domain/ownership.js";
+
 import type {
   AccountSnapshot,
   CancelAck,
@@ -90,6 +91,29 @@ export type SimulatorInit = {
   quantity: DecimalString;
 };
 
+export type ExecutionIntegrityFaultCode =
+  | "NON_POSITIVE_EXECUTION_QUANTITY"
+  | "NON_POSITIVE_EXECUTION_PRICE"
+  | "EXECUTION_OVERFILL"
+  | "EXECUTION_ID_COLLISION"
+  | "ORDER_ID_COLLISION";
+
+export type ExecutionIntegrityFault = {
+  code: ExecutionIntegrityFaultCode;
+  executionId: string | null;
+  exchangeOrderId: string;
+};
+
+export class SimulatorIntegrityError extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super(code);
+    this.name = "SimulatorIntegrityError";
+    this.code = code;
+  }
+}
+
 export type OwnedWorkingRiskIncreasing = {
   exchangeOrderId: ExchangeOrderId;
   logicalLevelId: GridLogicalLevelId | null;
@@ -145,6 +169,7 @@ export type SimulatorSnapshot = {
   riskIncreaseBlocked: boolean;
   executionGap: boolean;
   executionConflict: boolean;
+  executionIntegrityFault: ExecutionIntegrityFault | null;
   snapshotStale: boolean;
   orderSeq: number;
   executionSeq: number;
@@ -196,6 +221,7 @@ export class DeterministicSimulator {
   private riskIncreaseBlocked = false;
   private executionGap = false;
   private executionConflict = false;
+  private executionIntegrityFault: ExecutionIntegrityFault | null = null;
   private snapshotStale = false;
   private orderSeq = 0;
   private executionSeq = 0;
@@ -246,6 +272,7 @@ export class DeterministicSimulator {
     simulator.entriesPlanned = valid.entriesPlanned;
     simulator.executionGap = valid.executionGap;
     simulator.executionConflict = valid.executionConflict === true;
+    simulator.executionIntegrityFault = valid.executionIntegrityFault ?? null;
     simulator.snapshotStale = valid.snapshotStale;
     simulator.orderSeq = valid.orderSeq;
     simulator.executionSeq = valid.executionSeq;
@@ -265,13 +292,13 @@ export class DeterministicSimulator {
       simulator.intents.set(intent.intentId, intent);
     }
     for (const order of valid.orders) {
-      simulator.orders.set(order.exchangeOrderId, { ...order });
+      simulator.insertOrder({ ...order });
     }
     for (const link of valid.authorityLinks) {
       simulator.authorityLinks.set(link.exchangeOrderId, { ...link });
     }
     for (const execution of valid.executions) {
-      simulator.executions.set(execution.executionId, execution);
+      simulator.insertExecution(execution);
     }
     for (const unknown of valid.unknownWrites) {
       simulator.unknownWrites.set(unknown.intentId, unknown);
@@ -348,6 +375,9 @@ export class DeterministicSimulator {
     if (this.isIntentTerminal(level, intent.purpose, intent.intentId)) {
       return { kind: "NOT_SENT", reason: "INTENT_TERMINAL" };
     }
+    if (outcome === "ACK") {
+      this.peekGeneratedOrderId();
+    }
     if (intent.purpose === "GRID_ENTRY") {
       this.setState(level, "ENTRY_SUBMITTING", "LOCAL");
     } else if (intent.purpose === "GRID_EXIT") {
@@ -415,7 +445,7 @@ export class DeterministicSimulator {
       anchorEpoch: intent.anchorEpoch,
       scopeKey: intent.scopeKey,
     };
-    this.orders.set(exchangeOrderId, order);
+    this.insertOrder(order);
     this.recordAuthority({
       source: "ACK",
       evidenceId: `ack:${exchangeOrderId}`,
@@ -452,6 +482,7 @@ export class DeterministicSimulator {
     if (this.unknownWrites.get(intentId) === undefined) {
       throw new Error("NO_UNKNOWN_WRITE_TO_DISCOVER");
     }
+    this.peekGeneratedOrderId();
     const levelId = this.requireLevelId(intent.logicalLevelId);
     const level = this.requireLevel(levelId);
     const exchangeOrderId = this.nextOrderId();
@@ -474,7 +505,7 @@ export class DeterministicSimulator {
       anchorEpoch: intent.anchorEpoch,
       scopeKey: intent.scopeKey,
     };
-    this.orders.set(exchangeOrderId, order);
+    this.insertOrder(order);
     this.recordAuthority({
       source: "AUTHORITATIVE_OBSERVATION",
       evidenceId: `obs:${exchangeOrderId}`,
@@ -510,7 +541,7 @@ export class DeterministicSimulator {
     const sourceIntentId = level.entryIntentId ?? level.exitIntentId;
     const sourceIntent = sourceIntentId === null ? undefined : this.intents.get(sourceIntentId);
     const clientOrderId = sourceIntent?.clientOrderId ?? `dup-${logicalLevelId}`;
-    this.orders.set(exchangeOrderId, {
+    this.insertOrder({
       exchangeOrderId,
       clientOrderId,
       intentId: sourceIntentId,
@@ -551,6 +582,20 @@ export class DeterministicSimulator {
   }): ExecutionObservation | null {
     const quantity = parseDecimalString(input.quantity);
     const price = parseDecimalString(input.price);
+    if (decimalCmp(quantity, "0") <= 0) {
+      this.failIntegrity({
+        code: "NON_POSITIVE_EXECUTION_QUANTITY",
+        executionId: input.executionId ?? null,
+        exchangeOrderId: input.exchangeOrderId,
+      });
+    }
+    if (decimalCmp(price, "0") <= 0) {
+      this.failIntegrity({
+        code: "NON_POSITIVE_EXECUTION_PRICE",
+        executionId: input.executionId ?? null,
+        exchangeOrderId: input.exchangeOrderId,
+      });
+    }
     if (input.executionId !== undefined) {
       const existing = this.executions.get(input.executionId);
       if (existing !== undefined) {
@@ -565,7 +610,46 @@ export class DeterministicSimulator {
     if (order === undefined) {
       throw new Error("UNKNOWN_EXCHANGE_ORDER");
     }
-    const executionId = input.executionId ?? this.nextExecutionId();
+
+    let executionId: ExecutionId;
+    let nextExecutionSeq = this.executionSeq;
+    if (input.executionId !== undefined) {
+      executionId = input.executionId;
+      const generatedSeq = parseGeneratedSequence(executionId, GENERATED_EXECUTION_PREFIX);
+      if (generatedSeq !== null && generatedSeq > nextExecutionSeq) {
+        nextExecutionSeq = generatedSeq;
+      }
+    } else {
+      const candidateSeq = this.executionSeq + 1;
+      executionId = formatGeneratedId(GENERATED_EXECUTION_PREFIX, candidateSeq);
+      if (this.executions.has(executionId)) {
+        this.failIntegrity({
+          code: "EXECUTION_ID_COLLISION",
+          executionId,
+          exchangeOrderId: order.exchangeOrderId,
+        });
+      }
+      nextExecutionSeq = candidateSeq;
+    }
+
+    const residual = decimalSub(order.originalQuantity, order.executedQuantity);
+    if (decimalCmp(quantity, residual) > 0) {
+      this.failIntegrity({
+        code: "EXECUTION_OVERFILL",
+        executionId,
+        exchangeOrderId: order.exchangeOrderId,
+      });
+    }
+
+    const nextExecutedQuantity = decimalAdd(order.executedQuantity, quantity);
+    const nextRemainingQuantity = remainingAfter(order.originalQuantity, nextExecutedQuantity);
+    const nextOrder: InternalOrder = {
+      ...order,
+      executedQuantity: nextExecutedQuantity,
+      remainingQuantity: nextRemainingQuantity,
+      status: decimalIsZero(nextRemainingQuantity) ? "FILLED" : "PARTIALLY_FILLED",
+      presentInOpenBook: decimalIsZero(nextRemainingQuantity) ? false : order.presentInOpenBook,
+    };
     const execution: ExecutionObservation = {
       venue: this.init.venue,
       market: this.init.market,
@@ -580,17 +664,19 @@ export class DeterministicSimulator {
       liquidity: "UNKNOWN",
       meta: this.meta("execution"),
     };
-    this.executions.set(executionId, execution);
-    order.executedQuantity = decimalAdd(order.executedQuantity, quantity);
-    order.remainingQuantity = remainingAfter(order.originalQuantity, order.executedQuantity);
-    if (decimalIsZero(order.remainingQuantity)) {
-      order.status = "FILLED";
-      order.presentInOpenBook = false;
-    } else {
-      order.status = "PARTIALLY_FILLED";
+    const computed = this.computeExecutionEffects(order, nextOrder, execution);
+    const nextPosition = this.nextPositionAfterFill(order.side, quantity);
+
+    this.insertExecution(execution);
+    this.commitOrderQuantities(order, nextOrder);
+    if (computed.nextLevel !== undefined) {
+      this.levels.set(computed.nextLevel.logicalLevelId, computed.nextLevel);
     }
-    this.applyExecutionToLevel(order, execution);
-    this.applyFillToPosition(order.side, quantity);
+    if (computed.nextExitIntent !== undefined) {
+      this.intents.set(computed.nextExitIntent.intentId, computed.nextExitIntent);
+    }
+    this.position = nextPosition;
+    this.executionSeq = nextExecutionSeq;
     return execution;
   }
 
@@ -715,7 +801,7 @@ export class DeterministicSimulator {
   injectForeignOrder(
     order: Omit<InternalOrder, "ownership" | "presentInOpenBook" | "intentId">,
   ): void {
-    this.orders.set(order.exchangeOrderId, {
+    this.insertOrder({
       ...order,
       intentId: null,
       ownership: "UNOWNED",
@@ -729,7 +815,7 @@ export class DeterministicSimulator {
     price: DecimalString,
     quantity: DecimalString,
   ): void {
-    this.orders.set(exchangeOrderId, {
+    this.insertOrder({
       exchangeOrderId,
       clientOrderId: null,
       intentId: null,
@@ -885,6 +971,7 @@ export class DeterministicSimulator {
       riskIncreaseBlocked: this.riskIncreaseBlocked,
       executionGap: this.executionGap,
       executionConflict: this.executionConflict,
+      executionIntegrityFault: this.executionIntegrityFault,
       snapshotStale: this.snapshotStale,
       orderSeq: this.orderSeq,
       executionSeq: this.executionSeq,
@@ -968,6 +1055,20 @@ export class DeterministicSimulator {
     reduceOnly: boolean;
     sequence: string;
   }): OrderIntent {
+    const intent = this.buildIntent(input);
+    this.intents.set(intent.intentId, intent);
+    return intent;
+  }
+
+  private buildIntent(input: {
+    logicalLevelId: GridLogicalLevelId;
+    purpose: IntentPurpose;
+    side: "BUY" | "SELL";
+    price: DecimalString;
+    quantity: DecimalString;
+    reduceOnly: boolean;
+    sequence: string;
+  }): OrderIntent {
     const intentId = makeIntentId({
       experimentId: this.init.experimentId,
       runId: this.init.runId,
@@ -977,7 +1078,7 @@ export class DeterministicSimulator {
       purpose: input.purpose,
       sequence: input.sequence,
     });
-    const intent: OrderIntent = {
+    return {
       intentId,
       experimentId: this.init.experimentId,
       runId: this.init.runId,
@@ -1001,81 +1102,119 @@ export class DeterministicSimulator {
       leaseGeneration: this.init.leaseGeneration,
       createdAt: this.init.createdAt,
     };
-    this.intents.set(intentId, intent);
-    return intent;
   }
 
-  private applyExecutionToLevel(order: InternalOrder, execution: ExecutionObservation): void {
+  private computeExecutionEffects(
+    order: InternalOrder,
+    nextOrder: InternalOrder,
+    execution: ExecutionObservation,
+  ): { nextLevel?: MutableLevel; nextExitIntent?: OrderIntent } {
     if (order.logicalLevelId === null) {
-      return;
+      return {};
     }
     const level = this.requireLevel(order.logicalLevelId);
-    level.executionIds.push(execution.executionId);
-    level.executedQuantity = order.executedQuantity;
-    level.remainingQuantity = order.remainingQuantity;
-    level.originalQuantity = order.originalQuantity;
-    level.weightedExecutionPrice = weightedPrice(
-      [...this.executions.values()].filter(
+    const nextLevel: MutableLevel = {
+      ...level,
+      executionIds: [...level.executionIds, execution.executionId],
+    };
+    nextLevel.executedQuantity = nextOrder.executedQuantity;
+    nextLevel.remainingQuantity = nextOrder.remainingQuantity;
+    nextLevel.originalQuantity = nextOrder.originalQuantity;
+    nextLevel.weightedExecutionPrice = weightedPrice([
+      ...[...this.executions.values()].filter(
         (item) => item.exchangeOrderId === order.exchangeOrderId,
       ),
-    );
-    this.applyInventory(level, order.purpose, execution.quantity);
-    if (order.purpose === "GRID_ENTRY") {
-      if (decimalIsZero(order.remainingQuantity)) {
-        this.markPurposeTerminal(level, "GRID_ENTRY");
-        this.setState(level, "POSITION_OPEN", "OBSERVATION");
-        this.ensureExitIntent(level);
-        level.workingExchangeOrderId = null;
-      } else {
-        this.setState(level, "ENTRY_PARTIAL", "OBSERVATION");
+      execution,
+    ]);
+    this.applyInventory(nextLevel, order.purpose, execution.quantity);
+    let nextExitIntent: OrderIntent | undefined;
+    const attachExitIfNeeded = (): void => {
+      const built = this.buildExitIntent(nextLevel);
+      if (built === undefined) {
+        return;
       }
-      return;
+      nextExitIntent = built.intent;
+      nextLevel.exitIntentId = built.intent.intentId;
+      nextLevel.exitMutationSequence = built.sequence;
+      nextLevel.exitIntentTerminal = false;
+    };
+    if (order.purpose === "GRID_ENTRY") {
+      if (decimalIsZero(nextOrder.remainingQuantity)) {
+        this.markPurposeTerminal(nextLevel, "GRID_ENTRY");
+        this.setState(nextLevel, "POSITION_OPEN", "OBSERVATION");
+        attachExitIfNeeded();
+        nextLevel.workingExchangeOrderId = null;
+      } else {
+        this.setState(nextLevel, "ENTRY_PARTIAL", "OBSERVATION");
+      }
+      return nextExitIntent === undefined ? { nextLevel } : { nextLevel, nextExitIntent };
     }
     if (order.purpose === "GRID_EXIT") {
-      if (decimalIsZero(order.remainingQuantity)) {
-        this.markPurposeTerminal(level, "GRID_EXIT");
-        level.workingExchangeOrderId = null;
-        if (decimalIsZero(level.openInventory)) {
-          this.setState(level, "IDLE", "OBSERVATION");
+      if (decimalIsZero(nextOrder.remainingQuantity)) {
+        this.markPurposeTerminal(nextLevel, "GRID_EXIT");
+        nextLevel.workingExchangeOrderId = null;
+        if (decimalIsZero(nextLevel.openInventory)) {
+          this.setState(nextLevel, "IDLE", "OBSERVATION");
         } else {
-          this.setState(level, "POSITION_OPEN", "OBSERVATION");
-          this.ensureExitIntent(level);
+          this.setState(nextLevel, "POSITION_OPEN", "OBSERVATION");
+          attachExitIfNeeded();
         }
       } else {
-        this.setState(level, "EXIT_PARTIAL", "OBSERVATION");
+        this.setState(nextLevel, "EXIT_PARTIAL", "OBSERVATION");
       }
     }
+    return nextExitIntent === undefined ? { nextLevel } : { nextLevel, nextExitIntent };
+  }
+
+  private buildExitIntent(
+    level: MutableLevel,
+  ): { intent: OrderIntent; sequence: string } | undefined {
+    if (level.exitIntentId !== null && !level.exitIntentTerminal) {
+      return undefined;
+    }
+    if (decimalIsZero(level.openInventory)) {
+      return undefined;
+    }
+    const sequence = nextSequence(level.exitMutationSequence);
+    return {
+      sequence,
+      intent: this.buildIntent({
+        logicalLevelId: level.logicalLevelId,
+        purpose: "GRID_EXIT",
+        side: oppositeSide(level.logicalLevelId),
+        price: level.normalizedExitPrice,
+        quantity: level.openInventory,
+        reduceOnly: true,
+        sequence,
+      }),
+    };
   }
 
   private ensureExitIntent(level: MutableLevel): void {
-    if (level.exitIntentId !== null && !level.exitIntentTerminal) {
+    const built = this.buildExitIntent(level);
+    if (built === undefined) {
       return;
     }
-    if (decimalIsZero(level.openInventory)) {
-      return;
-    }
-    const sequence = nextSequence(level.exitMutationSequence);
-    const intent = this.createIntent({
-      logicalLevelId: level.logicalLevelId,
-      purpose: "GRID_EXIT",
-      side: oppositeSide(level.logicalLevelId),
-      price: level.normalizedExitPrice,
-      quantity: level.openInventory,
-      reduceOnly: true,
-      sequence,
-    });
-    level.exitIntentId = intent.intentId;
-    level.exitMutationSequence = sequence;
+    this.intents.set(built.intent.intentId, built.intent);
+    level.exitIntentId = built.intent.intentId;
+    level.exitMutationSequence = built.sequence;
     level.exitIntentTerminal = false;
   }
 
-  private applyFillToPosition(side: "BUY" | "SELL", quantity: DecimalString): void {
+  private nextPositionAfterFill(side: "BUY" | "SELL", quantity: DecimalString): PositionSnapshot {
     const delta = side === "BUY" ? quantity : decimalMul(quantity, "-1");
-    this.position = {
+    return {
       ...this.position,
       quantity: decimalAdd(this.position.quantity, delta),
       meta: this.meta("position"),
     };
+  }
+
+  private commitOrderQuantities(order: InternalOrder, nextOrder: InternalOrder): void {
+    order.executedQuantity = nextOrder.executedQuantity;
+    order.remainingQuantity = nextOrder.remainingQuantity;
+    order.status = nextOrder.status;
+    order.presentInOpenBook = nextOrder.presentInOpenBook;
   }
 
   private setState(
@@ -1108,7 +1247,12 @@ export class DeterministicSimulator {
   }
 
   private hasDerivedRiskBlockers(): boolean {
-    if (this.executionGap || this.executionConflict || this.snapshotStale) {
+    if (
+      this.executionGap ||
+      this.executionConflict ||
+      this.executionIntegrityFault !== null ||
+      this.snapshotStale
+    ) {
       return true;
     }
     if (this.unknownWrites.size > 0) {
@@ -1371,13 +1515,59 @@ export class DeterministicSimulator {
   }
 
   private nextOrderId(): ExchangeOrderId {
+    const exchangeOrderId = this.peekGeneratedOrderId();
     this.orderSeq += 1;
-    return `sim-ord-${String(this.orderSeq).padStart(4, "0")}`;
+    return exchangeOrderId;
   }
 
-  private nextExecutionId(): ExecutionId {
-    this.executionSeq += 1;
-    return `sim-exec-${String(this.executionSeq).padStart(4, "0")}`;
+  private peekGeneratedOrderId(): ExchangeOrderId {
+    const exchangeOrderId = formatGeneratedId(GENERATED_ORDER_PREFIX, this.orderSeq + 1);
+    if (this.orders.has(exchangeOrderId)) {
+      this.failIntegrity({
+        code: "ORDER_ID_COLLISION",
+        executionId: null,
+        exchangeOrderId,
+      });
+    }
+    return exchangeOrderId;
+  }
+
+  private insertOrder(order: InternalOrder): void {
+    if (this.orders.has(order.exchangeOrderId)) {
+      this.failIntegrity({
+        code: "ORDER_ID_COLLISION",
+        executionId: null,
+        exchangeOrderId: order.exchangeOrderId,
+      });
+    }
+    this.orders.set(order.exchangeOrderId, order);
+  }
+
+  private insertExecution(execution: ExecutionObservation): void {
+    if (this.executions.has(execution.executionId)) {
+      this.failIntegrity({
+        code: "EXECUTION_ID_COLLISION",
+        executionId: execution.executionId,
+        exchangeOrderId: execution.exchangeOrderId,
+      });
+    }
+    this.executions.set(execution.executionId, execution);
+  }
+
+  private recordIntegrityFault(fault: ExecutionIntegrityFault): void {
+    if (this.executionIntegrityFault !== null) {
+      return;
+    }
+    this.executionIntegrityFault = {
+      code: fault.code,
+      executionId: fault.executionId,
+      exchangeOrderId: fault.exchangeOrderId,
+    };
+  }
+
+  private failIntegrity(fault: ExecutionIntegrityFault): never {
+    this.recordIntegrityFault(fault);
+    throw new SimulatorIntegrityError(fault.code);
   }
 
   private meta(source: string): ObservationMeta {
@@ -1392,6 +1582,28 @@ export class DeterministicSimulator {
       sequence: null,
     };
   }
+}
+
+const GENERATED_ORDER_PREFIX = "sim-ord-";
+const GENERATED_EXECUTION_PREFIX = "sim-exec-";
+
+function formatGeneratedId(prefix: string, sequence: number): string {
+  return `${prefix}${String(sequence).padStart(4, "0")}`;
+}
+
+function parseGeneratedSequence(id: string, prefix: string): number | null {
+  if (!id.startsWith(prefix)) {
+    return null;
+  }
+  const digits = id.slice(prefix.length);
+  if (!/^\d+$/.test(digits)) {
+    return null;
+  }
+  const value = Number(digits);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    return null;
+  }
+  return value;
 }
 
 function requireClientOrderId(clientOrderId: ClientOrderId | null): ClientOrderId {

@@ -30,6 +30,15 @@ const TIME_IN_FORCES = new Set(["GTC", "IOC", "FOK", "POST_ONLY"]);
 const OWNERSHIPS = new Set(["OWNED", "UNOWNED", "AMBIGUOUS"]);
 
 const AUTHORITY_SOURCES = new Set(["ACK", "AUTHORITATIVE_OBSERVATION"]);
+const EXECUTION_INTEGRITY_FAULT_CODES = new Set([
+  "NON_POSITIVE_EXECUTION_QUANTITY",
+  "NON_POSITIVE_EXECUTION_PRICE",
+  "EXECUTION_OVERFILL",
+  "EXECUTION_ID_COLLISION",
+  "ORDER_ID_COLLISION",
+]);
+const GENERATED_ORDER_PREFIX = "sim-ord-";
+const GENERATED_EXECUTION_PREFIX = "sim-exec-";
 
 export const SIMULATOR_SCHEMA_VERSION = "phase1-simulator-2" as const;
 
@@ -66,6 +75,7 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
   if (snapshot.executionConflict !== undefined && typeof snapshot.executionConflict !== "boolean") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", "EXECUTION_CONFLICT_INVALID");
   }
+  assertExecutionIntegrityFault(snapshot.executionIntegrityFault);
   if (typeof snapshot.snapshotStale !== "boolean") {
     throw new SnapshotImportError("INVALID_SNAPSHOT", "SNAPSHOT_STALE_INVALID");
   }
@@ -308,6 +318,18 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
 
   reconcileOrderExecutions(orderRecords, executionRecords);
   reconcileSignedPosition(asRecord(snapshot.position, "position"), levels);
+  assertGeneratedSequenceNotBehind(
+    snapshot.orderSeq,
+    orderIds,
+    GENERATED_ORDER_PREFIX,
+    "ORDER_SEQ_BEHIND_IDENTITIES",
+  );
+  assertGeneratedSequenceNotBehind(
+    snapshot.executionSeq,
+    executionIds,
+    GENERATED_EXECUTION_PREFIX,
+    "EXECUTION_SEQ_BEHIND_IDENTITIES",
+  );
 
   return value as SimulatorSnapshot;
 }
@@ -701,6 +723,58 @@ function requireString(value: unknown, path: string): string {
 function requireSequence(value: unknown, path: string): string {
   if (typeof value !== "string" || !/^\d+$/.test(value)) {
     throw new SnapshotImportError("MISSING_MUTATION_SEQUENCE", `${path}:INVALID_SEQUENCE`);
+  }
+  return value;
+}
+
+function assertExecutionIntegrityFault(value: unknown): void {
+  if (value === undefined || value === null) {
+    return;
+  }
+  const record = asRecord(value, "executionIntegrityFault");
+  const code = requireString(record.code, "executionIntegrityFault.code");
+  if (!EXECUTION_INTEGRITY_FAULT_CODES.has(code)) {
+    throw new SnapshotImportError("MALFORMED_EXECUTION_INTEGRITY_FAULT", "UNKNOWN_FAULT_CODE");
+  }
+  if (record.executionId !== null) {
+    requireString(record.executionId, "executionIntegrityFault.executionId");
+  }
+  requireString(record.exchangeOrderId, "executionIntegrityFault.exchangeOrderId");
+}
+
+function assertGeneratedSequenceNotBehind(
+  sequence: unknown,
+  identities: Set<string>,
+  prefix: string,
+  code: string,
+): void {
+  assertNonNegativeInteger(
+    sequence,
+    prefix === GENERATED_ORDER_PREFIX ? "orderSeq" : "executionSeq",
+  );
+  let maxGenerated = 0;
+  for (const identity of identities) {
+    const parsed = parseGeneratedSequence(identity, prefix);
+    if (parsed !== null && parsed > maxGenerated) {
+      maxGenerated = parsed;
+    }
+  }
+  if (typeof sequence === "number" && sequence < maxGenerated) {
+    throw new SnapshotImportError(code, `${prefix}COUNTER_BEHIND`);
+  }
+}
+
+function parseGeneratedSequence(id: string, prefix: string): number | null {
+  if (!id.startsWith(prefix)) {
+    return null;
+  }
+  const digits = id.slice(prefix.length);
+  if (!/^\d+$/.test(digits)) {
+    return null;
+  }
+  const value = Number(digits);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    return null;
   }
   return value;
 }
