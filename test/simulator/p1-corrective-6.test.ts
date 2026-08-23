@@ -544,19 +544,22 @@ test("C6-13 sequences that cannot be incremented safely are rejected or exhaust 
   const orderRuntime = DeterministicSimulator.create(testInit());
   seedOwnedB1(orderRuntime);
   const nearMaxOrder = orderRuntime.exportSnapshot();
-  nearMaxOrder.orderSeq = Number.MAX_SAFE_INTEGER - 1;
+  nearMaxOrder.orderSeq = Number.MAX_SAFE_INTEGER - 2;
   const orderNear = DeterministicSimulator.fromSnapshot(nearMaxOrder);
   const b2 = plannedEntry(orderNear, "B2");
   const b2OrderId = ackPlace(orderNear, b2.intentId);
-  assert.equal(orderNear.exportSnapshot().orderSeq, Number.MAX_SAFE_INTEGER);
+  assert.equal(orderNear.exportSnapshot().orderSeq, Number.MAX_SAFE_INTEGER - 1);
   assert.ok(b2OrderId.startsWith("sim-ord-"));
+  const orderExported = orderNear.exportSnapshot();
+  const orderRestored = DeterministicSimulator.fromSnapshot(orderExported);
+  assert.deepEqual(orderRestored.exportSnapshot(), orderExported);
   const b3 = plannedEntry(orderNear, "B3");
   const { after } = assertRejectedWithoutTradingMutation(
     orderNear,
     () => orderNear.submit(b3.intentId, "ACK"),
     "ORDER_SEQ_EXHAUSTED",
   );
-  assert.equal(after.orderSeq, Number.MAX_SAFE_INTEGER);
+  assert.equal(after.orderSeq, Number.MAX_SAFE_INTEGER - 1);
   assert.equal(orderNear.level("B3").state, "IDLE");
   assert.equal(after.executionIntegrityFault?.code, "ORDER_SEQ_EXHAUSTED");
   assert.equal(orderNear.canIncreaseRisk(), false);
@@ -564,7 +567,7 @@ test("C6-13 sequences that cannot be incremented safely are rejected or exhaust 
   const executionRuntime = DeterministicSimulator.create(testInit());
   const { primaryOrderId } = seedOwnedB1(executionRuntime);
   const nearMaxExecution = executionRuntime.exportSnapshot();
-  nearMaxExecution.executionSeq = Number.MAX_SAFE_INTEGER - 1;
+  nearMaxExecution.executionSeq = Number.MAX_SAFE_INTEGER - 2;
   const executionNear = DeterministicSimulator.fromSnapshot(nearMaxExecution);
   const first = executionNear.applyExecution({
     exchangeOrderId: primaryOrderId,
@@ -572,7 +575,10 @@ test("C6-13 sequences that cannot be incremented safely are rejected or exhaust 
     price: "99.4",
   });
   assert.ok(first);
-  assert.equal(executionNear.exportSnapshot().executionSeq, Number.MAX_SAFE_INTEGER);
+  assert.equal(executionNear.exportSnapshot().executionSeq, Number.MAX_SAFE_INTEGER - 1);
+  const executionExported = executionNear.exportSnapshot();
+  const executionRestored = DeterministicSimulator.fromSnapshot(executionExported);
+  assert.deepEqual(executionRestored.exportSnapshot(), executionExported);
   assertRejectedWithoutTradingMutation(
     executionNear,
     () =>
@@ -583,7 +589,7 @@ test("C6-13 sequences that cannot be incremented safely are rejected or exhaust 
       }),
     "EXECUTION_SEQ_EXHAUSTED",
   );
-  assert.equal(executionNear.exportSnapshot().executionSeq, Number.MAX_SAFE_INTEGER);
+  assert.equal(executionNear.exportSnapshot().executionSeq, Number.MAX_SAFE_INTEGER - 1);
   assert.equal(
     executionNear.exportSnapshot().executionIntegrityFault?.code,
     "EXECUTION_SEQ_EXHAUSTED",
