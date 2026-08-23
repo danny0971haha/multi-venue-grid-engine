@@ -2,6 +2,9 @@ import { Buffer } from "node:buffer";
 
 const DANGEROUS_OBJECT_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
+// Own-property descriptors are the authority. Object.keys() is not a complete own-property set.
+// Arbitrary malicious Proxy traps are an unverified limitation, not a hostile-object guarantee.
+
 export class CanonicalJsonError extends Error {
   readonly reasonCode: string;
 
@@ -70,23 +73,87 @@ function serializeNumber(value: number): string {
   return String(value);
 }
 
+function isAccessorDescriptor(descriptor: PropertyDescriptor): boolean {
+  return Object.hasOwn(descriptor, "get") || Object.hasOwn(descriptor, "set");
+}
+
+function descriptorValue(descriptor: PropertyDescriptor | undefined): unknown {
+  if (descriptor === undefined) {
+    throw new CanonicalJsonError("NON_PLAIN_OBJECT");
+  }
+  if (isAccessorDescriptor(descriptor) || !Object.hasOwn(descriptor, "value")) {
+    throw new CanonicalJsonError("ACCESSOR_PROPERTY");
+  }
+  return descriptor.value;
+}
+
+function isCanonicalArrayIndexKey(key: string, length: number): boolean {
+  if (!/^(?:0|[1-9]\d*)$/.test(key)) {
+    return false;
+  }
+  const index = Number(key);
+  return index < length && String(index) === key;
+}
+
 function serializeArray(value: unknown[], seen: WeakSet<object>): string {
   if (Object.getPrototypeOf(value) !== Array.prototype) {
     throw new CanonicalJsonError("NON_PLAIN_OBJECT");
   }
 
-  for (const key of Object.keys(value)) {
-    if (!/^(?:0|[1-9]\d*)$/.test(key)) {
-      throw new CanonicalJsonError("NON_PLAIN_OBJECT");
+  const descriptors = Object.getOwnPropertyDescriptors(value) as Record<
+    string,
+    PropertyDescriptor | undefined
+  >;
+  const lengthDescriptor = descriptors.length;
+  if (lengthDescriptor === undefined) {
+    throw new CanonicalJsonError("NON_PLAIN_OBJECT");
+  }
+  if (isAccessorDescriptor(lengthDescriptor) || !Object.hasOwn(lengthDescriptor, "value")) {
+    throw new CanonicalJsonError("ACCESSOR_PROPERTY");
+  }
+  if (
+    lengthDescriptor.writable !== true ||
+    lengthDescriptor.enumerable !== false ||
+    lengthDescriptor.configurable !== false
+  ) {
+    throw new CanonicalJsonError("NON_PLAIN_OBJECT");
+  }
+  const length = lengthDescriptor.value;
+  if (
+    typeof length !== "number" ||
+    Object.is(length, -0) ||
+    !Number.isSafeInteger(length) ||
+    length < 0
+  ) {
+    throw new CanonicalJsonError("NON_PLAIN_OBJECT");
+  }
+
+  const ownKeys = Reflect.ownKeys(descriptors);
+  const indexValues = new Map<string, unknown>();
+  for (const key of ownKeys) {
+    if (typeof key === "symbol") {
+      throw new CanonicalJsonError("SYMBOL_VALUE");
     }
+    if (key === "length") {
+      continue;
+    }
+    if (!isCanonicalArrayIndexKey(key, length)) {
+      throw new CanonicalJsonError("EXTRA_ARRAY_PROPERTY");
+    }
+    const descriptor = Reflect.get(descriptors, key) as PropertyDescriptor | undefined;
+    const element = descriptorValue(descriptor);
+    if (descriptor?.enumerable !== true) {
+      throw new CanonicalJsonError("NON_ENUMERABLE_PROPERTY");
+    }
+    indexValues.set(key, element);
+  }
+  if (indexValues.size !== length) {
+    throw new CanonicalJsonError("SPARSE_ARRAY");
   }
 
   const parts: string[] = [];
-  for (let index = 0; index < value.length; index += 1) {
-    if (!Object.hasOwn(value, index)) {
-      throw new CanonicalJsonError("SPARSE_ARRAY");
-    }
-    parts.push(serializeValue(value[index], seen));
+  for (let index = 0; index < length; index += 1) {
+    parts.push(serializeValue(indexValues.get(String(index)), seen));
   }
   return `[${parts.join(",")}]`;
 }
@@ -103,22 +170,29 @@ function serializeObject(value: object, seen: WeakSet<object>): string {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new CanonicalJsonError("NON_PLAIN_OBJECT");
   }
-  if (Object.getOwnPropertySymbols(value).length > 0) {
-    throw new CanonicalJsonError("SYMBOL_VALUE");
-  }
 
-  const keys = Object.keys(value);
-  for (const key of keys) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const ownKeys = Reflect.ownKeys(descriptors);
+  const collected: Array<[string, unknown]> = [];
+  for (const key of ownKeys) {
+    if (typeof key === "symbol") {
+      throw new CanonicalJsonError("SYMBOL_VALUE");
+    }
+    const descriptor = Reflect.get(descriptors, key) as PropertyDescriptor | undefined;
+    const propertyValue = descriptorValue(descriptor);
     if (DANGEROUS_OBJECT_KEYS.has(key)) {
       throw new CanonicalJsonError("DANGEROUS_OBJECT_KEY");
     }
+    if (descriptor?.enumerable !== true) {
+      throw new CanonicalJsonError("NON_ENUMERABLE_PROPERTY");
+    }
+    collected.push([key, propertyValue]);
   }
-  keys.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  collected.sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0));
 
-  const record = value as Record<string, unknown>;
   const parts: string[] = [];
-  for (const key of keys) {
-    parts.push(`${JSON.stringify(key)}:${serializeValue(record[key], seen)}`);
+  for (const [key, propertyValue] of collected) {
+    parts.push(`${JSON.stringify(key)}:${serializeValue(propertyValue, seen)}`);
   }
   return `{${parts.join(",")}}`;
 }
