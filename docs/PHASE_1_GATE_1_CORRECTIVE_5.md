@@ -216,18 +216,24 @@ node --import tsx --test test/simulator/p1-corrective-5.test.ts
 BASE_SHA=bee50ec5e9b5b66b358b3a05f5124fee1988b00c
 IMPLEMENTATION_SHA=76e40fabe470189a2938a953178856ca0310cb3f
 IMPLEMENTATION_TREE_SHA=abe63b7e2d2dfb6a65f7070cc70da586037b3902
-HEAD_SHA=<filled after docs commit>
-TREE_SHA=<filled after docs commit>
+DOCS_BIND_SHA=7c6d56181101eb363779c28ab2b61e9b17241080
+DOCS_BIND_TREE_SHA=a34e26642ac1a9b1a8cee93b4ff106d56ddfe46b
 ```
+
+The evidence commit that records these identities is the current review HEAD after this file is updated.
 
 ## 10. Exact branch-push CI evidence
 
+Branch-push CI on `7c6d56181101eb363779c28ab2b61e9b17241080`:
+
 ```text
-RUN_ID=<filled after branch-push>
-RUN_URL=<filled after branch-push>
-HEAD_SHA=<must equal final HEAD>
-CONCLUSION=<success|failure>
+RUN_ID=32631213196
+RUN_URL=https://github.com/danny0971haha/multi-venue-grid-engine/actions/runs/32631213196
+HEAD_SHA=7c6d56181101eb363779c28ab2b61e9b17241080
+CONCLUSION=success
 ```
+
+A later evidence-only commit may move branch HEAD. Independent review must bind the exact final HEAD and the exact branch-push run whose `headSha` equals that HEAD.
 
 ## 11. Known limitations
 
