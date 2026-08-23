@@ -139,6 +139,9 @@ export function parseAndValidateDurableEnvelope(
 ): EnvelopeParseSuccess<unknown> | EnvelopeParseFailure {
   const bytes = Buffer.isBuffer(rawBytes) ? rawBytes : Buffer.from(rawBytes);
   const reasonCodes: string[] = [];
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return fail(["NON_CANONICAL_BYTES"]);
+  }
   const text = decodeUtf8Fatal(bytes);
   if (text === null) {
     return fail(["MALFORMED_JSON"]);
@@ -172,7 +175,10 @@ export function parseAndValidateDurableEnvelope(
   if (typeof parsed.scopeKey !== "string" || !SCOPE_PATTERN.test(parsed.scopeKey)) {
     reasonCodes.push("INVALID_SCOPE");
   }
-  if (typeof parsed.storeGeneration !== "string" || !GENERATION_PATTERN.test(parsed.storeGeneration)) {
+  if (
+    typeof parsed.storeGeneration !== "string" ||
+    !GENERATION_PATTERN.test(parsed.storeGeneration)
+  ) {
     reasonCodes.push("INVALID_GENERATION");
   }
   if (!previousHashMatchesGeneration(parsed.storeGeneration, parsed.previousEnvelopeSha256)) {
@@ -181,7 +187,10 @@ export function parseAndValidateDurableEnvelope(
   if (typeof parsed.payloadSha256 !== "string" || !SHA256_HEX_PATTERN.test(parsed.payloadSha256)) {
     reasonCodes.push("PAYLOAD_HASH_MISMATCH");
   }
-  if (typeof parsed.envelopeSha256 !== "string" || !SHA256_HEX_PATTERN.test(parsed.envelopeSha256)) {
+  if (
+    typeof parsed.envelopeSha256 !== "string" ||
+    !SHA256_HEX_PATTERN.test(parsed.envelopeSha256)
+  ) {
     reasonCodes.push("ENVELOPE_HASH_MISMATCH");
   }
   if (!Object.hasOwn(parsed, "payload")) {
@@ -295,7 +304,9 @@ function previousHashMatchesGeneration(
   if (storeGeneration === "1") {
     return previousEnvelopeSha256 === null;
   }
-  return typeof previousEnvelopeSha256 === "string" && SHA256_HEX_PATTERN.test(previousEnvelopeSha256);
+  return (
+    typeof previousEnvelopeSha256 === "string" && SHA256_HEX_PATTERN.test(previousEnvelopeSha256)
+  );
 }
 
 function decodeUtf8Fatal(bytes: Buffer): string | null {

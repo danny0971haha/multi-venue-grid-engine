@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import {
-  CanonicalJsonError,
-  canonicalSerializeToUtf8,
-} from "../../src/persistence/canonical-json.js";
+import { canonicalSerializeToUtf8 } from "../../src/persistence/canonical-json.js";
 import {
   buildDurableEnvelope,
+  EnvelopeValidationError,
   parseAndValidateDurableEnvelope,
 } from "../../src/persistence/durable-envelope.js";
 import {
@@ -156,7 +154,7 @@ test("2A-C13 generation 1 with non-null previous hash is rejected", () => {
     });
     assert.fail("expected rejection");
   } catch (error) {
-    assert.ok(error instanceof CanonicalJsonError);
+    assert.ok(error instanceof EnvelopeValidationError);
     assert.match(String(error), /INVALID_PREVIOUS_HASH/);
   }
 });

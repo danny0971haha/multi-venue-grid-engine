@@ -386,7 +386,9 @@ test("2A-C17 reason-code ordering is deterministic", async () => {
     await writeCopy(directory, `${STATE_NAME}.json`, Buffer.from("{primary", "utf8"));
     const inspection = await inspectExactPair(inspectOptions(directory));
     assert.deepEqual(inspection.reasonCodes, sortReasonCodes(inspection.reasonCodes));
-    const catalogIndex = new Map(REASON_CODE_CATALOG.map((code, index) => [code, index]));
+    const catalogIndex = new Map<string, number>(
+      REASON_CODE_CATALOG.map((code, index) => [code, index]),
+    );
     for (let index = 1; index < inspection.reasonCodes.length; index += 1) {
       const previous = inspection.reasonCodes[index - 1];
       const current = inspection.reasonCodes[index];
