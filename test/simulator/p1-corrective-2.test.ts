@@ -105,7 +105,10 @@ test("D2 forged imported ownership cannot enter knownExchangeOrderIds or duplica
   assert.equal(plan.survivorExchangeOrderId, ownedOrderId);
   const refused = restored.requestCancel("forged-unlinked", "ACK");
   assert.equal(refused.kind, "NOT_SENT");
-  assert.equal(refused.kind === "NOT_SENT" ? refused.reason : "", "REFUSES_UNOWNED_CANCEL");
+  assert.equal(
+    refused.kind === "NOT_SENT" ? refused.reason : "",
+    "REFUSES_UNPROVEN_CANCEL_AUTHORITY",
+  );
 });
 
 test("D3 legitimate ACK-linked owned order remains OWNED after export/import", () => {

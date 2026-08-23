@@ -462,11 +462,11 @@ test("C12 export -> import -> export preserves canonical financial bytes and sch
     price: "97.0",
   });
   const first = simulator.exportSnapshot();
-  assert.equal(first.schemaVersion, "phase1-simulator-1");
+  assert.equal(first.schemaVersion, "phase1-simulator-2");
   const firstJson = JSON.stringify(first);
   const restored = DeterministicSimulator.fromSnapshot(JSON.parse(firstJson) as SimulatorSnapshot);
   const second = restored.exportSnapshot();
-  assert.equal(second.schemaVersion, "phase1-simulator-1");
+  assert.equal(second.schemaVersion, "phase1-simulator-2");
   assert.equal(JSON.stringify(second), firstJson);
   const b5 = second.levels.find((level) => level.logicalLevelId === "B5");
   assert.equal(b5?.theoreticalEntryPrice, "97");

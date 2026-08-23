@@ -29,7 +29,9 @@ const ORDER_TYPES = new Set(["LIMIT", "MARKET"]);
 const TIME_IN_FORCES = new Set(["GTC", "IOC", "FOK", "POST_ONLY"]);
 const OWNERSHIPS = new Set(["OWNED", "UNOWNED", "AMBIGUOUS"]);
 
-export const SIMULATOR_SCHEMA_VERSION = "phase1-simulator-1" as const;
+const AUTHORITY_SOURCES = new Set(["ACK", "AUTHORITATIVE_OBSERVATION"]);
+
+export const SIMULATOR_SCHEMA_VERSION = "phase1-simulator-2" as const;
 
 export class SnapshotImportError extends Error {
   readonly code: string;
@@ -70,6 +72,7 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
   const levels = asArray(snapshot.levels, "levels");
   const intents = asArray(snapshot.intents, "intents");
   const orders = asArray(snapshot.orders, "orders");
+  const authorityLinks = asArray(snapshot.authorityLinks, "authorityLinks");
   const executions = asArray(snapshot.executions, "executions");
   const unknownWrites = asArray(snapshot.unknownWrites, "unknownWrites");
   assertPosition(asRecord(snapshot.position, "position"));
@@ -178,6 +181,14 @@ export function assertValidSimulatorSnapshot(value: unknown): SimulatorSnapshot 
     assertCanonicalOrNull(record.price, `unknownWrites[${index}].price`);
     assertNonNegativeCanonical(record.quantity, `unknownWrites[${index}].quantity`);
   }
+
+  assertAuthorityLinks(
+    authorityLinks,
+    intentRecords,
+    orderRecords,
+    expectedScopeKey,
+    requireString(init.anchorEpoch, "init.anchorEpoch"),
+  );
 
   const seenLevels = new Set<string>();
   for (const [index, level] of levels.entries()) {
@@ -447,6 +458,78 @@ function assertCurrentScopeIntent(
     throw new SnapshotImportError("INVALID_SNAPSHOT", `${path}:CLIENT_ORDER_ID_MISMATCH`);
   }
   assertCanonicalLeaseGeneration(record.leaseGeneration, `${path}.leaseGeneration`);
+}
+
+function assertAuthorityLinks(
+  authorityLinks: unknown[],
+  intentRecords: Map<string, Record<string, unknown>>,
+  orderRecords: Map<string, Record<string, unknown>>,
+  expectedScopeKey: string,
+  expectedAnchorEpoch: string,
+): void {
+  const evidenceIds = new Set<string>();
+  const authorityByOrder = new Set<string>();
+  for (const [index, link] of authorityLinks.entries()) {
+    const record = asRecord(link, `authorityLinks[${index}]`);
+    const path = `authorityLinks[${index}]`;
+    const evidenceId = requireString(record.evidenceId, `${path}.evidenceId`);
+    if (evidenceIds.has(evidenceId)) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "DUPLICATE_AUTHORITY_EVIDENCE_ID");
+    }
+    evidenceIds.add(evidenceId);
+    assertOneOf(record.source, AUTHORITY_SOURCES, `${path}.source`);
+    const exchangeOrderId = requireString(record.exchangeOrderId, `${path}.exchangeOrderId`);
+    const intentId = requireString(record.intentId, `${path}.intentId`);
+    const clientOrderId = requireString(record.clientOrderId, `${path}.clientOrderId`);
+    const scopeKey = requireString(record.scopeKey, `${path}.scopeKey`);
+    const anchorEpoch = requireString(record.anchorEpoch, `${path}.anchorEpoch`);
+    if (!orderRecords.has(exchangeOrderId)) {
+      throw new SnapshotImportError("DANGLING_IDENTITY", "AUTHORITY_ORDER_MISSING");
+    }
+    if (!intentRecords.has(intentId)) {
+      throw new SnapshotImportError("DANGLING_IDENTITY", "AUTHORITY_INTENT_MISSING");
+    }
+    if (authorityByOrder.has(exchangeOrderId)) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "CONFLICTING_ORDER_AUTHORITY");
+    }
+    authorityByOrder.add(exchangeOrderId);
+    const order = orderRecords.get(exchangeOrderId);
+    const intent = intentRecords.get(intentId);
+    if (order === undefined || intent === undefined) {
+      throw new SnapshotImportError("DANGLING_IDENTITY", "AUTHORITY_LINK_MISSING");
+    }
+    if (order.intentId === null) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "AUTHORITY_ON_NULL_INTENT_ORDER");
+    }
+    if (order.intentId !== intentId) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "AUTHORITY_INTENT_MISMATCH");
+    }
+    if (
+      order.clientOrderId !== clientOrderId ||
+      intent.clientOrderId !== clientOrderId ||
+      order.scopeKey !== scopeKey ||
+      intent.scopeKey !== scopeKey ||
+      order.anchorEpoch !== anchorEpoch ||
+      intent.anchorEpoch !== anchorEpoch
+    ) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "AUTHORITY_IDENTITY_MISMATCH");
+    }
+    if (scopeKey !== expectedScopeKey || anchorEpoch !== expectedAnchorEpoch) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "AUTHORITY_SCOPE_EPOCH_MISMATCH");
+    }
+    if (
+      order.logicalLevelId !== intent.logicalLevelId ||
+      order.purpose !== intent.purpose ||
+      order.side !== intent.side
+    ) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "AUTHORITY_STRUCTURAL_MISMATCH");
+    }
+    const orderQuantity = requireString(order.originalQuantity, `${path}.orderQuantity`);
+    const intentQuantity = requireString(intent.quantity, `${path}.intentQuantity`);
+    if (decimalCmp(orderQuantity, intentQuantity) !== 0) {
+      throw new SnapshotImportError("INVALID_AUTHORITY", "AUTHORITY_QUANTITY_MISMATCH");
+    }
+  }
 }
 
 function assertOrderMatchesIntent(

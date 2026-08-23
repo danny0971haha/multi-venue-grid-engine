@@ -13,6 +13,8 @@ export type Ownership = "OWNED" | "UNOWNED" | "AMBIGUOUS";
 
 export type WriteOutcomeKind = "ACK" | "REJECTED" | "UNKNOWN" | "NOT_SENT";
 
+export type OrderAuthoritySource = "ACK" | "AUTHORITATIVE_OBSERVATION";
+
 export type GridLevelState =
   | "IDLE"
   | "ENTRY_SUBMITTING"

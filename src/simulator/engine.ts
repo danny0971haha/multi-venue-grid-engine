@@ -25,8 +25,12 @@ import {
 import {
   classifyOwnership,
   type DuplicateCleanupPlan,
+  isProvenAuthoritySource,
+  type OrderAuthorityLink,
   planOwnedDuplicateCleanup,
 } from "../domain/ownership.js";
+
+export type { OrderAuthorityLink } from "../domain/ownership.js";
 import type {
   AccountSnapshot,
   CancelAck,
@@ -130,7 +134,7 @@ export type LevelView = {
 };
 
 export type SimulatorSnapshot = {
-  schemaVersion: "phase1-simulator-1";
+  schemaVersion: "phase1-simulator-2";
   init: SimulatorInit;
   config: ExperimentConfig;
   entriesPlanned: boolean;
@@ -142,6 +146,7 @@ export type SimulatorSnapshot = {
   levels: LevelView[];
   intents: OrderIntent[];
   orders: InternalOrder[];
+  authorityLinks: OrderAuthorityLink[];
   executions: ExecutionObservation[];
   unknownWrites: UnknownWrite[];
   position: PositionSnapshot;
@@ -191,6 +196,7 @@ export class DeterministicSimulator {
   private readonly levels = new Map<GridLogicalLevelId, MutableLevel>();
   private readonly intents = new Map<IntentId, OrderIntent>();
   private readonly orders = new Map<ExchangeOrderId, InternalOrder>();
+  private readonly authorityLinks = new Map<ExchangeOrderId, OrderAuthorityLink>();
   private readonly executions = new Map<ExecutionId, ExecutionObservation>();
   private readonly unknownWrites = new Map<IntentId, UnknownWrite>();
   private position: PositionSnapshot;
@@ -253,6 +259,9 @@ export class DeterministicSimulator {
     }
     for (const order of valid.orders) {
       simulator.orders.set(order.exchangeOrderId, { ...order });
+    }
+    for (const link of valid.authorityLinks) {
+      simulator.authorityLinks.set(link.exchangeOrderId, { ...link });
     }
     for (const execution of valid.executions) {
       simulator.executions.set(execution.executionId, execution);
@@ -400,6 +409,15 @@ export class DeterministicSimulator {
       scopeKey: intent.scopeKey,
     };
     this.orders.set(exchangeOrderId, order);
+    this.recordAuthority({
+      source: "ACK",
+      evidenceId: `ack:${exchangeOrderId}`,
+      exchangeOrderId,
+      intentId: intent.intentId,
+      clientOrderId: requireClientOrderId(intent.clientOrderId),
+      scopeKey: intent.scopeKey,
+      anchorEpoch: intent.anchorEpoch,
+    });
     level.originalQuantity = intent.quantity;
     level.executedQuantity = "0";
     level.remainingQuantity = intent.quantity;
@@ -450,6 +468,15 @@ export class DeterministicSimulator {
       scopeKey: intent.scopeKey,
     };
     this.orders.set(exchangeOrderId, order);
+    this.recordAuthority({
+      source: "AUTHORITATIVE_OBSERVATION",
+      evidenceId: `obs:${exchangeOrderId}`,
+      exchangeOrderId,
+      intentId: intent.intentId,
+      clientOrderId: requireClientOrderId(intent.clientOrderId),
+      scopeKey: intent.scopeKey,
+      anchorEpoch: intent.anchorEpoch,
+    });
     level.originalQuantity = intent.quantity;
     level.executedQuantity = "0";
     level.remainingQuantity = intent.quantity;
@@ -475,9 +502,10 @@ export class DeterministicSimulator {
     const exchangeOrderId = this.nextOrderId();
     const sourceIntentId = level.entryIntentId ?? level.exitIntentId;
     const sourceIntent = sourceIntentId === null ? undefined : this.intents.get(sourceIntentId);
+    const clientOrderId = sourceIntent?.clientOrderId ?? `dup-${logicalLevelId}`;
     this.orders.set(exchangeOrderId, {
       exchangeOrderId,
-      clientOrderId: sourceIntent?.clientOrderId ?? `dup-${logicalLevelId}`,
+      clientOrderId,
       intentId: sourceIntentId,
       logicalLevelId,
       purpose: "GRID_ENTRY",
@@ -494,6 +522,17 @@ export class DeterministicSimulator {
       anchorEpoch: this.init.anchorEpoch,
       scopeKey: this.scopeKey,
     });
+    if (sourceIntent !== undefined && sourceIntent.clientOrderId !== null) {
+      this.recordAuthority({
+        source: "AUTHORITATIVE_OBSERVATION",
+        evidenceId: `obs:${exchangeOrderId}`,
+        exchangeOrderId,
+        intentId: sourceIntent.intentId,
+        clientOrderId: sourceIntent.clientOrderId,
+        scopeKey: this.scopeKey,
+        anchorEpoch: this.init.anchorEpoch,
+      });
+    }
     return exchangeOrderId;
   }
 
@@ -549,8 +588,12 @@ export class DeterministicSimulator {
     if (order === undefined) {
       return { kind: "NOT_SENT", reason: "ORDER_NOT_FOUND" };
     }
-    if (this.classifyObserved(order) !== "OWNED") {
+    const ownership = this.classifyObserved(order);
+    if (ownership === "UNOWNED") {
       return { kind: "NOT_SENT", reason: "REFUSES_UNOWNED_CANCEL" };
+    }
+    if (ownership !== "OWNED") {
+      return { kind: "NOT_SENT", reason: "REFUSES_UNPROVEN_CANCEL_AUTHORITY" };
     }
     if (outcome === "NOT_SENT") {
       return { kind: "NOT_SENT", reason: "LOCAL_GATE" };
@@ -707,15 +750,21 @@ export class DeterministicSimulator {
   classifyObserved(
     order: Pick<InternalOrder, "clientOrderId" | "exchangeOrderId" | "scopeKey" | "anchorEpoch">,
   ): Ownership {
-    return classifyOwnership(
-      {
-        clientOrderId: order.clientOrderId,
-        exchangeOrderId: order.exchangeOrderId,
-        scopeKey: order.scopeKey,
-        anchorEpoch: order.anchorEpoch,
-      },
-      this.ownershipEvidence(),
-    );
+    const stored = this.orders.get(order.exchangeOrderId ?? ("" as ExchangeOrderId));
+    const identity = {
+      clientOrderId: stored?.clientOrderId ?? order.clientOrderId,
+      exchangeOrderId: stored?.exchangeOrderId ?? order.exchangeOrderId,
+      scopeKey: stored?.scopeKey ?? order.scopeKey,
+      anchorEpoch: stored?.anchorEpoch ?? order.anchorEpoch,
+    };
+    const classified = classifyOwnership(identity, this.ownershipEvidence());
+    if (classified === "UNOWNED") {
+      return "UNOWNED";
+    }
+    if (stored !== undefined) {
+      return this.hasProvenAuthorityLinkage(stored) ? "OWNED" : "AMBIGUOUS";
+    }
+    return classified;
   }
 
   planDuplicateCleanup(logicalLevelId: GridLogicalLevelId): DuplicateCleanupPlan {
@@ -812,7 +861,7 @@ export class DeterministicSimulator {
 
   exportSnapshot(): SimulatorSnapshot {
     return {
-      schemaVersion: "phase1-simulator-1",
+      schemaVersion: "phase1-simulator-2",
       init: this.init,
       config: this.config,
       entriesPlanned: this.entriesPlanned,
@@ -833,6 +882,17 @@ export class DeterministicSimulator {
         ...order,
         ownership: this.classifyObserved(order),
       })),
+      authorityLinks: [...this.authorityLinks.values()].sort((left, right) =>
+        left.exchangeOrderId < right.exchangeOrderId
+          ? -1
+          : left.exchangeOrderId > right.exchangeOrderId
+            ? 1
+            : left.evidenceId < right.evidenceId
+              ? -1
+              : left.evidenceId > right.evidenceId
+                ? 1
+                : 0,
+      ),
       executions: [...this.executions.values()],
       unknownWrites: [...this.unknownWrites.values()],
       position: this.position,
@@ -1144,16 +1204,13 @@ export class DeterministicSimulator {
           .map((intent) => intent.clientOrderId)
           .filter((value): value is ClientOrderId => value !== null),
       ),
-      knownExchangeOrderIds: new Set(
-        [...this.orders.values()]
-          .filter((order) => this.hasProvenAuthorityLinkage(order))
-          .map((order) => order.exchangeOrderId),
-      ),
+      knownExchangeOrderIds: new Set(this.authorityLinks.keys()),
       clientOrderEpochById: new Map(
         currentIntents
           .filter((intent) => intent.clientOrderId !== null)
           .map((intent) => [intent.clientOrderId as ClientOrderId, intent.anchorEpoch]),
       ),
+      authorityLinks: [...this.authorityLinks.values()],
     };
   }
 
@@ -1167,17 +1224,41 @@ export class DeterministicSimulator {
   }
 
   private hasProvenAuthorityLinkage(order: InternalOrder): boolean {
-    if (order.intentId === null) {
+    const link = this.authorityLinks.get(order.exchangeOrderId);
+    if (
+      link === undefined ||
+      !isProvenAuthoritySource(link.source) ||
+      link.evidenceId.length === 0
+    ) {
       return false;
     }
-    const intent = this.intents.get(order.intentId);
-    if (intent === undefined || !this.isCurrentScopeIntent(intent)) {
+    if (order.intentId === null || link.intentId !== order.intentId) {
       return false;
     }
-    if (order.clientOrderId === null || order.clientOrderId !== intent.clientOrderId) {
+    const intent = this.intents.get(link.intentId);
+    if (
+      intent === undefined ||
+      !this.isCurrentScopeIntent(intent) ||
+      intent.clientOrderId === null
+    ) {
       return false;
     }
-    if (order.scopeKey !== intent.scopeKey || order.anchorEpoch !== intent.anchorEpoch) {
+    if (
+      link.exchangeOrderId !== order.exchangeOrderId ||
+      link.clientOrderId !== order.clientOrderId ||
+      link.clientOrderId !== intent.clientOrderId ||
+      order.clientOrderId !== intent.clientOrderId
+    ) {
+      return false;
+    }
+    if (
+      link.scopeKey !== this.scopeKey ||
+      link.anchorEpoch !== this.init.anchorEpoch ||
+      order.scopeKey !== link.scopeKey ||
+      order.anchorEpoch !== link.anchorEpoch ||
+      intent.scopeKey !== link.scopeKey ||
+      intent.anchorEpoch !== link.anchorEpoch
+    ) {
       return false;
     }
     if (order.logicalLevelId !== intent.logicalLevelId) {
@@ -1187,6 +1268,22 @@ export class DeterministicSimulator {
       return false;
     }
     return decimalCmp(order.originalQuantity, intent.quantity) === 0;
+  }
+
+  private recordAuthority(link: OrderAuthorityLink): void {
+    if (link.evidenceId.length === 0) {
+      throw new Error("EMPTY_AUTHORITY_EVIDENCE_ID");
+    }
+    if (!isProvenAuthoritySource(link.source)) {
+      throw new Error("INVALID_AUTHORITY_SOURCE");
+    }
+    if ([...this.authorityLinks.values()].some((item) => item.evidenceId === link.evidenceId)) {
+      throw new Error("DUPLICATE_AUTHORITY_EVIDENCE_ID");
+    }
+    if (this.authorityLinks.has(link.exchangeOrderId)) {
+      throw new Error("CONFLICTING_ORDER_AUTHORITY");
+    }
+    this.authorityLinks.set(link.exchangeOrderId, link);
   }
 
   private observeOrder(exchangeOrderId: ExchangeOrderId): ExchangeOrderObservation {
@@ -1261,6 +1358,13 @@ export class DeterministicSimulator {
       sequence: null,
     };
   }
+}
+
+function requireClientOrderId(clientOrderId: ClientOrderId | null): ClientOrderId {
+  if (clientOrderId === null) {
+    throw new Error("AUTHORITY_REQUIRES_CLIENT_ORDER_ID");
+  }
+  return clientOrderId;
 }
 
 export function requestFingerprint(venue: VenueId, market: MarketId, intent: OrderIntent): string {

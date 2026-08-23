@@ -1,11 +1,22 @@
-import type { Ownership, ReconciliationDisposition } from "./enums.js";
+import type { OrderAuthoritySource, Ownership, ReconciliationDisposition } from "./enums.js";
 import type {
   AnchorEpoch,
   ClientOrderId,
   ExchangeOrderId,
+  IntentId,
   LogicalLevelId,
   ScopeKey,
 } from "./ids.js";
+
+export type OrderAuthorityLink = {
+  source: OrderAuthoritySource;
+  evidenceId: string;
+  exchangeOrderId: ExchangeOrderId;
+  intentId: IntentId;
+  clientOrderId: ClientOrderId;
+  scopeKey: ScopeKey;
+  anchorEpoch: AnchorEpoch;
+};
 
 export type OwnershipEvidence = {
   currentScopeKey: ScopeKey;
@@ -13,6 +24,7 @@ export type OwnershipEvidence = {
   knownClientOrderIds: ReadonlySet<ClientOrderId>;
   knownExchangeOrderIds: ReadonlySet<ExchangeOrderId>;
   clientOrderEpochById: ReadonlyMap<ClientOrderId, AnchorEpoch>;
+  authorityLinks?: ReadonlyArray<OrderAuthorityLink>;
 };
 
 export type ObservedIdentity = {
@@ -37,17 +49,53 @@ export function classifyOwnership(
     if (recordedEpoch !== undefined && recordedEpoch !== evidence.currentAnchorEpoch) {
       return "UNOWNED";
     }
-    if (evidence.knownClientOrderIds.has(observed.clientOrderId)) {
-      return "OWNED";
-    }
   }
-  if (
-    observed.exchangeOrderId !== null &&
-    evidence.knownExchangeOrderIds.has(observed.exchangeOrderId)
-  ) {
+  if (hasMatchingProvenAuthority(observed, evidence)) {
     return "OWNED";
   }
   return "AMBIGUOUS";
+}
+
+function hasMatchingProvenAuthority(
+  observed: ObservedIdentity,
+  evidence: OwnershipEvidence,
+): boolean {
+  if (observed.exchangeOrderId === null) {
+    return false;
+  }
+  const matches = (evidence.authorityLinks ?? []).filter(
+    (link) => link.exchangeOrderId === observed.exchangeOrderId,
+  );
+  if (matches.length !== 1) {
+    return false;
+  }
+  const link = matches[0];
+  if (link === undefined) {
+    return false;
+  }
+  if (!isProvenAuthoritySource(link.source) || link.evidenceId.length === 0) {
+    return false;
+  }
+  if (
+    link.scopeKey !== evidence.currentScopeKey ||
+    link.anchorEpoch !== evidence.currentAnchorEpoch
+  ) {
+    return false;
+  }
+  if (observed.clientOrderId !== null && observed.clientOrderId !== link.clientOrderId) {
+    return false;
+  }
+  if (observed.scopeKey !== null && observed.scopeKey !== link.scopeKey) {
+    return false;
+  }
+  if (observed.anchorEpoch !== null && observed.anchorEpoch !== link.anchorEpoch) {
+    return false;
+  }
+  return true;
+}
+
+export function isProvenAuthoritySource(source: string): source is OrderAuthoritySource {
+  return source === "ACK" || source === "AUTHORITATIVE_OBSERVATION";
 }
 
 export type DuplicateCleanupPlan = {

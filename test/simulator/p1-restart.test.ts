@@ -105,7 +105,7 @@ test("snapshot export/import is deterministic JSON without live class instances"
     DeterministicSimulator.fromSnapshot(JSON.parse(first)).exportSnapshot(),
   );
   assert.equal(first, second);
-  assert.equal(first.includes('"schemaVersion":"phase1-simulator-1"'), true);
+  assert.equal(first.includes('"schemaVersion":"phase1-simulator-2"'), true);
 });
 
 test("stale snapshot blocks risk increase and survives restart", () => {
