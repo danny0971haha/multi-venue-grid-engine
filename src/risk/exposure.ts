@@ -7,6 +7,12 @@ import {
   isCanonicalDecimalString,
 } from "../math/decimal.js";
 import type { RiskProposedIntent, RiskUnknownReservation, RiskWorkingOrder } from "./risk-types.js";
+import {
+  isRiskSide,
+  validateProposedIntent,
+  validateUnknownReservation,
+  validateWorkingOrder,
+} from "./risk-input-validation.js";
 
 export type ExposureComputation = {
   plannedGrossNotional: DecimalString | null;
@@ -50,13 +56,22 @@ export function computeExposure(args: {
   let unbounded = false;
 
   for (const order of args.ownedActiveOrders) {
-    if (!order.owned || order.reduceOnly) {
+    const invalid = validateWorkingOrder(order);
+    if (invalid.length > 0) {
+      reasons.push(...invalid);
+      continue;
+    }
+    if (order.owned !== true || order.reduceOnly === true) {
       continue;
     }
     const notional = parseNotional(order.remainingQuantity, order.price);
     if (notional === null) {
       unbounded = true;
       reasons.push("UNBOUNDED_EXPOSURE", "INVALID_DECIMAL");
+      continue;
+    }
+    if (!isRiskSide(order.side)) {
+      reasons.push("INVALID_RISK_INPUT");
       continue;
     }
     if (order.side === "BUY") {
@@ -67,6 +82,11 @@ export function computeExposure(args: {
   }
 
   for (const reservation of args.unknownReservations) {
+    const invalid = validateUnknownReservation(reservation);
+    if (invalid.length > 0) {
+      reasons.push(...invalid);
+      continue;
+    }
     if (reservation.price === null || reservation.quantity === null) {
       unbounded = true;
       reasons.push("UNBOUNDED_EXPOSURE", "STALE_OR_MISSING_INPUT");
@@ -78,6 +98,10 @@ export function computeExposure(args: {
       reasons.push("UNBOUNDED_EXPOSURE", "INVALID_DECIMAL");
       continue;
     }
+    if (!isRiskSide(reservation.side)) {
+      reasons.push("INVALID_RISK_INPUT");
+      continue;
+    }
     if (reservation.side === "BUY") {
       worstLongNotional = decimalAdd(worstLongNotional, notional);
     } else {
@@ -86,7 +110,16 @@ export function computeExposure(args: {
   }
 
   for (const intent of args.proposedBatch) {
-    if (intent.reduceOnly || intent.purpose !== "GRID_ENTRY") {
+    const invalid = validateProposedIntent(intent);
+    if (invalid.length > 0) {
+      reasons.push(...invalid);
+      continue;
+    }
+    if (intent.reduceOnly === true) {
+      continue;
+    }
+    if (intent.purpose === "CANCEL") {
+      reasons.push("INVALID_RISK_INPUT");
       continue;
     }
     if (intent.price === null) {
@@ -98,6 +131,10 @@ export function computeExposure(args: {
     if (notional === null) {
       unbounded = true;
       reasons.push("UNBOUNDED_EXPOSURE", "INVALID_DECIMAL");
+      continue;
+    }
+    if (!isRiskSide(intent.side)) {
+      reasons.push("INVALID_RISK_INPUT");
       continue;
     }
     if (intent.side === "BUY") {

@@ -25,7 +25,8 @@
     "test:phase2c": "tsx --test test/persistence/runtime-lease.test.ts",
     "test:phase2c-corrective": "tsx --test test/persistence/runtime-lease-corrective-1.test.ts",
     "test:phase2c-corrective-2": "tsx --test test/persistence/runtime-lease-corrective-2.test.ts",
-    "test:phase2d": "tsx --test test/risk/*.test.ts",
+    "test:phase2d": "tsx --test test/risk/risk-engine.test.ts",
+    "test:phase2d-corrective-1": "tsx --test test/risk/risk-engine-corrective-1.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

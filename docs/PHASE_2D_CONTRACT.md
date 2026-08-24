@@ -1,6 +1,7 @@
 # Phase 2D Implementation Contract — Risk Calculations and Continuation Gate
 
-**Status:** AUTHORIZED ONLY AFTER PHASE 2C CORRECTIVE 1 HARD INTERNAL GATE  
+**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REVIEW CANDIDATE
+
 **Date:** 2026-08-24  
 **Repository:** `danny0971haha/multi-venue-grid-engine`  
 **Implementation branch:** `experiment/v0.1-phase2`
@@ -10,9 +11,11 @@ This file binds Phase 2D only. It does not authorize Phase 2E/2F, live writes, o
 ```text
 PHASE_2A=PASS
 PHASE_2B=PASS
-PHASE_2C_CORRECTIVE_1=REVIEW_CANDIDATE
+PHASE_2C_CORRECTIVE_1=REJECT
+PHASE_2C_CORRECTIVE_2=REVIEW_CANDIDATE
 PHASE_2C_SELF_DECLARED_PASS=NO
-PHASE_2D=REVIEW_CANDIDATE
+PHASE_2D=REJECT
+PHASE_2D_CORRECTIVE_1=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
 PHASE_2E_AUTHORIZED=NO
 GATE_2=NOT_REVIEWED
@@ -114,3 +117,23 @@ Zero inventory plus boundary movement is not a hard halt by itself. It may block
 ## 6. Out of scope
 
 Do not implement halt state machines, durable halt ACK, telemetry/manifest, execution coordinator, venue adapters, network/auth/signing, live mode, or Phase 2E/2F.
+
+## 7. Corrective 1 addendum — full-batch exposure and invalid grid domain
+
+This addendum does not raise frozen 100U / 5x / 30U / 150U / -5U / 10U limits and does not authorize `systemAllowRiskIncrease=true`.
+
+Purpose names are not risk authority. Every `reduceOnly=false` proposed intent that can change position is included in directional worst-case exposure, regardless of purpose. Only a semantically valid `reduceOnly=true` intent may be excluded. An inconsistent `CANCEL` with `reduceOnly=false` is `INVALID_RISK_INPUT` and HALT. A non-reduce-only null or unbounded price is `UNBOUNDED_EXPOSURE` and HALT.
+
+Grid domain:
+
+```text
+gridLower > 0
+gridUpper > 0
+gridLower < gridUpper
+```
+
+Zero, negative, equal, or inverted bounds produce `INVALID_RISK_INPUT`, `action=HALT`, `riskMetricsWithinLimits=false`, and must not include `CONTINUE_METRICS_ONLY`.
+
+Valid boundary inequalities are unchanged: long inventory and mark `< gridLower * 0.99` is HALT; equality at that floor is not a breach. Short inventory and mark `> gridUpper * 1.01` is HALT; equality at that ceiling is not a breach.
+
+`INVALID_RISK_INPUT` is appended to `PHASE_2D_REASON_CODE_CATALOG` after `INVALID_DECIMAL`. Runtime validation of `side`, `purpose`, `fundingConvention`, `reduceOnly`, `owned`, and bounded-reduction booleans is exhaustive; TypeScript unions are not sufficient. Unknown or malformed required values do not receive a default financial interpretation.

@@ -8,6 +8,11 @@ import {
 } from "../math/decimal.js";
 import { computeExposure } from "./exposure.js";
 import { freshnessFailures } from "./freshness.js";
+import {
+  isFundingConvention,
+  validateGridDomain,
+  validateRiskInput,
+} from "./risk-input-validation.js";
 import type { RiskDecision, RiskInput, RiskMetrics } from "./risk-types.js";
 import {
   FROZEN_DAILY_NET_LOSS_USDT,
@@ -20,8 +25,9 @@ const SECRET_KEY_PATTERN =
   /secret|password|token|apikey|api[_-]?key|private[_-]?key|credential|authorization|bearer/i;
 
 export function evaluateRisk(input: RiskInput): RiskDecision {
+  const inputCodes = validateRiskInput(input);
   const snapshot = cloneInput(input);
-  const codes: string[] = ["DURABLE_HALT_OR_ACK_UNAVAILABLE"];
+  const codes: string[] = ["DURABLE_HALT_OR_ACK_UNAVAILABLE", ...inputCodes];
   if (snapshot.haltAuthorityClear !== false) {
     codes.push("DURABLE_HALT_OR_ACK_UNAVAILABLE");
   }
@@ -117,13 +123,17 @@ export function evaluateRisk(input: RiskInput): RiskDecision {
     uniqueCodes.includes("RECONCILIATION_REQUIRED") ||
     uniqueCodes.includes("STALE_OR_MISSING_INPUT") ||
     uniqueCodes.includes("UNBOUNDED_EXPOSURE") ||
-    uniqueCodes.includes("INVALID_DECIMAL");
+    uniqueCodes.includes("INVALID_DECIMAL") ||
+    uniqueCodes.includes("INVALID_RISK_INPUT");
   const plannedBlocked = uniqueCodes.includes("PLANNED_NOTIONAL");
   const riskMetricsWithinLimits =
     !metricHalt &&
     !uniqueCodes.includes("ACTUAL_NOTIONAL") &&
     !plannedBlocked &&
-    !uniqueCodes.includes("UNBOUNDED_EXPOSURE");
+    !uniqueCodes.includes("UNBOUNDED_EXPOSURE") &&
+    !uniqueCodes.includes("STALE_OR_MISSING_INPUT") &&
+    !uniqueCodes.includes("INVALID_DECIMAL") &&
+    !uniqueCodes.includes("INVALID_RISK_INPUT");
 
   let action: RiskDecision["action"] = "CONTINUE";
   if (systemHalt || metricHalt || actualAction === "HALT") {
@@ -207,6 +217,8 @@ function computeDailyPnl(input: RiskInput): {
   }
   if (input.fundingConvention === null) {
     reasons.push("FUNDING_CONVENTION_MISSING", "STALE_OR_MISSING_INPUT");
+  } else if (!isFundingConvention(input.fundingConvention)) {
+    reasons.push("INVALID_RISK_INPUT");
   }
   if (reasons.length > 0) {
     return { netDailyPnl: null, reasonCodes: reasons };
@@ -251,6 +263,10 @@ function computeStartDrawdown(input: RiskInput): {
 }
 
 function computeBoundary(input: RiskInput): { reasonCodes: string[] } {
+  const domain = validateGridDomain(input.gridLower, input.gridUpper);
+  if (domain.length > 0) {
+    return { reasonCodes: domain };
+  }
   if (
     input.signedPosition === null ||
     input.markOrMidPrice === null ||
