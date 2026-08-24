@@ -1,6 +1,7 @@
 # Phase 2C Implementation Contract — Runtime Lease and Fencing
 
-**Status:** AUTHORIZED AFTER INDEPENDENT PHASE 2B PASS  
+**Status:** PHASE 2C REJECTED; CORRECTIVE 1 REVIEW CANDIDATE  
+
 **Date:** 2026-08-24  
 **Repository:** `danny0971haha/multi-venue-grid-engine`  
 **Implementation branch:** `experiment/v0.1-phase2`  
@@ -30,8 +31,9 @@ PHASE_2A=PASS
 PHASE_2B=PASS
 ACCEPTED_PHASE_2B_HEAD=41eb277a7d6dfe36dbb864bc8190d5a20663dc4a
 ACCEPTED_PHASE_2B_TREE=8163e36c676f8b1d5332cdbc713b0672ea4fe148
-AUTHORIZED_CHECKPOINT=PHASE_2C_ONLY
-PHASE_2C=REVIEW_CANDIDATE
+AUTHORIZED_CHECKPOINT=PHASE_2C_CORRECTIVE_1
+PHASE_2C=REJECT
+PHASE_2C_CORRECTIVE_1=REVIEW_CANDIDATE
 PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D_AUTHORIZED=NO
 PHASE_2E_AUTHORIZED=NO
@@ -91,6 +93,7 @@ The following are not sufficient to prove owner or generation:
 ```text
 src/persistence/lease-coordination.ts
 src/persistence/runtime-lease.ts
+src/persistence/lease-witness.ts
 ```
 
 Phase 2A and Phase 2B current-byte files remain frozen unless a change is unavoidable and evidence proves frozen canonical vectors and Phase 2B crash outcomes are unchanged:
@@ -265,9 +268,22 @@ updatedAt  >= heartbeatAt
 
 Clock source:
 
-- production default: system clock (`Date.now()` captured once per operation into `BigInt`);
+- production default: system clock (`Date.now()` captured into `BigInt`);
 - tests may inject a deterministic clock;
-- one operation uses one captured `nowMs`.
+- a pre-lock timestamp must never authorize a post-lock mutation.
+
+Required clock/coordination order:
+
+```text
+acquire coordination guard
+-> read and validate fresh clock
+-> inspect/match durable lease
+-> immediately before callback read and validate clock again
+-> synchronous exact-pair fence check with final fresh time
+-> invoke callback
+```
+
+Invalid clocks (negative, greater than `MAX_TIMESTAMP_MS`, non-`BigInt`, or throwing provider) become explicit fail-closed `LeaseResult` / `FencedMutationResult` values. The coordination guard is released. They must not escape as uncaught exceptions.
 
 Malformed timestamps fail closed. Clock regression beyond tolerance fails closed and leaves authority unproven. Process death does not bypass durable expiry or coordination rules.
 
@@ -355,20 +371,74 @@ runLeaseFencedMutation(...)
 
 Phase 2C must not connect a venue transport.
 
-`runLeaseFencedMutation`:
+`runLeaseFencedMutation<T>({ mutation: () => T | Promise<T> }): Promise<FencedMutationResult<T>>`:
 
 1. Obtain the coordination guard.
-2. Fresh-inspect the exact durable lease.
-3. Check the persistence latch.
-4. Check scope, ownerId, processInstanceId, generation, `ACTIVE`, and unexpired.
-5. Invoke the test-only pre-callback hook if one is installed (default `null`; no production activation).
-6. Reconfirm on a final synchronous boundary (`readFileSync` of both pair files, parse, compare expected envelope hash / generation / owner / process instance, latch, clock).
-7. Call the test / simulator callback at most once, and only if every check passed.
-8. Failure before callback: `NOT_SENT`, callback count `0`.
-9. Callback entered and threw: `UNKNOWN`, callback count `1`. Do not disguise `UNKNOWN` as `NOT_SENT`.
-10. Callback returned: fencing outcome `SENT`, still `allowRiskIncrease=false`.
+2. Read and validate a fresh clock. Do not reuse a pre-lock timestamp.
+3. Fresh-inspect the exact durable lease and the durable witness log.
+4. Check the persistence latch.
+5. Require exact match of every `LeaseAuthority` field against durable state:
+   `scopeKey`, `ownerId`, `processInstanceId`, `generation`, `leaseEnvelopeSha256`,
+   `leaseStoreGeneration`, `observedExpiresAt`. Silent token upgrade is forbidden.
+6. Invoke the test-only pre-callback hook if one is installed (default `null`; no production activation).
+7. Read and validate the clock again. Reconfirm on a final synchronous boundary (`readFileSync` of both pair files, parse, compare the caller token exactly, latch, final clock).
+8. Call the test / simulator callback at most once, and only if every check passed.
+9. Failure before callback: `NOT_SENT`, callback count `0`.
+10. Callback invoked and the returned Promise resolves: `SENT`, callback count `1`.
+11. Callback invoked and throws synchronously: `UNKNOWN`, callback count `1`.
+12. Callback invoked and the returned Promise rejects: `UNKNOWN`, callback count `1`.
+13. A pending Promise must keep this function pending. It must not return or emit `SENT` early.
+14. The host-local coordination guard remains held until the callback Promise settles.
+
+```text
+HOST_LOCAL_SERIALIZED_MUTATION_LIMITATION
+```
+
+Holding the guard until settlement reduces liveness: a contender waits and then fail-closes with `COORDINATION_LOCK_TIMEOUT` / blocked. This is accepted to prevent dual owners. It does not prove distributed fencing. Phase 2D must not treat this API as live-write authorization. `allowRiskIncrease` remains `false`.
 
 A successful assertion does not permanently authorize the process. Each mutation in a sequence rechecks.
+
+Heartbeat success returns a new `LeaseAuthority`. The pre-heartbeat token is `STALE_LEASE_TOKEN` and cannot release, assert, or mutate.
+
+If `now < durable heartbeatAt` but the difference is within `MAX_CLOCK_SKEW_MS`, the write must not persist `updatedAt < heartbeatAt`. Use monotonic timestamp fields. The final persisted record must pass `parseLeaseRecord()`.
+
+Coordination-guard release must prove it still owns the lock instance it created (unpredictable guard token plus inode-equivalent identity). A replaced `llock` must not be unlinked by the old guard.
+
+## 13.1 Durable monotonic witness
+
+Project-owned append-only file `runtime-lease.witness.jsonl`. No third-party dependency.
+
+Every accepted `INITIALIZE` / `HEARTBEAT` / `TAKEOVER` / `RELEASE` transition writes:
+
+```text
+build exact target envelope identity
+-> append durable PREPARE witness
+-> commit Phase 2B exact pair
+-> append durable COMMIT witness
+```
+
+Each line includes `schemaVersion`, `scopeKey`, `operation`, `fencingGeneration`, `leaseStoreGeneration`, `targetEnvelopeSha256`, `ownerId`, `processInstanceId`, `status`, `previousWitnessSha256`, `witnessSha256`, `createdAt`.
+
+Witness bytes are canonical, append-only, completely written, file-fsynced, parent-directory-fsynced, hash-chained, and fatally rejected on UTF-8 / JSON / canonical failure. Exact duplicate of the last line is idempotent. Conflicting duplicates are rejected. Secrets are prohibited.
+
+Fresh-process rules:
+
+```text
+latest PREPARE without matching exact pair
+-> AUTHORITY_UNPROVEN, latch blocked
+
+exact pair matches latest PREPARE target
+-> storage-proven; COMMIT repair is not automatic;
+   INCOMPLETE_WITNESS_FINALIZATION; normal continuation remains explicitly reviewed
+
+latest COMMIT matches exact pair
+-> authority may proceed to remaining lease checks
+
+exact pair older than latest witnessed store/fencing generation
+-> LEASE_ROLLBACK_DETECTED; zero mutation; latch blocked
+```
+
+No auto-selection of old/new bytes and no rewrite of contradictory evidence.
 
 ## 14. Persistence latch composition
 
