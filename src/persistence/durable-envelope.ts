@@ -97,31 +97,46 @@ export function isLowerHexSha256(value: string): boolean {
 }
 
 export function buildDurableEnvelope<T>(fields: DurableEnvelopeFields<T>): BuiltDurableEnvelope<T> {
-  const reasonCode = validateEnvelopeFields(fields);
+  // Approach A: read each caller-owned field exactly once. Do not observe `fields` after this.
+  // Documented observation count per accepted input field: 1. No object spread.
+  const schemaVersion = fields.schemaVersion;
+  const kind = fields.kind;
+  const scopeKey = fields.scopeKey;
+  const storeGeneration = fields.storeGeneration;
+  const previousEnvelopeSha256 = fields.previousEnvelopeSha256;
+  const payload = fields.payload;
+
+  const reasonCode = validateEnvelopeFields(
+    schemaVersion,
+    kind,
+    scopeKey,
+    storeGeneration,
+    previousEnvelopeSha256,
+  );
   if (reasonCode !== null) {
     throw new EnvelopeValidationError(reasonCode);
   }
 
-  const payloadCanonicalBytes = canonicalSerialize(fields.payload);
+  const payloadCanonicalBytes = canonicalSerialize(payload);
   const detachedPayload = JSON.parse(payloadCanonicalBytes.toString("utf8")) as T;
   const payloadSha256 = sha256HexBytes(payloadCanonicalBytes);
   const envelopeHashInput = {
-    schemaVersion: fields.schemaVersion,
-    kind: fields.kind,
-    scopeKey: fields.scopeKey,
-    storeGeneration: fields.storeGeneration,
-    previousEnvelopeSha256: fields.previousEnvelopeSha256,
+    schemaVersion,
+    kind,
+    scopeKey,
+    storeGeneration,
+    previousEnvelopeSha256,
     payloadSha256,
     payload: detachedPayload,
   };
   const envelopeHashInputBytes = canonicalSerialize(envelopeHashInput);
   const envelopeSha256 = sha256HexBytes(envelopeHashInputBytes);
   const envelope: DurableEnvelope<T> = {
-    schemaVersion: fields.schemaVersion,
-    kind: fields.kind,
-    scopeKey: fields.scopeKey,
-    storeGeneration: fields.storeGeneration,
-    previousEnvelopeSha256: fields.previousEnvelopeSha256,
+    schemaVersion,
+    kind,
+    scopeKey,
+    storeGeneration,
+    previousEnvelopeSha256,
     payloadSha256,
     payload: detachedPayload,
     envelopeSha256,
@@ -275,26 +290,29 @@ export function parseAndValidateDurableEnvelope(
   };
 }
 
-function validateEnvelopeFields<T>(fields: DurableEnvelopeFields<T>): string | null {
-  if (typeof fields.schemaVersion !== "number" || !Number.isInteger(fields.schemaVersion)) {
+function validateEnvelopeFields(
+  schemaVersion: unknown,
+  kind: unknown,
+  scopeKey: unknown,
+  storeGeneration: unknown,
+  previousEnvelopeSha256: unknown,
+): string | null {
+  if (typeof schemaVersion !== "number" || !Number.isInteger(schemaVersion)) {
     return "UNSUPPORTED_SCHEMA";
   }
-  if (fields.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
+  if (schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
     return "UNSUPPORTED_SCHEMA";
   }
-  if (typeof fields.kind !== "string" || !KIND_PATTERN.test(fields.kind)) {
+  if (typeof kind !== "string" || !KIND_PATTERN.test(kind)) {
     return "INVALID_KIND";
   }
-  if (typeof fields.scopeKey !== "string" || !SCOPE_PATTERN.test(fields.scopeKey)) {
+  if (typeof scopeKey !== "string" || !SCOPE_PATTERN.test(scopeKey)) {
     return "INVALID_SCOPE";
   }
-  if (
-    typeof fields.storeGeneration !== "string" ||
-    !GENERATION_PATTERN.test(fields.storeGeneration)
-  ) {
+  if (typeof storeGeneration !== "string" || !GENERATION_PATTERN.test(storeGeneration)) {
     return "INVALID_GENERATION";
   }
-  if (!previousHashMatchesGeneration(fields.storeGeneration, fields.previousEnvelopeSha256)) {
+  if (!previousHashMatchesGeneration(storeGeneration, previousEnvelopeSha256)) {
     return "INVALID_PREVIOUS_HASH";
   }
   return null;
