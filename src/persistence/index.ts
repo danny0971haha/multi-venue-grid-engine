@@ -64,6 +64,25 @@ export {
   isHostLocalCoordinationMode,
 } from "./lease-coordination.js";
 export type {
+  LeaseWitnessLine,
+  LeaseWitnessLineStatus,
+  LeaseWitnessOperation,
+  WitnessDecision,
+  WitnessFaultWindow,
+} from "./lease-witness.js";
+export {
+  GENESIS_WITNESS_SHA256,
+  HOST_LOCAL_SERIALIZED_MUTATION_LIMITATION,
+  LEASE_WITNESS_FILE_NAME,
+  LEASE_WITNESS_SCHEMA_VERSION,
+  appendLeaseWitnessLine,
+  evaluateLeaseWitness,
+  leaseWitnessPath,
+  loadLeaseWitnessLog,
+  seedWitnessCommitForTests,
+  setLeaseWitnessFaultHookForTests,
+} from "./lease-witness.js";
+export type {
   FencedMutationOutcome,
   FencedMutationResult,
   LeaseAuthority,

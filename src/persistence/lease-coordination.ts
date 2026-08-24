@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
-import { open, readFile, unlink } from "node:fs/promises";
+import { open, readFile, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
 export const COORDINATION_CAPABILITY = "HOST_LOCAL_FILESYSTEM_ONLY" as const;
@@ -41,8 +42,22 @@ export async function acquireHostLocalCoordinationGuard(
         fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
         0o600,
       );
+      const guardToken = randomBytes(32).toString("hex");
       try {
-        await handle.writeFile(`${process.pid.toString(10)}\n`);
+        await handle.writeFile(`${process.pid.toString(10)}\n${guardToken}\n`);
+      } catch {
+        await handle.close();
+        await unlinkQuiet(lockPath);
+        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN", "IO_FAILURE"] };
+      }
+      let identity: { token: string; dev: bigint; ino: bigint };
+      try {
+        const created = await handle.stat();
+        identity = {
+          token: guardToken,
+          dev: BigInt(created.dev),
+          ino: BigInt(created.ino),
+        };
       } catch {
         await handle.close();
         await unlinkQuiet(lockPath);
@@ -53,8 +68,7 @@ export async function acquireHostLocalCoordinationGuard(
         guard: {
           capability: COORDINATION_CAPABILITY,
           release: async () => {
-            await handle.close();
-            await unlinkQuiet(lockPath);
+            await releaseOwnedLock(lockPath, handle, identity);
           },
         },
       };
@@ -93,8 +107,8 @@ async function probeHolder(lockPath: string): Promise<Liveness> {
     }
     return "UNCERTAIN";
   }
-  const pidText = raw.trim();
-  if (pidText.length === 0) {
+  const pidText = lockPidText(raw);
+  if (pidText === "") {
     return "LIVE";
   }
   if (!PID_PATTERN.test(pidText)) {
@@ -154,6 +168,44 @@ async function recoverStaleLock(
   await unlinkQuiet(lockPath);
   await unlinkQuiet(recoverPath);
   return "RECOVERED";
+}
+
+async function releaseOwnedLock(
+  lockPath: string,
+  handle: Awaited<ReturnType<typeof open>>,
+  identity: { token: string; dev: bigint; ino: bigint },
+): Promise<void> {
+  try {
+    const current = await stat(lockPath);
+    const raw = await readFile(lockPath);
+    const sameInode = BigInt(current.dev) === identity.dev && BigInt(current.ino) === identity.ino;
+    const sameToken = lockTokenText(raw) === identity.token;
+    await handle.close();
+    if (sameInode && sameToken) {
+      await unlinkQuiet(lockPath);
+    }
+  } catch {
+    try {
+      await handle.close();
+    } catch {
+      // Handle already closed or unusable; never unlink a replaced lock.
+    }
+  }
+}
+
+function lockPidText(raw: string): string {
+  const firstLine = raw.split("\n")[0] ?? "";
+  return firstLine.trim();
+}
+
+function lockTokenText(raw: Buffer | string): string | null {
+  const text = typeof raw === "string" ? raw : raw.toString("utf8");
+  const tokenLine = text.split("\n")[1];
+  if (tokenLine === undefined) {
+    return null;
+  }
+  const token = tokenLine.trim();
+  return token.length === 0 ? null : token;
 }
 
 async function unlinkQuiet(target: string): Promise<void> {

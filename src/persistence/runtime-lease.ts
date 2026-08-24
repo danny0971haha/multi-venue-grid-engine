@@ -9,8 +9,10 @@ import {
   sortPhase2BReasonCodes,
 } from "./atomic-pair-store.js";
 import {
+  buildDurableEnvelope,
   isCanonicalGenerationString,
   parseAndValidateDurableEnvelope,
+  SUPPORTED_SCHEMA_VERSION,
 } from "./durable-envelope.js";
 import type { PairInspection } from "./exact-pair-inspection.js";
 import { inspectExactPair } from "./exact-pair-inspection.js";
@@ -19,7 +21,17 @@ import {
   COORDINATION_CAPABILITY,
   isHostLocalCoordinationMode,
 } from "./lease-coordination.js";
+import type { LeaseWitnessOperation, WitnessDecision } from "./lease-witness.js";
+import {
+  appendLeaseWitnessLine,
+  applyWitnessFaultHookForTests,
+  evaluateLeaseWitness,
+  HOST_LOCAL_SERIALIZED_MUTATION_LIMITATION,
+  loadLeaseWitnessLog,
+} from "./lease-witness.js";
 import type { LatchState, RuntimePersistenceLatch } from "./runtime-persistence-latch.js";
+
+export { HOST_LOCAL_SERIALIZED_MUTATION_LIMITATION };
 
 export const LEASE_KIND = "runtime-lease";
 export const LEASE_STATE_NAME = "runtime-lease";
@@ -76,6 +88,7 @@ export type LeaseResult = {
   coordinationCapability: typeof COORDINATION_CAPABILITY;
   distributedFencingProven: false;
   inspection: PairInspection;
+  incompleteWitnessFinalization: boolean;
 };
 
 export type FencedMutationOutcome = "SENT" | "NOT_SENT" | "UNKNOWN";
@@ -89,6 +102,7 @@ export type FencedMutationResult<T> = {
   latchState: LatchState;
   coordinationCapability: typeof COORDINATION_CAPABILITY;
   distributedFencingProven: false;
+  incompleteWitnessFinalization: boolean;
 };
 
 export type LeaseOperationRequest = {
@@ -148,6 +162,18 @@ export const PHASE_2C_REASON_CODE_CATALOG = [
   "MUTATION_SENT",
   "FENCED_CALLBACK_THREW",
   "LATCH_ALREADY_BLOCKED",
+  "INVALID_CLOCK",
+  "CLOCK_PROVIDER_FAILED",
+  "LEASE_ROLLBACK_DETECTED",
+  "INCOMPLETE_WITNESS_FINALIZATION",
+  "WITNESS_MALFORMED",
+  "WITNESS_TRUNCATED",
+  "WITNESS_HASH_CONFLICT",
+  "WITNESS_DUPLICATE_CONFLICT",
+  "WITNESS_MISSING",
+  "WITNESS_PREPARE_UNMATCHED",
+  "WITNESS_IO_FAILURE",
+  "WITNESS_SECRET_PROHIBITED",
 ] as const;
 
 const OWNER_ID_PATTERN = /^[A-Za-z][A-Za-z0-9._:-]{0,63}$/;
@@ -250,6 +276,7 @@ export function formatLeaseResultDiagnostic(result: LeaseResult): string {
             observedExpiresAt: result.authority.observedExpiresAt,
           },
     latchState: result.latchState,
+    incompleteWitnessFinalization: result.incompleteWitnessFinalization,
     inspection: {
       pairStatus: result.inspection.pairStatus,
       pairAuthorityProven: result.inspection.pairAuthorityProven,
@@ -269,7 +296,11 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
     }
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     if (inspection.pairStatus === "BOTH_ABSENT") {
-      return initializeFirstLease(request, nowMs);
+      const gated = await gateWitness(request, inspection, null, true);
+      if (!gated.ok) {
+        return gated.result;
+      }
+      return initializeFirstLease(request, nowMs, inspection);
     }
     if (!inspection.pairAuthorityProven) {
       return leaseFail(
@@ -283,6 +314,10 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
     const parsed = parseProvenLease(inspection);
     if (!parsed.ok) {
       return leaseFail(request, "AUTHORITY_UNPROVEN", parsed.reasonCodes, inspection, true);
+    }
+    const gated = await gateWitness(request, inspection, parsed.record.generation, false);
+    if (!gated.ok) {
+      return gated.result;
     }
     if (hasObservedRegression(request.directory, request.scopeKey, parsed.record.generation)) {
       return leaseFail(
@@ -326,10 +361,16 @@ export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise
         matched.blockLatch,
       );
     }
-    const nextHeartbeatAt = maxTimestamp(matched.record.heartbeatAt, canonicalTimestamp(nowMs));
+    const gated = await gateWitness(request, inspection, matched.record.generation, false);
+    if (!gated.ok) {
+      return gated.result;
+    }
+    const nowTs = canonicalTimestamp(nowMs);
+    const nextHeartbeatAt = maxTimestamp(matched.record.heartbeatAt, nowTs);
     if (compareTimestamp(nextHeartbeatAt, matched.record.heartbeatAt) < 0) {
       return leaseFail(request, "AUTHORITY_UNPROVEN", ["HEARTBEAT_REGRESSION"], inspection, true);
     }
+    const nextUpdatedAt = maxTimestamp(nextHeartbeatAt, nowTs);
     const next: RuntimeLeaseRecord = {
       schemaVersion: 1,
       scopeKey: matched.record.scopeKey,
@@ -340,11 +381,18 @@ export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise
       acquiredAt: matched.record.acquiredAt,
       heartbeatAt: nextHeartbeatAt,
       expiresAt: addTtl(nextHeartbeatAt),
-      updatedAt: canonicalTimestamp(nowMs),
+      updatedAt: nextUpdatedAt,
     };
-    return commitLeaseTransition(request, next, inspection, "HEARTBEAT_COMMITTED", [
-      "LEASE_HEARTBEAT_COMMITTED",
-    ]);
+    return commitWitnessedLease({
+      request,
+      nowTs,
+      operation: "HEARTBEAT",
+      record: next,
+      inspection,
+      mode: "TRANSITION",
+      disposition: "HEARTBEAT_COMMITTED",
+      extraCodes: ["LEASE_HEARTBEAT_COMMITTED"],
+    });
   });
 }
 
@@ -364,6 +412,10 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
         matched.blockLatch,
       );
     }
+    const gated = await gateWitness(request, inspection, matched.record.generation, false);
+    if (!gated.ok) {
+      return gated.result;
+    }
     const next: RuntimeLeaseRecord = {
       schemaVersion: 1,
       scopeKey: matched.record.scopeKey,
@@ -374,11 +426,18 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
       acquiredAt: matched.record.acquiredAt,
       heartbeatAt: matched.record.heartbeatAt,
       expiresAt: matched.record.expiresAt,
-      updatedAt: canonicalTimestamp(nowMs),
+      updatedAt: maxTimestamp(matched.record.heartbeatAt, canonicalTimestamp(nowMs)),
     };
-    const committed = await commitLeaseTransition(request, next, inspection, "RELEASED", [
-      "LEASE_RELEASED",
-    ]);
+    const committed = await commitWitnessedLease({
+      request,
+      nowTs: canonicalTimestamp(nowMs),
+      operation: "RELEASE",
+      record: next,
+      inspection,
+      mode: "TRANSITION",
+      disposition: "RELEASED",
+      extraCodes: ["LEASE_RELEASED"],
+    });
     if (committed.authority !== null) {
       fenceToken(request.directory, committed.authority);
     }
@@ -402,6 +461,10 @@ export async function assertCurrentLease(request: LeaseTokenRequest): Promise<Le
         matched.blockLatch,
       );
     }
+    const gated = await gateWitness(request, inspection, matched.record.generation, false);
+    if (!gated.ok) {
+      return gated.result;
+    }
     return {
       disposition: "ACQUIRED",
       authority: matched.authority,
@@ -412,26 +475,25 @@ export async function assertCurrentLease(request: LeaseTokenRequest): Promise<Le
       coordinationCapability: COORDINATION_CAPABILITY,
       distributedFencingProven: false,
       inspection,
+      incompleteWitnessFinalization: false,
     };
   });
 }
 
 export async function runLeaseFencedMutation<T>(
-  request: LeaseTokenRequest & { mutation: () => T },
+  request: LeaseTokenRequest & { mutation: () => T | Promise<T> },
 ): Promise<FencedMutationResult<T>> {
   const distributed = distributedFailure(request);
   if (distributed !== null) {
-    return mutationFail(request, distributed, false);
+    return mutationFail(request, distributed);
   }
   if (request.latch.blocked) {
-    return mutationFail(request, ["LATCH_ALREADY_BLOCKED", "MUTATION_NOT_SENT"], false);
+    return mutationFail(request, ["LATCH_ALREADY_BLOCKED", "MUTATION_NOT_SENT"]);
   }
   if (isTokenFenced(request.directory, request.authority)) {
-    return mutationFail(request, ["FENCED_OWNER", "STALE_LEASE_TOKEN", "MUTATION_NOT_SENT"], false);
+    return mutationFail(request, ["FENCED_OWNER", "STALE_LEASE_TOKEN", "MUTATION_NOT_SENT"]);
   }
 
-  const clock = request.clock ?? systemLeaseClock();
-  const nowMs = clock.nowMs();
   const guard = await acquireHostLocalCoordinationGuard(request.directory);
   if (!guard.ok) {
     request.latch.block(guard.reasonCodes);
@@ -439,8 +501,34 @@ export async function runLeaseFencedMutation<T>(
   }
 
   try {
+    const clock = request.clock ?? systemLeaseClock();
+    const firstClock = readValidatedClock(clock);
+    if (!firstClock.ok) {
+      request.latch.block(firstClock.reasonCodes);
+      return mutationFail(request, [...firstClock.reasonCodes, "MUTATION_NOT_SENT"], true);
+    }
+
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
-    const matched = matchDurableToken(request, inspection, nowMs, {
+    const witness = await inspectWitnessDecision(
+      request.directory,
+      inspection,
+      fencingFrom(inspection),
+    );
+    if (!witness.ok) {
+      request.latch.block(witness.reasonCodes);
+      return mutationFail(request, [...witness.reasonCodes, "MUTATION_NOT_SENT"], true, {
+        incompleteWitnessFinalization: witness.incompleteWitnessFinalization,
+      });
+    }
+    if (witness.decision.kind !== "ALLOW_CONTINUE") {
+      const codes = witnessDecisionCodes(witness.decision);
+      request.latch.block(codes);
+      return mutationFail(request, [...codes, "MUTATION_NOT_SENT"], true, {
+        incompleteWitnessFinalization: witness.decision.kind === "INCOMPLETE_FINALIZATION",
+      });
+    }
+
+    const matched = matchDurableToken(request, inspection, firstClock.nowMs, {
       requireActive: true,
       requireUnexpired: true,
     });
@@ -451,63 +539,49 @@ export async function runLeaseFencedMutation<T>(
       if (matched.fenceCaller) {
         fenceToken(request.directory, request.authority);
       }
-      return {
-        outcome: "NOT_SENT",
-        value: null,
-        allowRiskIncrease: false,
-        reasonCodes: sortLeaseCodes([...matched.reasonCodes, "MUTATION_NOT_SENT"]),
-        callbackCount: 0,
-        latchState: request.latch.snapshot(),
-        coordinationCapability: COORDINATION_CAPABILITY,
-        distributedFencingProven: false,
-      };
+      return mutationFail(
+        request,
+        [...matched.reasonCodes, "MUTATION_NOT_SENT"],
+        matched.blockLatch,
+      );
     }
 
     if (preCallbackHookForTests !== null) {
       preCallbackHookForTests();
     }
 
-    const syncCheck = synchronousFenceCheck(request, matched.authority, nowMs);
+    const finalClock = readValidatedClock(clock);
+    if (!finalClock.ok) {
+      request.latch.block(finalClock.reasonCodes);
+      return mutationFail(request, [...finalClock.reasonCodes, "MUTATION_NOT_SENT"], true);
+    }
+
+    const syncCheck = synchronousFenceCheck(request, request.authority, finalClock.nowMs);
     if (!syncCheck.ok) {
       if (syncCheck.blockLatch) {
         request.latch.block(syncCheck.reasonCodes);
       }
       fenceToken(request.directory, request.authority);
-      return {
-        outcome: "NOT_SENT",
-        value: null,
-        allowRiskIncrease: false,
-        reasonCodes: sortLeaseCodes([...syncCheck.reasonCodes, "MUTATION_NOT_SENT"]),
-        callbackCount: 0,
-        latchState: request.latch.snapshot(),
-        coordinationCapability: COORDINATION_CAPABILITY,
-        distributedFencingProven: false,
-      };
+      return mutationFail(
+        request,
+        [...syncCheck.reasonCodes, "MUTATION_NOT_SENT"],
+        syncCheck.blockLatch,
+      );
     }
 
     try {
-      const value = request.mutation();
-      return {
-        outcome: "SENT",
-        value,
-        allowRiskIncrease: false,
-        reasonCodes: sortLeaseCodes(["MUTATION_SENT"]),
-        callbackCount: 1,
-        latchState: request.latch.snapshot(),
-        coordinationCapability: COORDINATION_CAPABILITY,
-        distributedFencingProven: false,
-      };
+      const maybeValue = request.mutation();
+      if (isPromiseLike(maybeValue)) {
+        try {
+          const value = await maybeValue;
+          return mutationSent(request, value);
+        } catch {
+          return mutationUnknown(request);
+        }
+      }
+      return mutationSent(request, maybeValue);
     } catch {
-      return {
-        outcome: "UNKNOWN",
-        value: null,
-        allowRiskIncrease: false,
-        reasonCodes: sortLeaseCodes(["FENCED_CALLBACK_THREW"]),
-        callbackCount: 1,
-        latchState: request.latch.snapshot(),
-        coordinationCapability: COORDINATION_CAPABILITY,
-        distributedFencingProven: false,
-      };
+      return mutationUnknown(request);
     }
   } finally {
     await guard.guard.release();
@@ -530,14 +604,16 @@ async function withLeaseCoordination(
   if (request.latch.blocked) {
     return leaseFail(request, "BLOCKED", ["LATCH_ALREADY_BLOCKED", "LEASE_BLOCKED"]);
   }
-  const clock = request.clock ?? systemLeaseClock();
-  const nowMs = clock.nowMs();
   const guard = await acquireHostLocalCoordinationGuard(request.directory);
   if (!guard.ok) {
     return leaseFail(request, "AUTHORITY_UNPROVEN", guard.reasonCodes, undefined, true);
   }
   try {
-    return await run(nowMs);
+    const clockRead = readValidatedClock(request.clock ?? systemLeaseClock());
+    if (!clockRead.ok) {
+      return leaseFail(request, "AUTHORITY_UNPROVEN", clockRead.reasonCodes, undefined, true);
+    }
+    return await run(clockRead.nowMs);
   } finally {
     await guard.guard.release();
   }
@@ -546,6 +622,7 @@ async function withLeaseCoordination(
 async function initializeFirstLease(
   request: LeaseOperationRequest,
   nowMs: bigint,
+  inspection: PairInspection,
 ): Promise<LeaseResult> {
   const now = canonicalTimestamp(nowMs);
   const record = makeLeaseRecord({
@@ -559,25 +636,16 @@ async function initializeFirstLease(
     expiresAt: addTtl(now),
     updatedAt: now,
   });
-  const persist = await initializeExactPair({
-    directory: request.directory,
-    stateName: LEASE_STATE_NAME,
-    expectedKind: LEASE_KIND,
-    expectedScopeKey: request.scopeKey,
-    payload: record,
-    bootstrapAuthorization: { mode: "NON_LIVE_BOOTSTRAP", allowLive: false },
-    latch: request.latch,
+  return commitWitnessedLease({
+    request,
+    nowTs: now,
+    operation: "INITIALIZE",
+    record,
+    inspection,
+    mode: "INITIALIZE",
+    disposition: "ACQUIRED",
+    extraCodes: ["LEASE_ACQUIRED"],
   });
-  if (persist.disposition !== "REQUESTED_STATE_COMMITTED" || persist.state === null) {
-    return leaseFail(
-      request,
-      "AUTHORITY_UNPROVEN",
-      ["LEASE_AUTHORITY_UNPROVEN", ...persist.reasonCodes],
-      persist.inspection,
-      true,
-    );
-  }
-  return authorityFromPersist(request, persist.state, persist, "ACQUIRED", ["LEASE_ACQUIRED"]);
 }
 
 async function takeoverLease(
@@ -605,53 +673,115 @@ async function takeoverLease(
     expiresAt: addTtl(now),
     updatedAt: now,
   });
-  const persist = await persistExactPairTransition({
-    directory: request.directory,
-    stateName: LEASE_STATE_NAME,
-    expectedKind: LEASE_KIND,
-    expectedScopeKey: request.scopeKey,
-    expectedGeneration: inspection.generation,
-    expectedPredecessorEnvelopeSha256: inspection.envelopeSha256,
-    payload: record,
-    latch: request.latch,
+  return commitWitnessedLease({
+    request,
+    nowTs: now,
+    operation: "TAKEOVER",
+    record,
+    inspection,
+    mode: "TRANSITION",
+    disposition: "ACQUIRED",
+    extraCodes: ["LEASE_ACQUIRED"],
   });
-  if (persist.disposition !== "REQUESTED_STATE_COMMITTED" || persist.state === null) {
-    return leaseFail(
-      request,
-      "AUTHORITY_UNPROVEN",
-      ["LEASE_AUTHORITY_UNPROVEN", ...persist.reasonCodes],
-      persist.inspection,
-      true,
-    );
-  }
-  return authorityFromPersist(request, persist.state, persist, "ACQUIRED", ["LEASE_ACQUIRED"]);
 }
 
-async function commitLeaseTransition(
+async function commitWitnessedLease(args: {
   request: {
     directory: string;
     scopeKey: string;
     latch: RuntimePersistenceLatch;
-    authority?: LeaseAuthority;
-  },
-  next: RuntimeLeaseRecord,
-  inspection: PairInspection,
-  disposition: LeaseDisposition,
-  extraCodes: string[],
-): Promise<LeaseResult> {
-  if (inspection.envelopeSha256 === null || inspection.generation === null) {
-    return leaseFail(request, "AUTHORITY_UNPROVEN", ["LEASE_AUTHORITY_UNPROVEN"], inspection, true);
+  };
+  nowTs: string;
+  operation: LeaseWitnessOperation;
+  record: RuntimeLeaseRecord;
+  inspection: PairInspection;
+  mode: "INITIALIZE" | "TRANSITION";
+  disposition: LeaseDisposition;
+  extraCodes: string[];
+}): Promise<LeaseResult> {
+  const { request, record, inspection } = args;
+  let storeGeneration: string;
+  let previousEnvelopeSha256: string | null;
+  if (args.mode === "INITIALIZE") {
+    storeGeneration = "1";
+    previousEnvelopeSha256 = null;
+  } else {
+    if (inspection.envelopeSha256 === null || inspection.generation === null) {
+      return leaseFail(
+        request,
+        "AUTHORITY_UNPROVEN",
+        ["LEASE_AUTHORITY_UNPROVEN"],
+        inspection,
+        true,
+      );
+    }
+    const nextStore = incrementCanonicalGeneration(inspection.generation);
+    if (!nextStore.ok) {
+      return leaseFail(request, "AUTHORITY_UNPROVEN", [nextStore.reasonCode], inspection, true);
+    }
+    storeGeneration = nextStore.generation;
+    previousEnvelopeSha256 = inspection.envelopeSha256;
   }
-  const persist = await persistExactPairTransition({
+
+  let targetSha256: string;
+  try {
+    targetSha256 = buildDurableEnvelope({
+      schemaVersion: SUPPORTED_SCHEMA_VERSION,
+      kind: LEASE_KIND,
+      scopeKey: request.scopeKey,
+      storeGeneration,
+      previousEnvelopeSha256,
+      payload: record,
+    }).envelope.envelopeSha256;
+  } catch {
+    return leaseFail(
+      request,
+      "AUTHORITY_UNPROVEN",
+      ["CANONICALIZATION_REJECTED", "LEASE_AUTHORITY_UNPROVEN"],
+      inspection,
+      true,
+    );
+  }
+
+  const prepare = await appendLeaseWitnessLine({
     directory: request.directory,
-    stateName: LEASE_STATE_NAME,
-    expectedKind: LEASE_KIND,
-    expectedScopeKey: request.scopeKey,
-    expectedGeneration: inspection.generation,
-    expectedPredecessorEnvelopeSha256: inspection.envelopeSha256,
-    payload: next,
-    latch: request.latch,
+    scopeKey: request.scopeKey,
+    operation: args.operation,
+    fencingGeneration: record.generation,
+    leaseStoreGeneration: storeGeneration,
+    targetEnvelopeSha256: targetSha256,
+    ownerId: record.ownerId,
+    processInstanceId: record.processInstanceId,
+    status: "PREPARE",
+    createdAt: args.nowTs,
   });
+  if (!prepare.ok) {
+    return leaseFail(request, "AUTHORITY_UNPROVEN", prepare.reasonCodes, inspection, true);
+  }
+  await applyWitnessFaultHookForTests("AFTER_PREPARE_FSYNC");
+
+  const persist =
+    args.mode === "INITIALIZE"
+      ? await initializeExactPair({
+          directory: request.directory,
+          stateName: LEASE_STATE_NAME,
+          expectedKind: LEASE_KIND,
+          expectedScopeKey: request.scopeKey,
+          payload: record,
+          bootstrapAuthorization: { mode: "NON_LIVE_BOOTSTRAP", allowLive: false },
+          latch: request.latch,
+        })
+      : await persistExactPairTransition({
+          directory: request.directory,
+          stateName: LEASE_STATE_NAME,
+          expectedKind: LEASE_KIND,
+          expectedScopeKey: request.scopeKey,
+          expectedGeneration: inspection.generation ?? "",
+          expectedPredecessorEnvelopeSha256: inspection.envelopeSha256 ?? "",
+          payload: record,
+          latch: request.latch,
+        });
+
   if (persist.disposition !== "REQUESTED_STATE_COMMITTED" || persist.state === null) {
     return leaseFail(
       request,
@@ -661,7 +791,33 @@ async function commitLeaseTransition(
       true,
     );
   }
-  return authorityFromPersist(request, persist.state, persist, disposition, extraCodes);
+
+  await applyWitnessFaultHookForTests("BEFORE_COMMIT_WITNESS");
+
+  const commit = await appendLeaseWitnessLine({
+    directory: request.directory,
+    scopeKey: request.scopeKey,
+    operation: args.operation,
+    fencingGeneration: record.generation,
+    leaseStoreGeneration: storeGeneration,
+    targetEnvelopeSha256: targetSha256,
+    ownerId: record.ownerId,
+    processInstanceId: record.processInstanceId,
+    status: "COMMIT",
+    createdAt: args.nowTs,
+  });
+  if (!commit.ok) {
+    return leaseFail(
+      request,
+      "AUTHORITY_UNPROVEN",
+      ["INCOMPLETE_WITNESS_FINALIZATION", ...commit.reasonCodes],
+      persist.inspection,
+      true,
+      true,
+    );
+  }
+  await applyWitnessFaultHookForTests("AFTER_COMMIT_WITNESS");
+  return authorityFromPersist(request, persist.state, persist, args.disposition, args.extraCodes);
 }
 
 function authorityFromPersist(
@@ -710,6 +866,7 @@ function authorityFromPersist(
     coordinationCapability: COORDINATION_CAPABILITY,
     distributedFencingProven: false,
     inspection: persist.inspection,
+    incompleteWitnessFinalization: false,
   };
 }
 
@@ -820,6 +977,21 @@ function matchDurableToken(
   if (parsed.record.generation !== request.authority.generation) {
     mismatches.push("LEASE_GENERATION_MISMATCH", "STALE_LEASE_TOKEN");
   }
+  if (
+    inspection.envelopeSha256 === null ||
+    inspection.envelopeSha256 !== request.authority.leaseEnvelopeSha256
+  ) {
+    mismatches.push("STALE_LEASE_TOKEN", "FORGED_LEASE_TOKEN");
+  }
+  if (
+    inspection.generation === null ||
+    inspection.generation !== request.authority.leaseStoreGeneration
+  ) {
+    mismatches.push("STALE_LEASE_TOKEN", "FORGED_LEASE_TOKEN");
+  }
+  if (parsed.record.expiresAt !== request.authority.observedExpiresAt) {
+    mismatches.push("STALE_LEASE_TOKEN", "FORGED_LEASE_TOKEN");
+  }
   if (mismatches.length > 0) {
     return {
       ok: false,
@@ -860,13 +1032,13 @@ function matchDurableToken(
     ok: true,
     record: parsed.record,
     authority: {
-      scopeKey: parsed.record.scopeKey,
-      ownerId: parsed.record.ownerId,
-      processInstanceId: parsed.record.processInstanceId,
-      generation: parsed.record.generation,
-      leaseEnvelopeSha256: inspection.envelopeSha256,
-      leaseStoreGeneration: inspection.generation,
-      observedExpiresAt: parsed.record.expiresAt,
+      scopeKey: request.authority.scopeKey,
+      ownerId: request.authority.ownerId,
+      processInstanceId: request.authority.processInstanceId,
+      generation: request.authority.generation,
+      leaseEnvelopeSha256: request.authority.leaseEnvelopeSha256,
+      leaseStoreGeneration: request.authority.leaseStoreGeneration,
+      observedExpiresAt: request.authority.observedExpiresAt,
     },
   };
 }
@@ -1065,10 +1237,28 @@ function addTtl(heartbeatAt: string): string {
 }
 
 function canonicalTimestamp(nowMs: bigint): string {
-  if (nowMs < 0n || nowMs > MAX_TIMESTAMP_MS) {
-    throw new Error("MALFORMED_TIMESTAMP");
-  }
   return nowMs.toString(10);
+}
+
+function readValidatedClock(
+  clock: LeaseClock,
+): { ok: true; nowMs: bigint } | { ok: false; reasonCodes: string[] } {
+  let raw: unknown;
+  try {
+    raw = (clock.nowMs as () => unknown)();
+  } catch {
+    return { ok: false, reasonCodes: ["CLOCK_PROVIDER_FAILED", "INVALID_CLOCK"] };
+  }
+  if (typeof raw !== "bigint") {
+    return { ok: false, reasonCodes: ["INVALID_CLOCK", "MALFORMED_TIMESTAMP"] };
+  }
+  if (raw < 0n) {
+    return { ok: false, reasonCodes: ["INVALID_CLOCK", "MALFORMED_TIMESTAMP"] };
+  }
+  if (raw > MAX_TIMESTAMP_MS) {
+    return { ok: false, reasonCodes: ["INVALID_CLOCK", "EXCESSIVE_TIMESTAMP"] };
+  }
+  return { ok: true, nowMs: raw };
 }
 
 function maxTimestamp(left: string, right: string): string {
@@ -1172,6 +1362,7 @@ function leaseFail(
   reasonCodes: string[],
   inspection?: PairInspection,
   blockLatch = false,
+  incompleteWitnessFinalization = false,
 ): LeaseResult {
   const codes = sortLeaseCodes([
     ...reasonCodes,
@@ -1203,13 +1394,15 @@ function leaseFail(
         reasonCodes: sortPhase2BReasonCodes(codes),
         allowRiskIncrease: false,
       } satisfies PairInspection),
+    incompleteWitnessFinalization,
   };
 }
 
 function mutationFail(
   request: { latch: RuntimePersistenceLatch },
   reasonCodes: string[],
-  _blocked: boolean,
+  _blocked = false,
+  extras?: { incompleteWitnessFinalization?: boolean },
 ): FencedMutationResult<never> {
   return {
     outcome: "NOT_SENT",
@@ -1220,7 +1413,129 @@ function mutationFail(
     latchState: request.latch.snapshot(),
     coordinationCapability: COORDINATION_CAPABILITY,
     distributedFencingProven: false,
+    incompleteWitnessFinalization: extras?.incompleteWitnessFinalization === true,
   };
+}
+
+function mutationSent<T>(
+  request: { latch: RuntimePersistenceLatch },
+  value: T,
+): FencedMutationResult<T> {
+  return {
+    outcome: "SENT",
+    value,
+    allowRiskIncrease: false,
+    reasonCodes: sortLeaseCodes(["MUTATION_SENT"]),
+    callbackCount: 1,
+    latchState: request.latch.snapshot(),
+    coordinationCapability: COORDINATION_CAPABILITY,
+    distributedFencingProven: false,
+    incompleteWitnessFinalization: false,
+  };
+}
+
+function mutationUnknown(request: { latch: RuntimePersistenceLatch }): FencedMutationResult<never> {
+  return {
+    outcome: "UNKNOWN",
+    value: null,
+    allowRiskIncrease: false,
+    reasonCodes: sortLeaseCodes(["FENCED_CALLBACK_THREW"]),
+    callbackCount: 1,
+    latchState: request.latch.snapshot(),
+    coordinationCapability: COORDINATION_CAPABILITY,
+    distributedFencingProven: false,
+    incompleteWitnessFinalization: false,
+  };
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof (value as Promise<T>).then === "function"
+  );
+}
+
+async function gateWitness(
+  request: { directory: string; latch: RuntimePersistenceLatch },
+  inspection: PairInspection,
+  fencingGeneration: string | null,
+  allowInitialize: boolean,
+): Promise<{ ok: true; decision: WitnessDecision } | { ok: false; result: LeaseResult }> {
+  const inspected = await inspectWitnessDecision(request.directory, inspection, fencingGeneration);
+  if (!inspected.ok) {
+    return {
+      ok: false,
+      result: leaseFail(
+        request,
+        "AUTHORITY_UNPROVEN",
+        inspected.reasonCodes,
+        inspection,
+        true,
+        inspected.incompleteWitnessFinalization,
+      ),
+    };
+  }
+  if (inspected.decision.kind === "ALLOW_INITIALIZE" && allowInitialize) {
+    return { ok: true, decision: inspected.decision };
+  }
+  if (inspected.decision.kind === "ALLOW_CONTINUE") {
+    return { ok: true, decision: inspected.decision };
+  }
+  const codes = witnessDecisionCodes(inspected.decision);
+  return {
+    ok: false,
+    result: leaseFail(
+      request,
+      inspected.decision.kind === "ROLLBACK" ? "AUTHORITY_UNPROVEN" : "AUTHORITY_UNPROVEN",
+      codes,
+      inspection,
+      true,
+      inspected.decision.kind === "INCOMPLETE_FINALIZATION",
+    ),
+  };
+}
+
+async function inspectWitnessDecision(
+  directory: string,
+  inspection: PairInspection,
+  fencingGeneration: string | null,
+): Promise<
+  | { ok: true; decision: WitnessDecision }
+  | { ok: false; reasonCodes: string[]; incompleteWitnessFinalization: boolean }
+> {
+  const loaded = await loadLeaseWitnessLog(directory);
+  if (!loaded.ok) {
+    return {
+      ok: false,
+      reasonCodes: loaded.reasonCodes,
+      incompleteWitnessFinalization: false,
+    };
+  }
+  return {
+    ok: true,
+    decision: evaluateLeaseWitness({
+      log: loaded,
+      inspection,
+      fencingGeneration,
+    }),
+  };
+}
+
+function fencingFrom(inspection: PairInspection): string | null {
+  if (inspection.primary.status !== "VALID") {
+    return null;
+  }
+  const parsed = parseLeaseRecord(inspection.primary.envelope.payload);
+  return parsed.ok ? parsed.record.generation : null;
+}
+
+function witnessDecisionCodes(decision: WitnessDecision): string[] {
+  if (decision.kind === "ALLOW_INITIALIZE" || decision.kind === "ALLOW_CONTINUE") {
+    return [];
+  }
+  return decision.reasonCodes;
 }
 
 function sortLeaseCodes(codes: readonly string[]): string[] {
