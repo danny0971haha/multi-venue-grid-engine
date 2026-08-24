@@ -184,7 +184,7 @@ fullEnvelopeBytes =
 
 Do not include `envelopeSha256` recursively in its own hash input.
 
-`buildDurableEnvelope` canonicalizes `fields.payload` exactly once, JSON-parses those canonical bytes into a detached snapshot, and uses that snapshot for envelope hash input, the returned envelope payload, and `fullEnvelopeBytes`. It does not observe the caller-owned payload again. Runtime scalar fields (`schemaVersion`, `kind`, `scopeKey`, `storeGeneration`, `previousEnvelopeSha256`) are type-checked before regex tests so values are not accepted by `RegExp` string coercion.
+`buildDurableEnvelope` uses Approach A: at entry it explicitly reads each caller-owned field once into locals (`schemaVersion`, `kind`, `scopeKey`, `storeGeneration`, `previousEnvelopeSha256`, `payload`). It does not spread the caller `fields` object and does not observe that object after the snapshot, including for error diagnostics. Documented observation count per accepted input field: 1. Validation uses only the captured metadata. Payload is canonicalized exactly once from the captured payload reference, JSON-parsed into a detached snapshot, and that detached snapshot is the payload used for `payloadSha256`, envelope hash input, the returned envelope, and `fullEnvelopeBytes`. Runtime scalar fields are type-checked before regex tests so values are not accepted by `RegExp` string coercion.
 
 ### 4.1 Field validation
 
