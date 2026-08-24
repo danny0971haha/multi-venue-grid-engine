@@ -26,6 +26,7 @@ import type {
   AtomicWriteTarget,
 } from "../../src/persistence/atomic-pair-store.js";
 import type { LeaseAuthority, RuntimeLeaseRecord } from "../../src/persistence/runtime-lease.js";
+import { seedWitnessCommitForTests } from "../../src/persistence/lease-witness.js";
 import {
   LEASE_KIND,
   LEASE_STATE_NAME,
@@ -264,6 +265,17 @@ async function writeExactLeasePair(
   const primary = path.join(directory, `${LEASE_STATE_NAME}.json`);
   await writeFile(primary, built.fullEnvelopeBytes, { mode: 0o600 });
   await writeFile(`${primary}.bak`, built.fullEnvelopeBytes, { mode: 0o600 });
+  await seedWitnessCommitForTests({
+    directory,
+    scopeKey: record.scopeKey,
+    operation: record.status === "RELEASED" ? "RELEASE" : "INITIALIZE",
+    fencingGeneration: record.generation,
+    leaseStoreGeneration: storeGeneration,
+    targetEnvelopeSha256: built.envelope.envelopeSha256,
+    ownerId: record.ownerId,
+    processInstanceId: record.processInstanceId,
+    createdAt: NOW_MS.toString(10),
+  });
   return built;
 }
 
