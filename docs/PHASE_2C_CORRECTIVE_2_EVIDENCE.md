@@ -5,6 +5,47 @@ Checkpoint: recoverable host-local coordination claims after empty-lock and orph
 Requested reviewer decision: independent review of Phase 2C Corrective 2 only  
 The implementation agent does **not** declare `PHASE_2C=PASS`, `PHASE_2C_CORRECTIVE_2=PASS`, `PHASE_2D=PASS`, or `GATE_2=PASS`.
 
+## Cumulative Phase 1 integration refresh (2026-08-25)
+
+This packet is rebound to the cumulative Phase 2 integration candidate. It does **not** declare PASS for Phase 2C Corrective 2, Phase 2D Corrective 1, or Gate 2.
+
+```text
+CUMULATIVE_PHASE_2_BASELINE=REVIEW_CANDIDATE
+PHASE_2C_CORRECTIVE_2=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_1=REVIEW_CANDIDATE
+PHASE_2C_SELF_DECLARED_PASS=NO
+PHASE_2D_SELF_DECLARED_PASS=NO
+PHASE_2E_AUTHORIZED=NO
+PHASE_2E_STARTED=NO
+GATE_2=NOT_REVIEWED
+SYSTEM_ALLOW_RISK_INCREASE=false
+LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
+MERGE_AUTHORIZED=NO
+DEPLOYMENT_AUTHORIZED=NO
+ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
+RAW_PHASE_2_HEAD=a2869d68b452b7295a0baec6e98835094d87e17c
+MERGE_BASE_BEFORE=31cfe078c09a15d4906b56fb64731449ca1c598a
+INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
+INTEGRATION_MERGE_TREE=420c4184209a0c919829e5fc1b66b653d37b8460
+PHASE1_IS_ANCESTOR_OF_INTEGRATION=YES
+CONFLICTS=NONE
+TEST_REMOVAL=NO
+ASSERTION_WEAKENING=NO
+HISTORICAL_RAW_PHASE2_TEST_TOTAL=332
+HISTORICAL_RAW_PHASE2_TEST_TOTAL_AUTHORITATIVE=NO
+CUMULATIVE_LOCAL_TEST_TOTAL=358
+CUMULATIVE_LOCAL_TEST_FAIL=0
+CUMULATIVE_LOCAL_TEST_SKIP=0
+CUMULATIVE_LOCAL_TEST_TODO=0
+CUMULATIVE_LOCAL_TEST_CANCELLED=0
+NODE_VERSION=v22.23.2
+NPM_VERSION=10.9.8
+BRANCH_HEAD_CI_RUN=PENDING_AFTER_PUSH
+PR_MERGE_CI_RUN=PENDING_AFTER_PUSH
+```
+
+314 / 332 totals below are **historical / non-authoritative**. They describe earlier raw-branch heads that did not contain accepted Phase 1 Corrective 6/7. The current cumulative local total is 358.
+
 ## 1. Identity
 
 ```text
@@ -23,6 +64,11 @@ WORKTREE_CLEAN_BEFORE=YES
 PHASE_2C_CORRECTIVE_1=REJECT
 PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D_STARTED=NO
+CUMULATIVE_PHASE_2_BASELINE=REVIEW_CANDIDATE
+ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
+INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
+INTEGRATION_MERGE_TREE=420c4184209a0c919829e5fc1b66b653d37b8460
+PHASE1_IS_ANCESTOR_OF_INTEGRATION=YES
 ```
 
 Exact `STAGE_1_RESULT_HEAD` / `STAGE_1_RESULT_TREE` after the evidence commit, and GitHub Actions run IDs for that HEAD, are recorded on Draft PR #3 after push. They must not be substituted from a different SHA.
@@ -34,13 +80,15 @@ OS=Darwin
 ARCH=arm64
 LOCAL_NODE_VERSION=v26.5.0
 LOCAL_NPM_VERSION=11.17.0
+CUMULATIVE_REFRESH_NODE_VERSION=v22.23.2
+CUMULATIVE_REFRESH_NPM_VERSION=10.9.8
 PINNED_NODE_VERSION=v22.23.2
 PINNED_NPM_VERSION=10.9.8
 TYPESCRIPT_VERSION=7.0.2
 PACKAGE_MANAGER_VERSION=npm@10.9.8
 ```
 
-Local workstation Node/npm are not the pinned pair. Static checks, tests, build, secret scan, dry-run, and audit below used the local toolchain against the already-present `node_modules` tree. GitHub Actions on `ubuntu-latest` using `.node-version` is the pinned-runtime authority.
+The 2026-08-25 cumulative refresh executed `npm ci` and the full validation suite under official Node `v22.23.2` / npm `10.9.8` (extracted to `/tmp/node-v22.23.2-darwin-arm64`). Historical rows that mention workstation Node 26 remain historical only. GitHub Actions on `ubuntu-latest` using `.node-version` remains the branch-head / PR-merge pinned-runtime authority.
 
 ## 3. Scope
 
@@ -166,6 +214,13 @@ DIFF_CHECK_EXIT=0
 PRIOR_BRANCH_HEAD_TEST_TOTAL=304
 STAGE_1_TEST_TOTAL=314
 PRIOR_304_REMAIN_WITHOUT_WEAKENING=YES
+HISTORICAL_STAGE_1_TEST_TOTAL_AUTHORITATIVE=NO
+CUMULATIVE_LOCAL_TEST_TOTAL=358
+CUMULATIVE_LOCAL_TEST_PASS=358
+CUMULATIVE_LOCAL_TEST_FAIL=0
+CUMULATIVE_LOCAL_TEST_SKIP=0
+CUMULATIVE_LOCAL_TEST_TODO=0
+CUMULATIVE_LOCAL_TEST_CANCELLED=0
 ```
 
 ## 7. Contract conformance
@@ -284,6 +339,10 @@ PHASE_2C_CORRECTIVE_1_25=PASS
 CURRENT_HEAD_PUSH_CI=PENDING_AFTER_PUSH
 CURRENT_HEAD_PR_CI=PENDING_AFTER_PUSH
 CI_COMMIT_SHA=PENDING_AFTER_EVIDENCE_COMMIT
+INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
+CUMULATIVE_LOCAL_TEST_TOTAL=358
+BRANCH_HEAD_TEST_TOTAL=PENDING_AFTER_PUSH
+PR_MERGE_TEST_TOTAL=PENDING_AFTER_PUSH
 ```
 
 A CI result from a different SHA does not validate this candidate.
@@ -295,7 +354,7 @@ KNOWN_GAPS=HOST_LOCAL_SERIALIZED_MUTATION_LIMITATION; COORDINATION_CAPABILITY=HO
 UNVERIFIED_ASSUMPTIONS=NFS/SMB/multi-host lock durability remain unproven
 VENUE_DEPENDENCIES=NONE
 PLATFORM_DEPENDENCIES=POSIX exclusive create, fstat inode/dev identity, process.kill(pid, 0)
-FOLLOW_UP_REQUIRED=independent review of Corrective 2; bind exact push and pull_request CI run IDs to RESULT_HEAD; Stage 2 / Phase 2D Corrective 1 must not start unless this hard internal gate is fully green
+FOLLOW_UP_REQUIRED=independent review of Corrective 2 on the cumulative baseline; bind exact branch-head and PR-merge CI run IDs to the evidence-bind HEAD; do not start Phase 2E / Gate 2 / merge / live testing
 ```
 
 ## 13. Prohibited-action attestation

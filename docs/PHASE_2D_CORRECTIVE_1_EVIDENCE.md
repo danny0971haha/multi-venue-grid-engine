@@ -5,6 +5,48 @@ Checkpoint: full proposed-batch exposure and fail-closed invalid grid / runtime 
 Requested reviewer decision: independent review of Phase 2D Corrective 1 only  
 The implementation agent does **not** declare `PHASE_2D=PASS`, `PHASE_2D_CORRECTIVE_1=PASS`, `PHASE_2C=PASS`, or `GATE_2=PASS`.
 
+## Cumulative Phase 1 integration refresh (2026-08-25)
+
+This packet is rebound to the cumulative Phase 2 integration candidate. It does **not** declare PASS.
+
+```text
+CUMULATIVE_PHASE_2_BASELINE=REVIEW_CANDIDATE
+PHASE_2C_CORRECTIVE_2=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_1=REVIEW_CANDIDATE
+PHASE_2C_SELF_DECLARED_PASS=NO
+PHASE_2D_SELF_DECLARED_PASS=NO
+PHASE_2E_AUTHORIZED=NO
+PHASE_2E_STARTED=NO
+GATE_2=NOT_REVIEWED
+SYSTEM_ALLOW_RISK_INCREASE=false
+LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
+MERGE_AUTHORIZED=NO
+DEPLOYMENT_AUTHORIZED=NO
+ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
+RAW_PHASE_2_HEAD=a2869d68b452b7295a0baec6e98835094d87e17c
+MERGE_BASE_BEFORE=31cfe078c09a15d4906b56fb64731449ca1c598a
+INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
+INTEGRATION_MERGE_TREE=420c4184209a0c919829e5fc1b66b653d37b8460
+PHASE1_IS_ANCESTOR_OF_INTEGRATION=YES
+CONFLICTS=NONE
+TEST_REMOVAL=NO
+ASSERTION_WEAKENING=NO
+HISTORICAL_STAGE_1_TEST_TOTAL=314
+HISTORICAL_STAGE_2_TEST_TOTAL=332
+HISTORICAL_TOTALS_AUTHORITATIVE=NO
+CUMULATIVE_LOCAL_TEST_TOTAL=358
+CUMULATIVE_LOCAL_TEST_FAIL=0
+CUMULATIVE_LOCAL_TEST_SKIP=0
+CUMULATIVE_LOCAL_TEST_TODO=0
+CUMULATIVE_LOCAL_TEST_CANCELLED=0
+NODE_VERSION=v22.23.2
+NPM_VERSION=10.9.8
+BRANCH_HEAD_CI_RUN=PENDING_AFTER_PUSH
+PR_MERGE_CI_RUN=PENDING_AFTER_PUSH
+```
+
+314 / 332 totals below are **historical / non-authoritative**. They describe earlier raw-branch heads that did not contain accepted Phase 1 Corrective 6/7. The current cumulative local `npm test` total is 358.
+
 ## 1. Identity
 
 ```text
@@ -27,6 +69,11 @@ PHASE_2C_CORRECTIVE_2=REVIEW_CANDIDATE
 PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D_SELF_DECLARED_PASS=NO
 PHASE_2E_STARTED=NO
+CUMULATIVE_PHASE_2_BASELINE=REVIEW_CANDIDATE
+ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
+INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
+INTEGRATION_MERGE_TREE=420c4184209a0c919829e5fc1b66b653d37b8460
+PHASE1_IS_ANCESTOR_OF_INTEGRATION=YES
 ```
 
 Exact `STAGE_2_RESULT_HEAD` / `STAGE_2_RESULT_TREE` after the evidence commit, and GitHub Actions run IDs for that HEAD, are recorded on Draft PR #3 after push.
@@ -38,12 +85,14 @@ OS=Darwin
 ARCH=arm64
 LOCAL_NODE_VERSION=v26.5.0
 LOCAL_NPM_VERSION=11.17.0
+CUMULATIVE_REFRESH_NODE_VERSION=v22.23.2
+CUMULATIVE_REFRESH_NPM_VERSION=10.9.8
 PINNED_NODE_VERSION=v22.23.2
 PINNED_NPM_VERSION=10.9.8
 TYPESCRIPT_VERSION=7.0.2
 ```
 
-Local `npm ci` against engines `node=22.23.2` / `npm=10.9.8` is expected to fail `EBADENGINE` on this workstation. GitHub Actions on `ubuntu-latest` using `.node-version` is the pinned-runtime authority. Stage 1 push CI `32742336568` already ran `npm ci` and `# tests 314` on SHA `260dbd7ed292db7e2aa27575af6a4bb801221c70`.
+The 2026-08-25 cumulative refresh executed `npm ci` and the full validation suite under official Node `v22.23.2` / npm `10.9.8`. Historical Stage 1 push CI `32742336568` (`# tests 314` on SHA `260dbd7ed292db7e2aa27575af6a4bb801221c70`) is non-authoritative for the cumulative candidate. GitHub Actions on `ubuntu-latest` using `.node-version` remains the branch-head / PR-merge pinned-runtime authority.
 
 ## 3. Scope
 
@@ -91,6 +140,16 @@ PHASE_2E_STARTED=NO
 PRIOR_BRANCH_HEAD_TEST_TOTAL=304
 STAGE_1_TEST_TOTAL=314
 STAGE_2_TEST_TOTAL=332
+HISTORICAL_STAGE_1_TEST_TOTAL_AUTHORITATIVE=NO
+HISTORICAL_STAGE_2_TEST_TOTAL_AUTHORITATIVE=NO
+CUMULATIVE_LOCAL_TEST_TOTAL=358
+CUMULATIVE_LOCAL_TEST_PASS=358
+CUMULATIVE_LOCAL_TEST_FAIL=0
+CUMULATIVE_LOCAL_TEST_SKIP=0
+CUMULATIVE_LOCAL_TEST_TODO=0
+CUMULATIVE_LOCAL_TEST_CANCELLED=0
+CUMULATIVE_SECRET_SCAN_RESULT=Secret scan passed (108 tracked files inspected).
+CUMULATIVE_DRY_RUN_RESULT={"project":"multi-venue-grid-engine","runtimeMode":"DRY_RUN","liveExchangeWrites":false,"phase":0,"experimentSpecVersion":"0.1.0"}
 ```
 
 ## 5. Corrective matrix
@@ -122,8 +181,8 @@ P2D-C1-18 original Phase 2D tests remain PASS
 
 ```text
 KNOWN_GAPS=Phase 2E durable halt/ACK unimplemented; Phase 2F restart integration unimplemented; CONTINUE is not live authorization; HOST_LOCAL_FILESYSTEM_ONLY coordination remains
-UNVERIFIED_ASSUMPTIONS=venue fee/funding sign conventions remain caller-supplied; local npm ci under pinned Node 22.23.2 was not executed on this workstation
-FOLLOW_UP_REQUIRED=independent review of Phase 2C Corrective 2 and Phase 2D Corrective 1; do not start Phase 2E, Gate 2, merge, or live testing
+UNVERIFIED_ASSUMPTIONS=venue fee/funding sign conventions remain caller-supplied
+FOLLOW_UP_REQUIRED=independent review of Phase 2C Corrective 2 and Phase 2D Corrective 1 on the cumulative baseline; bind exact branch-head and PR-merge CI run IDs; do not start Phase 2E, Gate 2, merge, or live testing
 ```
 
 ## 7. Prohibited-action attestation
