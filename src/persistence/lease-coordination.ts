@@ -1,7 +1,22 @@
 import { randomBytes } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import { constants as fsConstants } from "node:fs";
-import { open, readFile, stat, unlink } from "node:fs/promises";
+import { access, open, stat } from "node:fs/promises";
 import path from "node:path";
+
+import type { CoordinationPathIdentity } from "./coordination-claim.js";
+import {
+  COORDINATION_IN_PROGRESS_GRACE_MS,
+  confirmPathIdentity,
+  formatCoordinationClaim,
+  probeCoordinationPath,
+  readPathInode,
+  unlinkIfMatchingIdentity,
+  unlinkIfSameInode,
+  unlinkIfStillStaleSameInode,
+} from "./coordination-claim.js";
+
+export { COORDINATION_IN_PROGRESS_GRACE_MS };
 
 export const COORDINATION_CAPABILITY = "HOST_LOCAL_FILESYSTEM_ONLY" as const;
 export const DISTRIBUTED_FENCING_PROVEN = false;
@@ -10,10 +25,10 @@ export const HOST_LOCAL_COORDINATION_MODE = "HOST_LOCAL_FILESYSTEM_ONLY" as cons
 
 export const COORDINATION_LOCK_FILE_NAME = "llock";
 export const COORDINATION_RECOVER_NAME = "llock.recover";
+export const COORDINATION_RECOVER2_NAME = "llock.recover2";
 
 const LOCK_RETRY_MS = 20;
 const DEFAULT_LOCK_DEADLINE_MS = 15_000;
-const PID_PATTERN = /^[1-9][0-9]{0,15}$/;
 
 export type CoordinationGuard = {
   capability: typeof COORDINATION_CAPABILITY;
@@ -23,6 +38,26 @@ export type CoordinationGuard = {
 export type CoordinationAcquireResult =
   | { ok: true; guard: CoordinationGuard }
   | { ok: false; reasonCodes: string[] };
+
+export type CoordinationFaultWindow =
+  | "AFTER_LLOCK_EXCL_CREATE"
+  | "AFTER_LLOCK_METADATA_WRITE"
+  | "AFTER_RECOVER_EXCL_CREATE"
+  | "AFTER_RECOVER_IDENTITY"
+  | "AFTER_STALE_LLOCK_UNLINK";
+
+export type CoordinationFaultHook = {
+  window: CoordinationFaultWindow;
+  action: "NOTIFY_AND_WAIT" | "NOTIFY_AND_WAIT_RESUME";
+  readyFilePath: string;
+  resumeFilePath?: string;
+};
+
+let coordinationFaultHookForTests: CoordinationFaultHook | null = null;
+
+export function setCoordinationFaultHookForTests(hook: CoordinationFaultHook | null): void {
+  coordinationFaultHookForTests = hook;
+}
 
 export function isHostLocalCoordinationMode(mode: string | undefined): boolean {
   return mode === undefined || mode === HOST_LOCAL_COORDINATION_MODE;
@@ -36,104 +71,69 @@ export async function acquireHostLocalCoordinationGuard(
   const deadline = Date.now() + deadlineMs;
 
   while (Date.now() <= deadline) {
-    try {
-      const handle = await open(
-        lockPath,
-        fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
-        0o600,
-      );
-      const guardToken = randomBytes(32).toString("hex");
+    const created = await exclusiveCreate(lockPath);
+    if (created.ok) {
       try {
-        await handle.writeFile(`${process.pid.toString(10)}\n${guardToken}\n`);
+        await applyCoordinationFaultHookForTests("AFTER_LLOCK_EXCL_CREATE");
       } catch {
-        await handle.close();
-        await unlinkQuiet(lockPath);
+        await abandonCreatedClaim(lockPath, created.handle, null);
         return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN", "IO_FAILURE"] };
       }
-      let identity: { token: string; dev: bigint; ino: bigint };
-      try {
-        const created = await handle.stat();
-        identity = {
-          token: guardToken,
-          dev: BigInt(created.dev),
-          ino: BigInt(created.ino),
-        };
-      } catch {
-        await handle.close();
-        await unlinkQuiet(lockPath);
+      const written = await writeClaimRecord(created.handle, lockPath);
+      if (!written.ok) {
         return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN", "IO_FAILURE"] };
+      }
+      try {
+        await applyCoordinationFaultHookForTests("AFTER_LLOCK_METADATA_WRITE");
+      } catch {
+        await abandonCreatedClaim(lockPath, created.handle, written.identity);
+        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN", "IO_FAILURE"] };
+      }
+      const confirmed = await confirmPathIdentity(lockPath, written.identity);
+      if (!confirmed) {
+        await created.handle.close();
+        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN"] };
+      }
+      if (await hasBlockingRecoverer(directory)) {
+        await unlinkIfMatchingIdentity(lockPath, written.identity);
+        await created.handle.close();
+        await delay(LOCK_RETRY_MS);
+        continue;
+      }
+      const stillOurs = await confirmPathIdentity(lockPath, written.identity);
+      if (!stillOurs) {
+        await created.handle.close();
+        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN"] };
       }
       return {
         ok: true,
         guard: {
           capability: COORDINATION_CAPABILITY,
           release: async () => {
-            await releaseOwnedLock(lockPath, handle, identity);
+            await releaseOwnedLock(lockPath, created.handle, written.identity);
           },
         },
       };
-    } catch (error) {
-      if (!hasErrorCode(error, "EEXIST")) {
-        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN", "IO_FAILURE"] };
-      }
-      const liveness = await probeHolder(lockPath);
-      if (liveness === "LIVE") {
-        await delay(LOCK_RETRY_MS);
-        continue;
-      }
-      if (liveness === "UNCERTAIN") {
-        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN"] };
-      }
-      const recovered = await recoverStaleLock(directory, lockPath);
-      if (recovered === "UNCERTAIN") {
-        return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN"] };
-      }
-      await delay(LOCK_RETRY_MS);
     }
+    if (created.code !== "EEXIST") {
+      return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN", "IO_FAILURE"] };
+    }
+    const liveness = await probeCoordinationPath(lockPath);
+    if (liveness === "LIVE" || liveness === "ABSENT") {
+      await delay(LOCK_RETRY_MS);
+      continue;
+    }
+    if (liveness === "UNCERTAIN") {
+      return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN"] };
+    }
+    const recovered = await recoverStaleLock(directory, lockPath);
+    if (recovered === "UNCERTAIN") {
+      return { ok: false, reasonCodes: ["COORDINATION_LOCK_UNCERTAIN"] };
+    }
+    await delay(LOCK_RETRY_MS);
   }
 
   return { ok: false, reasonCodes: ["COORDINATION_LOCK_TIMEOUT"] };
-}
-
-type Liveness = "LIVE" | "STALE" | "UNCERTAIN";
-
-async function probeHolder(lockPath: string): Promise<Liveness> {
-  let raw: string;
-  try {
-    raw = await readFile(lockPath, "utf8");
-  } catch (error) {
-    if (hasErrorCode(error, "ENOENT")) {
-      return "LIVE";
-    }
-    return "UNCERTAIN";
-  }
-  const pidText = lockPidText(raw);
-  if (pidText === "") {
-    return "LIVE";
-  }
-  if (!PID_PATTERN.test(pidText)) {
-    return "UNCERTAIN";
-  }
-  const alive = isProcessAlive(Number.parseInt(pidText, 10));
-  if (alive === "UNCERTAIN") {
-    return "UNCERTAIN";
-  }
-  return alive ? "LIVE" : "STALE";
-}
-
-function isProcessAlive(pid: number): boolean | "UNCERTAIN" {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    if (hasErrorCode(error, "ESRCH")) {
-      return false;
-    }
-    if (hasErrorCode(error, "EPERM")) {
-      return true;
-    }
-    return "UNCERTAIN";
-  }
 }
 
 async function recoverStaleLock(
@@ -141,48 +141,256 @@ async function recoverStaleLock(
   lockPath: string,
 ): Promise<"RECOVERED" | "RETRY" | "UNCERTAIN"> {
   const recoverPath = path.join(directory, COORDINATION_RECOVER_NAME);
-  try {
-    const handle = await open(
-      recoverPath,
-      fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
-      0o600,
-    );
-    await handle.close();
-  } catch (error) {
-    if (hasErrorCode(error, "EEXIST")) {
-      return "RETRY";
+  const created = await exclusiveCreate(recoverPath);
+  if (!created.ok) {
+    if (created.code !== "EEXIST") {
+      return "UNCERTAIN";
     }
+    return reclaimOrWaitForRecover(directory, recoverPath);
+  }
+
+  try {
+    await applyCoordinationFaultHookForTests("AFTER_RECOVER_EXCL_CREATE");
+  } catch {
+    await abandonCreatedClaim(recoverPath, created.handle, null);
     return "UNCERTAIN";
   }
 
-  const liveness = await probeHolder(lockPath);
-  if (liveness === "LIVE") {
-    await unlinkQuiet(recoverPath);
+  const written = await writeClaimRecord(created.handle, recoverPath);
+  if (!written.ok) {
+    return "UNCERTAIN";
+  }
+  const confirmed = await confirmPathIdentity(recoverPath, written.identity);
+  if (!confirmed) {
+    await created.handle.close();
+    return "RETRY";
+  }
+
+  try {
+    await applyCoordinationFaultHookForTests("AFTER_RECOVER_IDENTITY");
+  } catch {
+    await abandonCreatedClaim(recoverPath, created.handle, written.identity);
+    return "UNCERTAIN";
+  }
+
+  const stillOwned = await confirmPathIdentity(recoverPath, written.identity);
+  if (!stillOwned) {
+    await created.handle.close();
+    return "RETRY";
+  }
+
+  const liveness = await probeCoordinationPath(lockPath);
+  if (liveness === "LIVE" || liveness === "ABSENT") {
+    await unlinkIfMatchingIdentity(recoverPath, written.identity);
+    await created.handle.close();
     return "RETRY";
   }
   if (liveness === "UNCERTAIN") {
-    await unlinkQuiet(recoverPath);
+    await unlinkIfMatchingIdentity(recoverPath, written.identity);
+    await created.handle.close();
     return "UNCERTAIN";
   }
 
-  await unlinkQuiet(lockPath);
-  await unlinkQuiet(recoverPath);
+  const staleInode = await readPathInode(lockPath);
+  if (staleInode === null) {
+    await unlinkIfMatchingIdentity(recoverPath, written.identity);
+    await created.handle.close();
+    return "RETRY";
+  }
+
+  const recoverStillOurs = await confirmPathIdentity(recoverPath, written.identity);
+  if (!recoverStillOurs) {
+    await created.handle.close();
+    return "RETRY";
+  }
+
+  const unlinked = await unlinkIfStillStaleSameInode(lockPath, staleInode);
+  if (!unlinked && (await probeCoordinationPath(lockPath)) === "UNCERTAIN") {
+    await unlinkIfMatchingIdentity(recoverPath, written.identity);
+    await created.handle.close();
+    return "UNCERTAIN";
+  }
+
+  try {
+    await applyCoordinationFaultHookForTests("AFTER_STALE_LLOCK_UNLINK");
+  } catch {
+    await abandonCreatedClaim(recoverPath, created.handle, written.identity);
+    return "UNCERTAIN";
+  }
+
+  await unlinkIfMatchingIdentity(recoverPath, written.identity);
+  await created.handle.close();
   return "RECOVERED";
+}
+
+async function reclaimOrWaitForRecover(
+  directory: string,
+  recoverPath: string,
+): Promise<"RETRY" | "UNCERTAIN"> {
+  const liveness = await probeCoordinationPath(recoverPath);
+  if (liveness === "LIVE" || liveness === "ABSENT") {
+    return "RETRY";
+  }
+  if (liveness === "UNCERTAIN") {
+    return "UNCERTAIN";
+  }
+  const reclaimed = await reclaimStaleRecover(directory, recoverPath);
+  return reclaimed === "UNCERTAIN" ? "UNCERTAIN" : "RETRY";
+}
+
+async function reclaimStaleRecover(
+  directory: string,
+  recoverPath: string,
+): Promise<"RECLAIMED" | "RETRY" | "UNCERTAIN"> {
+  const recover2Path = path.join(directory, COORDINATION_RECOVER2_NAME);
+  const created = await exclusiveCreate(recover2Path);
+  if (!created.ok) {
+    if (created.code !== "EEXIST") {
+      return "UNCERTAIN";
+    }
+    const recover2Liveness = await probeCoordinationPath(recover2Path);
+    if (recover2Liveness === "LIVE" || recover2Liveness === "ABSENT") {
+      return "RETRY";
+    }
+    if (recover2Liveness === "UNCERTAIN") {
+      return "UNCERTAIN";
+    }
+    const recover2Inode = await readPathInode(recover2Path);
+    if (recover2Inode === null) {
+      return "RETRY";
+    }
+    await unlinkIfStillStaleSameInode(recover2Path, recover2Inode);
+    return "RETRY";
+  }
+
+  const written = await writeClaimRecord(created.handle, recover2Path);
+  if (!written.ok) {
+    return "UNCERTAIN";
+  }
+  const confirmed = await confirmPathIdentity(recover2Path, written.identity);
+  if (!confirmed) {
+    await created.handle.close();
+    return "RETRY";
+  }
+
+  const recoverLiveness = await probeCoordinationPath(recoverPath);
+  if (recoverLiveness === "LIVE" || recoverLiveness === "ABSENT") {
+    await unlinkIfMatchingIdentity(recover2Path, written.identity);
+    await created.handle.close();
+    return "RETRY";
+  }
+  if (recoverLiveness === "UNCERTAIN") {
+    await unlinkIfMatchingIdentity(recover2Path, written.identity);
+    await created.handle.close();
+    return "UNCERTAIN";
+  }
+
+  const recoverInode = await readPathInode(recoverPath);
+  if (recoverInode === null) {
+    await unlinkIfMatchingIdentity(recover2Path, written.identity);
+    await created.handle.close();
+    return "RETRY";
+  }
+  const recover2StillOurs = await confirmPathIdentity(recover2Path, written.identity);
+  if (!recover2StillOurs) {
+    await created.handle.close();
+    return "RETRY";
+  }
+  await unlinkIfStillStaleSameInode(recoverPath, recoverInode);
+  await unlinkIfMatchingIdentity(recover2Path, written.identity);
+  await created.handle.close();
+  return "RECLAIMED";
+}
+
+async function exclusiveCreate(
+  targetPath: string,
+): Promise<
+  | { ok: true; handle: Awaited<ReturnType<typeof open>> }
+  | { ok: false; code: "EEXIST" | "UNCERTAIN" }
+> {
+  try {
+    const handle = await open(
+      targetPath,
+      fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
+      0o600,
+    );
+    return { ok: true, handle };
+  } catch (error) {
+    if (hasErrorCode(error, "EEXIST")) {
+      return { ok: false, code: "EEXIST" };
+    }
+    return { ok: false, code: "UNCERTAIN" };
+  }
+}
+
+async function writeClaimRecord(
+  handle: Awaited<ReturnType<typeof open>>,
+  targetPath: string,
+): Promise<{ ok: true; identity: CoordinationPathIdentity } | { ok: false }> {
+  const token = randomBytes(32).toString("hex");
+  try {
+    const created = await handle.stat();
+    const identity: CoordinationPathIdentity = {
+      pid: process.pid.toString(10),
+      token,
+      dev: BigInt(created.dev),
+      ino: BigInt(created.ino),
+    };
+    const record = formatCoordinationClaim({
+      pid: process.pid,
+      token,
+      createdAt: Date.now().toString(10),
+      dev: identity.dev,
+      ino: identity.ino,
+    });
+    await handle.writeFile(record);
+    await handle.sync();
+    return { ok: true, identity };
+  } catch {
+    await abandonCreatedClaim(targetPath, handle, null);
+    return { ok: false };
+  }
+}
+
+async function abandonCreatedClaim(
+  targetPath: string,
+  handle: Awaited<ReturnType<typeof open>>,
+  identity: CoordinationPathIdentity | null,
+): Promise<void> {
+  try {
+    const handleStat = await handle.stat();
+    const handleIdentity = {
+      token: identity?.token ?? null,
+      dev: BigInt(handleStat.dev),
+      ino: BigInt(handleStat.ino),
+    };
+    await handle.close();
+    if (identity !== null) {
+      await unlinkIfMatchingIdentity(targetPath, identity);
+      return;
+    }
+    await unlinkIfSameInode(targetPath, handleIdentity);
+  } catch {
+    try {
+      await handle.close();
+    } catch {
+      // Handle already closed or unusable; never unlink a replaced path.
+    }
+  }
 }
 
 async function releaseOwnedLock(
   lockPath: string,
   handle: Awaited<ReturnType<typeof open>>,
-  identity: { token: string; dev: bigint; ino: bigint },
+  identity: CoordinationPathIdentity,
 ): Promise<void> {
   try {
     const current = await stat(lockPath);
-    const raw = await readFile(lockPath);
     const sameInode = BigInt(current.dev) === identity.dev && BigInt(current.ino) === identity.ino;
-    const sameToken = lockTokenText(raw) === identity.token;
+    const stillOurs = sameInode ? await confirmPathIdentity(lockPath, identity) : false;
     await handle.close();
-    if (sameInode && sameToken) {
-      await unlinkQuiet(lockPath);
+    if (stillOurs) {
+      await unlinkIfMatchingIdentity(lockPath, identity);
     }
   } catch {
     try {
@@ -193,29 +401,58 @@ async function releaseOwnedLock(
   }
 }
 
-function lockPidText(raw: string): string {
-  const firstLine = raw.split("\n")[0] ?? "";
-  return firstLine.trim();
+async function hasBlockingRecoverer(directory: string): Promise<boolean> {
+  const recoverPath = path.join(directory, COORDINATION_RECOVER_NAME);
+  const liveness = await probeCoordinationPath(recoverPath);
+  return liveness === "LIVE" || liveness === "UNCERTAIN";
 }
 
-function lockTokenText(raw: Buffer | string): string | null {
-  const text = typeof raw === "string" ? raw : raw.toString("utf8");
-  const tokenLine = text.split("\n")[1];
-  if (tokenLine === undefined) {
-    return null;
+export async function applyCoordinationFaultHookForTests(
+  window: CoordinationFaultWindow,
+): Promise<void> {
+  const configured = coordinationFaultHookForTests;
+  if (configured === null || configured.window !== window) {
+    return;
   }
-  const token = tokenLine.trim();
-  return token.length === 0 ? null : token;
+  const readyFilePath = configured.readyFilePath;
+  if (typeof readyFilePath !== "string" || readyFilePath.length === 0) {
+    throw new Error("COORDINATION_FAULT_HOOK_MISSING_READY_PATH");
+  }
+  writeFileSync(readyFilePath, `${window}\n`, { encoding: "utf8" });
+  try {
+    if (typeof process.send === "function") {
+      process.send({ type: "COORDINATION_HOOK_REACHED", window });
+    }
+  } catch {
+    // IPC is optional for parent notification; the ready file is authoritative.
+  }
+  if (configured.action === "NOTIFY_AND_WAIT_RESUME") {
+    const resumeFilePath = configured.resumeFilePath;
+    if (typeof resumeFilePath !== "string" || resumeFilePath.length === 0) {
+      throw new Error("COORDINATION_FAULT_HOOK_MISSING_RESUME_PATH");
+    }
+    await waitForResumePath(resumeFilePath);
+    return;
+  }
+  setInterval(() => {
+    // Keep the event loop alive until the parent sends SIGKILL.
+  }, 60_000);
+  await new Promise<never>(() => {
+    // Parent sends SIGKILL.
+  });
 }
 
-async function unlinkQuiet(target: string): Promise<void> {
-  try {
-    await unlink(target);
-  } catch (error) {
-    if (!hasErrorCode(error, "ENOENT")) {
-      throw error;
+async function waitForResumePath(filePath: string): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < 20_000) {
+    try {
+      await access(filePath);
+      return;
+    } catch {
+      await delay(10);
     }
   }
+  throw new Error("COORDINATION_FAULT_HOOK_RESUME_TIMEOUT");
 }
 
 function delay(ms: number): Promise<void> {

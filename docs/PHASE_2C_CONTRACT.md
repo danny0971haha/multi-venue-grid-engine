@@ -1,6 +1,7 @@
 # Phase 2C Implementation Contract — Runtime Lease and Fencing
 
-**Status:** PHASE 2C REJECTED; CORRECTIVE 1 REVIEW CANDIDATE  
+**Status:** PHASE 2C REJECTED; CORRECTIVE 1 REJECTED; CORRECTIVE 2 REVIEW CANDIDATE
+
 
 **Date:** 2026-08-24  
 **Repository:** `danny0971haha/multi-venue-grid-engine`  
@@ -31,9 +32,10 @@ PHASE_2A=PASS
 PHASE_2B=PASS
 ACCEPTED_PHASE_2B_HEAD=41eb277a7d6dfe36dbb864bc8190d5a20663dc4a
 ACCEPTED_PHASE_2B_TREE=8163e36c676f8b1d5332cdbc713b0672ea4fe148
-AUTHORIZED_CHECKPOINT=PHASE_2C_CORRECTIVE_1
+AUTHORIZED_CHECKPOINT=PHASE_2C_CORRECTIVE_2
 PHASE_2C=REJECT
-PHASE_2C_CORRECTIVE_1=REVIEW_CANDIDATE
+PHASE_2C_CORRECTIVE_1=REJECT
+PHASE_2C_CORRECTIVE_2=REVIEW_CANDIDATE
 PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D_AUTHORIZED=NO
 PHASE_2E_AUTHORIZED=NO
@@ -233,6 +235,27 @@ Recovery rules:
 ### 7.3 Critical section
 
 The coordination guard is a short critical-section mutex, not a process-lifetime lock. It is released after each acquire / heartbeat / takeover / release / assertion. An expired lease can be taken over while the previous owner process is still alive.
+
+### 7.4 Corrective 2 addendum — recoverable coordination claims
+
+This addendum does not weaken host-local-only fencing, exact `LeaseAuthority` matching, durable witness behavior, `allowRiskIncrease=false`, or the prohibition on automatic lease-pair repair.
+
+Independent review of Corrective 1 rejected permanent recovery locks (`P2C-C2-BLOCKER-01`). Empty `llock` and orphaned `llock.recover` files must become automatically recoverable on one host without creating two valid guards.
+
+Additional rules:
+
+1. Every durable coordination claim, including `llock`, `llock.recover`, and `llock.recover2`, must carry verifiable ownership identity after a successful write: PID, an unpredictable token, inode/device identity, and a creation timestamp.
+2. After writing a claim, the creator must verify that the path still names that exact inode and token before returning a usable guard. A delayed creator whose empty or in-progress file was safely reclaimed must observe path removal or replacement and must not enter the critical section or invoke a callback.
+3. An empty or in-progress claim is treated as live only during a short grace interval measured from filesystem `mtime`. After that interval it is stale and may be recovered. Grace is not a blind age-only delete: unlink still requires a recover coordination claim plus post-write path-identity fencing.
+4. A live recoverer (well-formed live PID, or empty/in-progress recover inside grace) must not be stolen.
+5. Cleanup may unlink a path only after revalidating that the path still refers to the exact ownership/identity being released or recovered. A replaced recover file must not be unlinked by an older recoverer.
+6. An orphaned `llock.recover` is itself recovered through an identified `llock.recover2` claim. A stale `llock.recover2` is reclaimed only after inode-and-liveness revalidation. Malformed or ambiguous coordination bytes remain `COORDINATION_LOCK_UNCERTAIN` and authorize no lease write.
+7. Capability remains:
+
+```text
+COORDINATION_CAPABILITY=HOST_LOCAL_FILESYSTEM_ONLY
+DISTRIBUTED_FENCING_PROVEN=false
+```
 
 ## 8. Frozen clock and expiry rules
 
