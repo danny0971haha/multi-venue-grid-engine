@@ -1,6 +1,6 @@
 # Phase 2D Implementation Contract — Risk Calculations and Continuation Gate
 
-**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REVIEW CANDIDATE; CUMULATIVE_PHASE_2_BASELINE=REVIEW_CANDIDATE
+**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REJECT; CORRECTIVE 2 REVIEW CANDIDATE; CUMULATIVE_PHASE_2_BASELINE=PASS
 
 **Date:** 2026-08-25
 **Repository:** `danny0971haha/multi-venue-grid-engine`  
@@ -12,12 +12,13 @@ This file binds Phase 2D only. It does not authorize Phase 2E/2F, live writes, o
 PHASE_2A=PASS
 PHASE_2B=PASS
 PHASE_2C_CORRECTIVE_1=REJECT
-PHASE_2C_CORRECTIVE_2=REVIEW_CANDIDATE
+PHASE_2C_CORRECTIVE_2=PASS
 PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D=REJECT
-PHASE_2D_CORRECTIVE_1=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_1=REJECT
+PHASE_2D_CORRECTIVE_2=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
-CUMULATIVE_PHASE_2_BASELINE=REVIEW_CANDIDATE
+CUMULATIVE_PHASE_2_BASELINE=PASS
 ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
 INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
 PHASE1_IS_ANCESTOR_OF_INTEGRATION=YES
@@ -144,3 +145,32 @@ Zero, negative, equal, or inverted bounds produce `INVALID_RISK_INPUT`, `action=
 Valid boundary inequalities are unchanged: long inventory and mark `< gridLower * 0.99` is HALT; equality at that floor is not a breach. Short inventory and mark `> gridUpper * 1.01` is HALT; equality at that ceiling is not a breach.
 
 `INVALID_RISK_INPUT` is appended to `PHASE_2D_REASON_CODE_CATALOG` after `INVALID_DECIMAL`. Runtime validation of `side`, `purpose`, `fundingConvention`, `reduceOnly`, `owned`, and bounded-reduction booleans is exhaustive; TypeScript unions are not sufficient. Unknown or malformed required values do not receive a default financial interpretation.
+
+## 8. Corrective 2 addendum — runtime input fail-closed boundary
+
+This addendum does not raise frozen 100U / 5x / 30U / 150U / -5U / 10U limits and does not authorize `systemAllowRiskIncrease=true`.
+
+`evaluateRisk(input: unknown)` is the public runtime boundary. Before any financial calculation, clone, `.map`, spread, freshness check, or nested property dereference of caller-owned data:
+
+1. Observe the untrusted value through canonical own-property descriptors (no getter invocation).
+2. Materialize a detached trusted `RiskInput` snapshot via canonical JSON parse.
+3. Confirm exact structural shape on that snapshot only.
+4. Run existing exact-shape and financial semantic validation on the trusted snapshot only.
+
+The caller object is never read a second time. Accessors, class instances, non-plain objects, sparse arrays, extra symbol/accessor properties, throwing `ownKeys` / `getOwnPropertyDescriptor` traps, and non-array collection fields fail closed.
+
+Any input that cannot be safely parsed or structurally completed returns a deterministic decision:
+
+```text
+action=HALT
+reasonCodes include DURABLE_HALT_OR_ACK_UNAVAILABLE, INVALID_RISK_INPUT, and STALE_OR_MISSING_INPUT
+reasonCodes exclude CONTINUE_METRICS_ONLY
+riskMetricsWithinLimits=false
+systemAllowRiskIncrease=false
+unproven metrics=null
+frozen limit fields retained
+```
+
+If `freshness.evaluatedAt` cannot be read from the detached snapshot, `evaluatedAt` is the unauthorized diagnostic sentinel `"0"`. That sentinel is not market time and must not be treated as a fresh observation.
+
+The same malformed input must produce a byte-identical decision. Valid Phase 2D inputs keep prior 150U / -5U / 10U and boundary semantics. Zero-quantity policy is unchanged in this corrective.

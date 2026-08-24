@@ -1,7 +1,7 @@
 import { decimalCmp, isCanonicalDecimalString } from "../math/decimal.js";
 import type { FundingConvention, RiskBoundedReduction, RiskFreshness } from "./risk-types.js";
 
-const RISK_INPUT_KEYS = [
+export const RISK_INPUT_KEYS = [
   "boundedReduction",
   "durableInspection",
   "equity",
@@ -25,7 +25,7 @@ const RISK_INPUT_KEYS = [
   "unknownReservations",
 ] as const;
 
-const FRESHNESS_KEYS = [
+export const FRESHNESS_KEYS = [
   "equityObservedAt",
   "evaluatedAt",
   "markObservedAt",
@@ -34,13 +34,19 @@ const FRESHNESS_KEYS = [
   "positionObservedAt",
 ] as const;
 
-const LEASE_KEYS = ["expired", "lost", "proven"] as const;
-const RECONCILIATION_KEYS = ["unresolved"] as const;
-const DURABLE_KEYS = ["pairAuthorityProven"] as const;
-const REDUCTION_KEYS = ["ambiguous", "cancelOnly", "possible", "snapshotFresh"] as const;
-const WORKING_ORDER_KEYS = ["owned", "price", "reduceOnly", "remainingQuantity", "side"] as const;
-const RESERVATION_KEYS = ["price", "quantity", "side"] as const;
-const INTENT_KEYS = ["price", "purpose", "quantity", "reduceOnly", "side"] as const;
+export const LEASE_KEYS = ["expired", "lost", "proven"] as const;
+export const RECONCILIATION_KEYS = ["unresolved"] as const;
+export const DURABLE_KEYS = ["pairAuthorityProven"] as const;
+export const REDUCTION_KEYS = ["ambiguous", "cancelOnly", "possible", "snapshotFresh"] as const;
+export const WORKING_ORDER_KEYS = [
+  "owned",
+  "price",
+  "reduceOnly",
+  "remainingQuantity",
+  "side",
+] as const;
+export const RESERVATION_KEYS = ["price", "quantity", "side"] as const;
+export const INTENT_KEYS = ["price", "purpose", "quantity", "reduceOnly", "side"] as const;
 
 const SIDES = new Set(["BUY", "SELL"]);
 const PURPOSES = new Set([
@@ -297,11 +303,11 @@ function validateNullableDecimal(value: unknown): string[] {
   return [];
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function hasExactKeys(value: object, expected: readonly string[]): boolean {
+export function hasExactKeys(value: object, expected: readonly string[]): boolean {
   const keys = Object.keys(value).sort();
   return keys.length === expected.length && keys.every((key, index) => key === expected[index]);
 }

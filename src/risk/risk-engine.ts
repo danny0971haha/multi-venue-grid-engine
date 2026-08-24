@@ -8,6 +8,7 @@ import {
 } from "../math/decimal.js";
 import { computeExposure } from "./exposure.js";
 import { freshnessFailures } from "./freshness.js";
+import { UNAUTHORIZED_EVALUATED_AT, parseAndSnapshotRiskInput } from "./risk-input-parser.js";
 import {
   isFundingConvention,
   validateGridDomain,
@@ -24,7 +25,19 @@ import {
 const SECRET_KEY_PATTERN =
   /secret|password|token|apikey|api[_-]?key|private[_-]?key|credential|authorization|bearer/i;
 
-export function evaluateRisk(input: RiskInput): RiskDecision {
+export function evaluateRisk(input: unknown): RiskDecision {
+  try {
+    const parsed = parseAndSnapshotRiskInput(input);
+    if (!parsed.ok) {
+      return invalidInputDecision(parsed.evaluatedAt, parsed.reasonCodes);
+    }
+    return evaluateTrustedRiskInput(parsed.value);
+  } catch {
+    return invalidInputDecision(UNAUTHORIZED_EVALUATED_AT, ["INVALID_RISK_INPUT"]);
+  }
+}
+
+function evaluateTrustedRiskInput(input: RiskInput): RiskDecision {
   const inputCodes = validateRiskInput(input);
   const snapshot = cloneInput(input);
   const codes: string[] = ["DURABLE_HALT_OR_ACK_UNAVAILABLE", ...inputCodes];
@@ -158,6 +171,38 @@ export function evaluateRisk(input: RiskInput): RiskDecision {
     riskMetricsWithinLimits,
     systemAllowRiskIncrease: false,
     evaluatedAt: snapshot.freshness.evaluatedAt,
+  };
+}
+
+function invalidInputDecision(evaluatedAt: string, extraCodes: readonly string[]): RiskDecision {
+  const codes = sortPhase2DReasonCodes([
+    "DURABLE_HALT_OR_ACK_UNAVAILABLE",
+    "STALE_OR_MISSING_INPUT",
+    "INVALID_RISK_INPUT",
+    ...extraCodes,
+  ]).filter((code) => code !== "CONTINUE_METRICS_ONLY");
+  return {
+    action: "HALT",
+    reasonCodes: codes,
+    metrics: {
+      plannedGrossNotional: null,
+      actualGrossNotional: null,
+      worstLongNotional: null,
+      worstShortNotional: null,
+      netDailyPnl: null,
+      equity: null,
+      startingEquity: null,
+      highWaterEquity: null,
+      startDrawdown: null,
+      signedPosition: null,
+      markOrMidPrice: null,
+      plannedCap: FROZEN_PLANNED_GROSS_NOTIONAL_USDT,
+      dailyLossLimit: FROZEN_DAILY_NET_LOSS_USDT,
+      startDrawdownLimit: FROZEN_START_DRAWDOWN_USDT,
+    },
+    riskMetricsWithinLimits: false,
+    systemAllowRiskIncrease: false,
+    evaluatedAt,
   };
 }
 
