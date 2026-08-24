@@ -55,3 +55,46 @@ export {
 } from "./atomic-pair-store.js";
 export type { LatchState } from "./runtime-persistence-latch.js";
 export { RuntimePersistenceLatch } from "./runtime-persistence-latch.js";
+export type { CoordinationAcquireResult, CoordinationGuard } from "./lease-coordination.js";
+export {
+  COORDINATION_CAPABILITY,
+  DISTRIBUTED_FENCING_PROVEN,
+  HOST_LOCAL_COORDINATION_MODE,
+  acquireHostLocalCoordinationGuard,
+  isHostLocalCoordinationMode,
+} from "./lease-coordination.js";
+export type {
+  FencedMutationOutcome,
+  FencedMutationResult,
+  LeaseAuthority,
+  LeaseClock,
+  LeaseDisposition,
+  LeaseOperationRequest,
+  LeaseResult,
+  LeaseStatus,
+  LeaseTokenRequest,
+  RuntimeLeaseRecord,
+} from "./runtime-lease.js";
+export {
+  LEASE_KIND,
+  LEASE_RECORD_SCHEMA_VERSION,
+  LEASE_STATE_NAME,
+  LEASE_TTL_MS,
+  MAX_CLOCK_SKEW_MS,
+  MAX_FORWARD_JUMP_MS,
+  PHASE_2C_REASON_CODE_CATALOG,
+  acquireRuntimeLease,
+  assertCurrentLease,
+  createProcessInstanceId,
+  fixedLeaseClock,
+  formatLeaseResultDiagnostic,
+  heartbeatRuntimeLease,
+  isCanonicalLeaseTimestamp,
+  parseLeaseRecord,
+  releaseRuntimeLease,
+  resetLeaseProcessStateForTests,
+  runLeaseFencedMutation,
+  setLeasePreCallbackHookForTests,
+  sortPhase2CReasonCodes,
+  systemLeaseClock,
+} from "./runtime-lease.js";
