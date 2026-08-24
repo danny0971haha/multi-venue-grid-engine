@@ -18,12 +18,13 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "scan:secrets": "node scripts/check-secrets.mjs",
-    "test": "tsx --test test/bootstrap/*.test.ts test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts test/persistence/*.test.ts",
+    "test": "tsx --test test/bootstrap/*.test.ts test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts test/persistence/*.test.ts test/risk/*.test.ts",
     "test:phase1": "tsx --test test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts",
     "test:phase2a": "tsx --test test/persistence/canonical-json.test.ts test/persistence/durable-envelope.test.ts test/persistence/exact-pair-inspection.test.ts",
     "test:phase2b": "tsx --test test/persistence/atomic-pair-store.test.ts",
     "test:phase2c": "tsx --test test/persistence/runtime-lease.test.ts",
     "test:phase2c-corrective": "tsx --test test/persistence/runtime-lease-corrective-1.test.ts",
+    "test:phase2d": "tsx --test test/risk/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
