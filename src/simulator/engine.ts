@@ -70,7 +70,7 @@ import {
   normalizePrice,
   normalizeQuantity,
 } from "../strategy/marketRules.js";
-import { assertValidSimulatorSnapshot } from "./snapshot.js";
+import { assertValidSimulatorSnapshot, isImportableSequenceCounter } from "./snapshot.js";
 
 export { SIMULATOR_SCHEMA_VERSION, SnapshotImportError } from "./snapshot.js";
 
@@ -96,7 +96,14 @@ export type ExecutionIntegrityFaultCode =
   | "NON_POSITIVE_EXECUTION_PRICE"
   | "EXECUTION_OVERFILL"
   | "EXECUTION_ID_COLLISION"
-  | "ORDER_ID_COLLISION";
+  | "ORDER_ID_COLLISION"
+  | "EXECUTION_ORDER_MISSING"
+  | "EXECUTION_AUTHORITY_UNPROVEN"
+  | "EXECUTION_STATE_TRANSITION_INVALID"
+  | "EXECUTION_INVENTORY_CONFLICT"
+  | "EXECUTION_EFFECT_CALCULATION_FAILURE"
+  | "ORDER_SEQ_EXHAUSTED"
+  | "EXECUTION_SEQ_EXHAUSTED";
 
 export type ExecutionIntegrityFault = {
   code: ExecutionIntegrityFaultCode;
@@ -608,7 +615,11 @@ export class DeterministicSimulator {
     }
     const order = this.orders.get(input.exchangeOrderId);
     if (order === undefined) {
-      throw new Error("UNKNOWN_EXCHANGE_ORDER");
+      this.failIntegrity({
+        code: "EXECUTION_ORDER_MISSING",
+        executionId: input.executionId ?? null,
+        exchangeOrderId: input.exchangeOrderId,
+      });
     }
 
     let executionId: ExecutionId;
@@ -616,10 +627,19 @@ export class DeterministicSimulator {
     if (input.executionId !== undefined) {
       executionId = input.executionId;
       const generatedSeq = parseGeneratedSequence(executionId, GENERATED_EXECUTION_PREFIX);
-      if (generatedSeq !== null && generatedSeq > nextExecutionSeq) {
-        nextExecutionSeq = generatedSeq;
+      if (generatedSeq !== null) {
+        this.assertCommittedSequenceImportable(
+          "execution",
+          generatedSeq,
+          executionId,
+          order.exchangeOrderId,
+        );
+        if (generatedSeq > nextExecutionSeq) {
+          nextExecutionSeq = generatedSeq;
+        }
       }
     } else {
+      this.assertSequenceIncrementable("execution");
       const candidateSeq = this.executionSeq + 1;
       executionId = formatGeneratedId(GENERATED_EXECUTION_PREFIX, candidateSeq);
       if (this.executions.has(executionId)) {
@@ -664,7 +684,20 @@ export class DeterministicSimulator {
       liquidity: "UNKNOWN",
       meta: this.meta("execution"),
     };
-    const computed = this.computeExecutionEffects(order, nextOrder, execution);
+    let computed: { nextLevel?: MutableLevel; nextExitIntent?: OrderIntent };
+    try {
+      computed = this.computeExecutionEffects(order, nextOrder, execution);
+    } catch (error) {
+      this.recordExecutionEffectFault(error, executionId, order.exchangeOrderId);
+      throw error;
+    }
+    if (!this.hasProvenAuthorityLinkage(order)) {
+      this.failIntegrity({
+        code: "EXECUTION_AUTHORITY_UNPROVEN",
+        executionId,
+        exchangeOrderId: order.exchangeOrderId,
+      });
+    }
     const nextPosition = this.nextPositionAfterFill(order.side, quantity);
 
     this.insertExecution(execution);
@@ -1521,6 +1554,7 @@ export class DeterministicSimulator {
   }
 
   private peekGeneratedOrderId(): ExchangeOrderId {
+    this.assertSequenceIncrementable("order");
     const exchangeOrderId = formatGeneratedId(GENERATED_ORDER_PREFIX, this.orderSeq + 1);
     if (this.orders.has(exchangeOrderId)) {
       this.failIntegrity({
@@ -1530,6 +1564,60 @@ export class DeterministicSimulator {
       });
     }
     return exchangeOrderId;
+  }
+
+  private assertSequenceIncrementable(kind: "order" | "execution"): void {
+    const sequence = kind === "order" ? this.orderSeq : this.executionSeq;
+    this.assertCommittedSequenceImportable(
+      kind,
+      sequence + 1,
+      null,
+      `${kind}Seq:${String(sequence)}`,
+    );
+  }
+
+  private assertCommittedSequenceImportable(
+    kind: "order" | "execution",
+    committedSequence: number,
+    executionId: ExecutionId | null,
+    exchangeOrderId: ExchangeOrderId,
+  ): void {
+    if (isImportableSequenceCounter(committedSequence)) {
+      return;
+    }
+    this.failIntegrity({
+      code: kind === "order" ? "ORDER_SEQ_EXHAUSTED" : "EXECUTION_SEQ_EXHAUSTED",
+      executionId,
+      exchangeOrderId,
+    });
+  }
+
+  private recordExecutionEffectFault(
+    error: unknown,
+    executionId: ExecutionId,
+    exchangeOrderId: ExchangeOrderId,
+  ): void {
+    if (error instanceof Error && error.message === "NEGATIVE_OPEN_INVENTORY") {
+      this.recordIntegrityFault({
+        code: "EXECUTION_INVENTORY_CONFLICT",
+        executionId,
+        exchangeOrderId,
+      });
+      return;
+    }
+    if (error instanceof Error && error.message.startsWith("FORBIDDEN_STATE_TRANSITION")) {
+      this.recordIntegrityFault({
+        code: "EXECUTION_STATE_TRANSITION_INVALID",
+        executionId,
+        exchangeOrderId,
+      });
+      return;
+    }
+    this.recordIntegrityFault({
+      code: "EXECUTION_EFFECT_CALCULATION_FAILURE",
+      executionId,
+      exchangeOrderId,
+    });
   }
 
   private insertOrder(order: InternalOrder): void {
