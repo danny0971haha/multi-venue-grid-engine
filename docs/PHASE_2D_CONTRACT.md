@@ -1,6 +1,6 @@
 # Phase 2D Implementation Contract — Risk Calculations and Continuation Gate
 
-**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REJECT; CORRECTIVE 2 ACCEPT; CORRECTIVE 3 REVIEW CANDIDATE; CUMULATIVE_PHASE_2_BASELINE=PASS
+**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REJECT; CORRECTIVE 2 ACCEPT; CORRECTIVE 3 REJECT; CORRECTIVE 4 REVIEW CANDIDATE; CUMULATIVE_PHASE_2_BASELINE=PASS
 
 **Date:** 2026-08-25
 **Repository:** `danny0971haha/multi-venue-grid-engine`  
@@ -17,7 +17,8 @@ PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D=REJECT
 PHASE_2D_CORRECTIVE_1=REJECT
 PHASE_2D_CORRECTIVE_2=ACCEPT
-PHASE_2D_CORRECTIVE_3=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_3=REJECT
+PHASE_2D_CORRECTIVE_4=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
 CUMULATIVE_PHASE_2_BASELINE=PASS
 ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
@@ -178,7 +179,7 @@ The same malformed input must produce a byte-identical decision. Valid Phase 2D 
 
 ## 9. Corrective 3 addendum — bounded risk input admission
 
-This addendum does not raise frozen 100U / 5x / 30U / 150U / -5U / 10U limits and does not authorize `systemAllowRiskIncrease=true`. Independent reviewer disposition for Corrective 2 is ACCEPT. Corrective 3 is a review candidate only.
+This addendum does not raise frozen 100U / 5x / 30U / 150U / -5U / 10U limits and does not authorize `systemAllowRiskIncrease=true`. Independent reviewer disposition for Corrective 2 is ACCEPT. Corrective 3 is REJECTED for object/raw UTF-8 budget mismatch; Corrective 4 is the review candidate.
 
 Frozen risk-admission resource budgets (risk boundary only; persistence canonical serializer default behavior is unchanged):
 
@@ -202,3 +203,13 @@ Exact caps are accepted. Cap + 1 is `RISK_INPUT_LIMIT_EXCEEDED` and HALT. Parse 
 `evaluatedAt` on a `RiskDecision` is only a canonical non-negative integer millisecond string of at most 13 digits. Malformed, overlong, accessor, symbol, object, or other non-canonical values become `"0"`. Invalid decisions must not echo attacker-provided giant `evaluatedAt` strings.
 
 Decimal-like fields are length-checked before decimal regex and `decimal.js` construction. Structure budgets are enforced before `cloneInput`, `freshnessFailures`, `computeExposure`, and exposure iteration. Traversal does not mutate caller input, does not invoke accessors, and stops at the first exceeded budget.
+
+## 10. Corrective 4 addendum — object/raw UTF-8 budget parity
+
+This addendum does not raise frozen 100U / 5x / 30U / 150U / -5U / 10U limits and does not authorize `systemAllowRiskIncrease=true`. Independent reviewer disposition for Corrective 3 is REJECT: `evaluateRisk(object)` admitted structurally in-budget objects whose canonical UTF-8 exceeded 65,536 bytes while `evaluateRiskFromJsonBytes` rejected the same canonical bytes.
+
+`evaluateRisk(input)` canonically serializes with the Corrective 3 structural limits, measures the UTF-8 byte length of that canonical result, and applies `MAX_RISK_INPUT_UTF8_BYTES` through the same admission function as `evaluateRiskFromJsonBytes` before `JSON.parse` of the snapshot and before any Decimal or exposure work. Exact 65,536 is accepted. 65,537 is `RISK_INPUT_LIMIT_EXCEEDED` and HALT. Persistence canonical serializer defaults remain unchanged.
+
+Duplicate JSON keys at the raw-byte boundary are ambiguous (`JSON.parse` last-key-wins is not an authoritative risk meaning). They fail closed with `INVALID_RISK_INPUT` and without `RISK_INPUT_LIMIT_EXCEEDED`, before Decimal or exposure math. Keys and values must not appear in diagnostics.
+
+JavaScript string input containing unpaired surrogates is rejected before `JSON.parse` with `INVALID_RISK_INPUT`, matching fatal UTF-8 rejection of `Uint8Array`. Valid `\uD800` JSON escapes remain ordinary string content and are still subject to decimal/shape validation.

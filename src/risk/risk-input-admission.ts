@@ -4,6 +4,7 @@ import {
   MAX_RISK_DECIMAL_CHARS,
   MAX_RISK_INPUT_DEPTH,
   MAX_RISK_INPUT_NODES,
+  MAX_RISK_INPUT_UTF8_BYTES,
   MAX_RISK_OBJECT_KEY_CHARS,
   MAX_RISK_OBJECT_PROPERTIES,
   MAX_RISK_STRING_CHARS,
@@ -26,6 +27,13 @@ export const RISK_CANONICAL_SERIALIZE_LIMITS: CanonicalSerializeLimits = {
   maxStringChars: MAX_RISK_STRING_CHARS,
   maxObjectKeyChars: MAX_RISK_OBJECT_KEY_CHARS,
 };
+
+/** Inclusive cap: 65,536 is accepted; 65,537 is RISK_INPUT_LIMIT_EXCEEDED. */
+export function enforceRiskUtf8ByteLimit(byteLength: number): void {
+  if (byteLength > MAX_RISK_INPUT_UTF8_BYTES) {
+    throw new RiskInputLimitError();
+  }
+}
 
 const TOP_LEVEL_DECIMAL_KEYS = [
   "equity",

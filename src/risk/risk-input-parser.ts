@@ -3,10 +3,12 @@ import { Buffer } from "node:buffer";
 import { CanonicalJsonError, canonicalSerializeToUtf8 } from "../persistence/canonical-json.js";
 import {
   enforceRiskJsonBudgets,
+  enforceRiskUtf8ByteLimit,
   RISK_CANONICAL_SERIALIZE_LIMITS,
   RiskInputLimitError,
   riskDecimalFieldsExceedBudget,
 } from "./risk-input-admission.js";
+import { hasUnpairedSurrogate, jsonTextHasDuplicateKeys } from "./risk-json-text.js";
 import {
   DURABLE_KEYS,
   FRESHNESS_KEYS,
@@ -20,7 +22,6 @@ import {
   hasExactKeys,
   isPlainObject,
 } from "./risk-input-validation.js";
-import { MAX_RISK_INPUT_UTF8_BYTES } from "./risk-types.js";
 import type { RiskInput } from "./risk-types.js";
 
 /**
@@ -66,15 +67,16 @@ const NULLABLE_DECIMAL_KEYS = [
  * `getOwnPropertyDescriptor` / `getPrototypeOf` throws are caught and fail closed.
  * Subsequent risk math must read only `value`, never the original caller object.
  *
- * This object API is defensive fail-closed for finite inputs. It is not a
- * DoS-proof or hard-timeout guarantee against non-returning Proxy traps or
- * process OOM. External bytes must use `parseRiskInputFromJsonBytes`.
+ * Canonical UTF-8 length is then admitted through the same byte budget as
+ * `parseRiskInputFromJsonBytes`. This object API is defensive fail-closed for
+ * finite inputs. It is not a DoS-proof or hard-timeout guarantee against
+ * non-returning Proxy traps or process OOM. External bytes must use
+ * `parseRiskInputFromJsonBytes`.
  */
 export function parseAndSnapshotRiskInput(input: unknown): ParsedRiskInput {
   try {
     const utf8 = canonicalSerializeToUtf8(input, RISK_CANONICAL_SERIALIZE_LIMITS);
-    const parsed: unknown = parseJsonText(utf8);
-    return admitParsedRiskJson(parsed);
+    return parseRiskInputFromJsonBytes(utf8);
   } catch (error) {
     return failFromObservation(error);
   }
@@ -82,16 +84,21 @@ export function parseAndSnapshotRiskInput(input: unknown): ParsedRiskInput {
 
 /**
  * Authoritative external trust boundary: measure UTF-8 bytes before JSON.parse,
- * fatal-decode Uint8Array, then apply exact-shape and resource budgets.
+ * fatal-decode Uint8Array, reject unpaired JS surrogates and duplicate keys,
+ * then apply exact-shape and resource budgets.
  */
 export function parseRiskInputFromJsonBytes(raw: string | Uint8Array): ParsedRiskInput {
   try {
     const byteLength = typeof raw === "string" ? Buffer.byteLength(raw, "utf8") : raw.byteLength;
-    if (byteLength > MAX_RISK_INPUT_UTF8_BYTES) {
-      return failClosedLimit(UNAUTHORIZED_EVALUATED_AT);
+    enforceRiskUtf8ByteLimit(byteLength);
+    if (typeof raw === "string" && hasUnpairedSurrogate(raw)) {
+      return failClosedParse(UNAUTHORIZED_EVALUATED_AT);
     }
     const text = decodeJsonBytes(raw);
     const parsed: unknown = parseJsonText(text);
+    if (jsonTextHasDuplicateKeys(text)) {
+      return failClosedParse(UNAUTHORIZED_EVALUATED_AT);
+    }
     return admitParsedRiskJson(parsed);
   } catch (error) {
     return failFromObservation(error);

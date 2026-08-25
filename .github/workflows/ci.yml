@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: Record implementation checkpoint
-        run: echo "implementationCheckpoint=PHASE_2D_CORRECTIVE_3"
+        run: echo "implementationCheckpoint=PHASE_2D_CORRECTIVE_4"
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

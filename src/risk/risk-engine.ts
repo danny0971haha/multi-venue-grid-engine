@@ -31,10 +31,12 @@ const SECRET_KEY_PATTERN =
   /secret|password|token|apikey|api[_-]?key|private[_-]?key|credential|authorization|bearer/i;
 
 /**
- * In-process object boundary. Defensive fail-closed for finite plain objects
- * that return from property observation. This is not a DoS-proof or hard-timeout
- * guarantee against non-returning Proxy traps or process OOM. External adapters,
- * fixtures, CLI, and network boundaries must use `evaluateRiskFromJsonBytes`.
+ * In-process object boundary. Canonical UTF-8 length uses the same 65,536-byte
+ * budget as `evaluateRiskFromJsonBytes` before snapshot parse. Defensive
+ * fail-closed for finite plain objects that return from property observation.
+ * This is not a DoS-proof or hard-timeout guarantee against non-returning Proxy
+ * traps or process OOM. External adapters, fixtures, CLI, and network
+ * boundaries must use `evaluateRiskFromJsonBytes`.
  */
 export function evaluateRisk(input: unknown): RiskDecision {
   try {
@@ -50,7 +52,8 @@ export function evaluateRisk(input: unknown): RiskDecision {
 
 /**
  * Authoritative external risk admission boundary. UTF-8 byte length is enforced
- * before JSON.parse. Uint8Array uses fatal UTF-8 decode.
+ * before JSON.parse. Uint8Array uses fatal UTF-8 decode. JavaScript strings
+ * with unpaired surrogates fail closed. Duplicate JSON keys fail closed.
  */
 export function evaluateRiskFromJsonBytes(raw: string | Uint8Array): RiskDecision {
   try {
