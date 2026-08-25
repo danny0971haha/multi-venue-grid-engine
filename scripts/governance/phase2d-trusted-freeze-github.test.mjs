@@ -5,6 +5,7 @@ import {
   collectPaginatedItems,
   fetchCompareAncestor,
   fetchRecursiveTree,
+  githubGetJson,
   paginationStatus,
   parseLinkRelNext,
 } from "./phase2d-trusted-freeze-github.mjs";
@@ -72,6 +73,30 @@ describe("GitHub API fail-closed wrappers", () => {
     });
     assert.equal(compare.complete, false);
     assert.equal(compare.reason, "compare_fields_missing");
+  });
+
+  it("12. fail closed when compare metadata omits files", async () => {
+    const compare = await fetchCompareAncestor({
+      apiUrl: API,
+      repository: REPO,
+      baseSha: SHA,
+      headSha: SHA,
+      token: "none",
+      fetchImpl: async () => response({ ahead_by: 1, behind_by: 0 }),
+    });
+    assert.equal(compare.complete, false);
+    assert.equal(compare.reason, "compare_files_missing");
+  });
+
+  it("12. fail closed on GitHub HTTP 429", async () => {
+    const page = await githubGetJson(`${API}/rate_limit`, {
+      token: "none",
+      fetchImpl: async () =>
+        response({ message: "API rate limit exceeded" }, { status: 429 }),
+    });
+    assert.equal(page.ok, false);
+    assert.equal(page.reason, "github_http_error");
+    assert.equal(page.status, 429);
   });
 
   it("12. fail closed when compare files hit the unpaginated 300 limit", async () => {

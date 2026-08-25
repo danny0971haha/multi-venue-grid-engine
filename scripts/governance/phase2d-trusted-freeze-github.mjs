@@ -231,7 +231,10 @@ export async function fetchCompareAncestor({
   if (typeof page.json?.behind_by !== "number" || typeof page.json?.ahead_by !== "number") {
     return { complete: false, reason: "compare_fields_missing", isAncestor: false };
   }
-  if (Array.isArray(page.json.files) && page.json.files.length >= 300) {
+  if (!Array.isArray(page.json.files)) {
+    return { complete: false, reason: "compare_files_missing", isAncestor: false };
+  }
+  if (page.json.files.length >= 300) {
     return {
       complete: false,
       reason: "compare_files_unpaginated_limit",
@@ -246,7 +249,7 @@ export async function fetchCompareAncestor({
     aheadBy: page.json.ahead_by,
     behindBy: page.json.behind_by,
     status: page.json.status,
-    files: Array.isArray(page.json.files) ? page.json.files : [],
+    files: page.json.files,
   };
 }
 

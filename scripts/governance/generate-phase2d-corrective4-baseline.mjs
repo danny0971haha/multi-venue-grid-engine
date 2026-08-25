@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Generate the trusted baseline manifest from Git objects at the
- * accepted Phase 2D Corrective 4 implementation base. Run only on a
- * trusted machine that already has those objects. Never run against
- * untrusted PR checkouts as a source of frozen bytes.
+ * Generate the trusted baseline manifest from Git objects.
+ * Protected file bytes come from the accepted Corrective 4 implementation
+ * base. The frozen numeric-contract hash comes from the unique
+ * `## 2` ... `## 11` slice at the pinned candidate source HEAD.
  */
 
 import { execFileSync } from "node:child_process";
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import {
   SCHEMA_VERSION,
   TRUSTED_BASELINE_PATH,
-  extractFrozenRiskNumericContract,
+  extractFrozenRiskNumericContractDetailed,
   frozenLimitRequiredSubstrings,
   pathMatchesAnyRule,
   sha256Bytes,
@@ -98,11 +98,14 @@ function main() {
   }
   protectedFiles.sort((a, b) => a.path.localeCompare(b.path));
 
-  const contract = git(["show", `${IMPLEMENTATION_BASE}:docs/PHASE_2D_CONTRACT.md`]);
-  const frozenBody = extractFrozenRiskNumericContract(contract);
-  if (!frozenBody) {
-    throw new Error("frozen_numeric_contract_missing");
+  const contract = execFileSync("git", ["show", `${CANDIDATE_HEAD}:docs/PHASE_2D_CONTRACT.md`], {
+    encoding: "utf8",
+  });
+  const extracted = extractFrozenRiskNumericContractDetailed(contract);
+  if (!extracted.ok) {
+    throw new Error(extracted.reason ?? "frozen_numeric_contract_missing");
   }
+  const frozenBody = extracted.body;
 
   const manifest = {
     schemaVersion: SCHEMA_VERSION,

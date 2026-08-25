@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -56,6 +57,8 @@ Authoritative arithmetic uses decimal.js.
 ## 3. Decision model
 
 body
+
+## 11. Corrective 4 evidence-closure addendum
 `;
 
 const FROZEN_BODY = extractFrozenRiskNumericContract(FROZEN_MARKDOWN);
@@ -89,19 +92,21 @@ function baseline(overrides = {}) {
         mode: "100644",
         objectType: "blob",
         blobSha: SHA.risk,
+        sha256: "a".repeat(64),
       },
       {
         path: "package-lock.json",
         mode: "100644",
         objectType: "blob",
         blobSha: SHA.lock,
+        sha256: "b".repeat(64),
       },
     ],
     ...overrides,
   };
 }
 
-function trees({ risk = {}, contractHeadText = `${FROZEN_MARKDOWN}## 11. Corrective 4 evidence-closure addendum\n` } = {}) {
+function trees({ risk = {}, contractHeadText = FROZEN_MARKDOWN } = {}) {
   const riskEntry = {
     path: "src/risk/risk-engine.ts",
     mode: "100644",
@@ -173,18 +178,43 @@ describe("parseBaseline", () => {
           mode: "100644",
           objectType: "blob",
           blobSha: SHA.risk,
+          sha256: "a".repeat(64),
         },
         {
           path: "src/risk/risk-engine.ts",
           mode: "100644",
           objectType: "blob",
           blobSha: SHA.riskNew,
+          sha256: "a".repeat(64),
         },
       ],
     });
     const parsed = parseBaseline(JSON.stringify(dup));
     assert.equal(parsed.ok, false);
     assert.ok(parsed.reasons.includes("baseline_duplicate_path"));
+  });
+
+  it("rejects a protected file that omits sha256", () => {
+    const missingHash = baseline({
+      protectedFiles: [
+        {
+          path: "src/risk/risk-engine.ts",
+          mode: "100644",
+          objectType: "blob",
+          blobSha: SHA.risk,
+        },
+        {
+          path: "package-lock.json",
+          mode: "100644",
+          objectType: "blob",
+          blobSha: SHA.lock,
+          sha256: "b".repeat(64),
+        },
+      ],
+    });
+    const parsed = parseBaseline(JSON.stringify(missingHash));
+    assert.equal(parsed.ok, false);
+    assert.ok(parsed.reasons.includes("baseline_protected_file_sha256"));
   });
 
   it("rejects missing schema and short SHAs", () => {
@@ -391,12 +421,14 @@ describe("evaluateTrustedFreeze", () => {
               mode: "100644",
               objectType: "blob",
               blobSha: SHA.lock,
+              sha256: "b".repeat(64),
             },
             {
               path: "package-lock.json",
               mode: "100644",
               objectType: "blob",
               blobSha: SHA.lock,
+              sha256: "b".repeat(64),
             },
           ],
         }),
@@ -453,6 +485,76 @@ describe("evaluateTrustedFreeze", () => {
     assert.ok(evaluation.reasons.includes("protected_file_copied"));
   });
 
+  it("fail closed when a decoy frozen-section heading hides mutated later limits", () => {
+    const originalBody = extractFrozenRiskNumericContract(FROZEN_MARKDOWN);
+    const decoy = `${originalBody}## 11. Corrective 4 evidence-closure addendum
+
+## 2. Frozen v0.1 limits
+
+These values are not upward-configurable.
+
+\`\`\`text
+capital ceiling=200 USDT
+leverage=5x
+margin budget=30 USDT
+planned gross-notional cap=150 USDT
+daily net-loss halt=-5 USDT
+starting-equity drawdown halt=10 USDT
+boundary buffer=1% beyond ±3% grid boundary
+\`\`\`
+
+## 11. Corrective 4 evidence-closure addendum
+`;
+    const { baseTree, headTree } = trees();
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({
+        baseTree,
+        headTree,
+        headTextByPath: { "docs/PHASE_2D_CONTRACT.md": decoy },
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("anchor_start_marker_not_unique"));
+  });
+
+  it("fail closed when the frozen end marker is duplicated to truncate the hashed slice", () => {
+    const truncated = FROZEN_MARKDOWN.replace(
+      "## 2. Frozen v0.1 limits",
+      "## 2. Frozen v0.1 limits\n\n## 11. Corrective 4 evidence-closure addendum\n",
+    );
+    const { baseTree, headTree } = trees();
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({
+        baseTree,
+        headTree,
+        headTextByPath: { "docs/PHASE_2D_CONTRACT.md": truncated },
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("anchor_end_marker_not_unique"));
+  });
+
+  it("fail closed when required numeric limits are only outside the unique frozen slice", () => {
+    const mutated = FROZEN_MARKDOWN.replace(
+      "capital ceiling=100 USDT",
+      "capital ceiling=200 USDT",
+    ).replace(
+      "## 11. Corrective 4 evidence-closure addendum",
+      "## 11. Corrective 4 evidence-closure addendum\n\ncapital ceiling=100 USDT\n",
+    );
+    const { baseTree, headTree } = trees();
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({
+        baseTree,
+        headTree,
+        headTextByPath: { "docs/PHASE_2D_CONTRACT.md": mutated },
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("anchor_sha256_mismatch"));
+    assert.ok(evaluation.reasons.includes("anchor_required_substring_missing"));
+  });
+
   it("does not emit ACCEPT or PASS in the machine summary", () => {
     const summary = formatMachineSummary({
       trustedBaselineIntegrityOk: false,
@@ -485,6 +587,14 @@ describe("committed baseline", () => {
       parsed.baseline.protectedFiles.some((file) => file.path === "src/risk/risk-engine.ts"),
     );
     assert.ok(!parsed.baseline.protectedFiles.some((file) => file.path === "docs/PHASE_2D_CONTRACT.md"));
+    const candidateContract = execFileSync(
+      "git",
+      ["show", "7f196d367e39640eee9517f742b0d61424f9d4cc:docs/PHASE_2D_CONTRACT.md"],
+      { encoding: "utf8" },
+    );
+    const extracted = extractFrozenRiskNumericContract(candidateContract);
+    assert.equal(typeof extracted, "string");
+    assert.equal(parsed.baseline.protectedContentAnchors[0].sha256, sha256Text(extracted));
     assert.equal(TRUSTED_WORKFLOW_PATH.length > 0, true);
   });
 });

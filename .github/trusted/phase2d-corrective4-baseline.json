@@ -34,7 +34,7 @@
       "description": "Phase 2D frozen v0.1 risk numeric contract body",
       "startMarker": "## 2. Frozen v0.1 limits",
       "endExclusiveMarker": "## 11. Corrective 4 evidence-closure addendum",
-      "sha256": "bd826fab79cab8ddec798868ccbde18c515d609dd3fe3b7cb1f4510da0be4743",
+      "sha256": "2eb75b74d668578fa996fb21a7ef2d7998bbc3a6274d61c1ba7b847506f5a68f",
       "requiredSubstrings": [
         "capital ceiling=100 USDT",
         "leverage=5x",

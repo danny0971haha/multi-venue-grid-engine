@@ -49,7 +49,7 @@ Protected path rules (Git bytes must match the implementation base):
 - `docs/DOMAIN_CONTRACTS.md`
 - `docs/ACCEPTANCE_GATES.md`
 
-`docs/PHASE_2D_CONTRACT.md` may change for evidence/status text, but the frozen v0.1 numeric contract body (`## 2. Frozen v0.1 limits` until `## 11. Corrective 4 evidence-closure addendum`) is hashed. Required exact substrings include the 100U / 5x / 30U / 150U / -5U / 10U / 1% limit lines.
+`docs/PHASE_2D_CONTRACT.md` may change for evidence/status text, but the frozen v0.1 numeric contract body (`## 2. Frozen v0.1 limits` until `## 11. Corrective 4 evidence-closure addendum`) is hashed from the pinned candidate source HEAD. Both markers must appear exactly once. A decoy copy of those headings cannot hide a later mutated limits table. Required numeric substrings are checked inside that unique slice, not merely anywhere in the file.
 
 Current evidence-only changed-path rules (not a content approval):
 

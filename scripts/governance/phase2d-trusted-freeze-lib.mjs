@@ -40,18 +40,55 @@ export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function extractFrozenRiskNumericContract(markdown) {
+export const FROZEN_START_MARKER = "## 2. Frozen v0.1 limits";
+export const FROZEN_END_MARKER = "## 11. Corrective 4 evidence-closure addendum";
+
+export function countExactOccurrences(haystack, needle) {
+  if (typeof haystack !== "string" || typeof needle !== "string" || needle.length === 0) {
+    return 0;
+  }
+  let count = 0;
+  let from = 0;
+  while (from <= haystack.length) {
+    const idx = haystack.indexOf(needle, from);
+    if (idx < 0) {
+      return count;
+    }
+    count += 1;
+    from = idx + needle.length;
+  }
+  return count;
+}
+
+export function extractFrozenRiskNumericContractDetailed(markdown) {
   if (typeof markdown !== "string") {
-    return null;
+    return { ok: false, body: null, reason: "anchor_content_unavailable" };
   }
-  const startMarker = "## 2. Frozen v0.1 limits";
-  const start = markdown.indexOf(startMarker);
-  if (start < 0) {
-    return null;
+  const startCount = countExactOccurrences(markdown, FROZEN_START_MARKER);
+  const endCount = countExactOccurrences(markdown, FROZEN_END_MARKER);
+  if (startCount === 0) {
+    return { ok: false, body: null, reason: "anchor_start_marker_missing" };
   }
-  const endMarker = "## 11. Corrective 4 evidence-closure addendum";
-  const end = markdown.indexOf(endMarker, start);
-  return end < 0 ? markdown.slice(start) : markdown.slice(start, end);
+  if (startCount !== 1) {
+    return { ok: false, body: null, reason: "anchor_start_marker_not_unique" };
+  }
+  if (endCount === 0) {
+    return { ok: false, body: null, reason: "anchor_end_marker_missing" };
+  }
+  if (endCount !== 1) {
+    return { ok: false, body: null, reason: "anchor_end_marker_not_unique" };
+  }
+  const start = markdown.indexOf(FROZEN_START_MARKER);
+  const end = markdown.indexOf(FROZEN_END_MARKER);
+  if (end <= start) {
+    return { ok: false, body: null, reason: "anchor_markers_out_of_order" };
+  }
+  return { ok: true, body: markdown.slice(start, end), reason: null };
+}
+
+export function extractFrozenRiskNumericContract(markdown) {
+  const extracted = extractFrozenRiskNumericContractDetailed(markdown);
+  return extracted.ok ? extracted.body : null;
 }
 
 export function pathMatchesRule(filePath, rule) {
@@ -174,7 +211,7 @@ export function parseBaseline(jsonText) {
       if (!GIT_SHA1_RE.test(file.blobSha ?? "")) {
         reasons.push("baseline_protected_file_blob_sha");
       }
-      if (file.sha256 !== undefined && !GIT_SHA256_RE.test(file.sha256)) {
+      if (!GIT_SHA256_RE.test(file.sha256 ?? "")) {
         reasons.push("baseline_protected_file_sha256");
       }
       files.push(file);
@@ -583,16 +620,17 @@ function checkContentAnchors(baseline, headIndex, headTextByPath, reasons) {
       continue;
     }
     const markdown = headTextByPath[anchor.path];
-    const body = extractFrozenRiskNumericContract(markdown);
-    if (body === null) {
-      reasons.push("anchor_start_marker_missing");
+    const extracted = extractFrozenRiskNumericContractDetailed(markdown);
+    if (!extracted.ok) {
+      reasons.push(extracted.reason);
       continue;
     }
+    const body = extracted.body;
     if (sha256Text(body) !== anchor.sha256) {
       reasons.push("anchor_sha256_mismatch");
     }
     for (const required of anchor.requiredSubstrings) {
-      if (!markdown.includes(required)) {
+      if (!body.includes(required)) {
         reasons.push("anchor_required_substring_missing");
       }
     }
@@ -611,5 +649,11 @@ export function formatMachineSummary(evaluation) {
 }
 
 export function summaryContainsForbiddenDecisionWording(text) {
-  return /\b(ACCEPT|PASS)\b/.test(text);
+  if (typeof text !== "string") {
+    return false;
+  }
+  return (
+    /\b(ACCEPT|PASS)\b/.test(text) ||
+    /release approval|merge approval|Gate 2 approval/i.test(text)
+  );
 }
