@@ -1,4 +1,12 @@
-import { canonicalSerializeToUtf8 } from "../persistence/canonical-json.js";
+import { Buffer } from "node:buffer";
+
+import { CanonicalJsonError, canonicalSerializeToUtf8 } from "../persistence/canonical-json.js";
+import {
+  enforceRiskJsonBudgets,
+  RISK_CANONICAL_SERIALIZE_LIMITS,
+  RiskInputLimitError,
+  riskDecimalFieldsExceedBudget,
+} from "./risk-input-admission.js";
 import {
   DURABLE_KEYS,
   FRESHNESS_KEYS,
@@ -12,6 +20,7 @@ import {
   hasExactKeys,
   isPlainObject,
 } from "./risk-input-validation.js";
+import { MAX_RISK_INPUT_UTF8_BYTES } from "./risk-types.js";
 import type { RiskInput } from "./risk-types.js";
 
 /**
@@ -21,9 +30,20 @@ import type { RiskInput } from "./risk-types.js";
  */
 export const UNAUTHORIZED_EVALUATED_AT = "0";
 
+const EVALUATED_AT_PATTERN = /^(0|[1-9][0-9]{0,12})$/;
+const FATAL_UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+
 export type ParsedRiskInput =
   | { ok: true; value: RiskInput }
   | { ok: false; reasonCodes: string[]; evaluatedAt: string };
+
+export const riskAdmissionStats = {
+  jsonParseCalls: 0,
+};
+
+export function resetRiskAdmissionStats(): void {
+  riskAdmissionStats.jsonParseCalls = 0;
+}
 
 const NULLABLE_DECIMAL_KEYS = [
   "equity",
@@ -45,23 +65,89 @@ const NULLABLE_DECIMAL_KEYS = [
  * Accessors are rejected without invocation. Proxy `ownKeys` /
  * `getOwnPropertyDescriptor` / `getPrototypeOf` throws are caught and fail closed.
  * Subsequent risk math must read only `value`, never the original caller object.
+ *
+ * This object API is defensive fail-closed for finite inputs. It is not a
+ * DoS-proof or hard-timeout guarantee against non-returning Proxy traps or
+ * process OOM. External bytes must use `parseRiskInputFromJsonBytes`.
  */
 export function parseAndSnapshotRiskInput(input: unknown): ParsedRiskInput {
   try {
-    return parseAndSnapshotRiskInputUnchecked(input);
-  } catch {
-    return failClosedParse(UNAUTHORIZED_EVALUATED_AT);
+    const utf8 = canonicalSerializeToUtf8(input, RISK_CANONICAL_SERIALIZE_LIMITS);
+    const parsed: unknown = parseJsonText(utf8);
+    return admitParsedRiskJson(parsed);
+  } catch (error) {
+    return failFromObservation(error);
   }
 }
 
-function parseAndSnapshotRiskInputUnchecked(input: unknown): ParsedRiskInput {
-  const utf8 = canonicalSerializeToUtf8(input);
-  const parsed: unknown = JSON.parse(utf8);
-  const evaluatedAt = extractEvaluatedAt(parsed);
+/**
+ * Authoritative external trust boundary: measure UTF-8 bytes before JSON.parse,
+ * fatal-decode Uint8Array, then apply exact-shape and resource budgets.
+ */
+export function parseRiskInputFromJsonBytes(raw: string | Uint8Array): ParsedRiskInput {
+  try {
+    const byteLength = typeof raw === "string" ? Buffer.byteLength(raw, "utf8") : raw.byteLength;
+    if (byteLength > MAX_RISK_INPUT_UTF8_BYTES) {
+      return failClosedLimit(UNAUTHORIZED_EVALUATED_AT);
+    }
+    const text = decodeJsonBytes(raw);
+    const parsed: unknown = parseJsonText(text);
+    return admitParsedRiskJson(parsed);
+  } catch (error) {
+    return failFromObservation(error);
+  }
+}
+
+export function canonicalEvaluatedAt(value: unknown): string {
+  if (typeof value !== "string" || value.length > 13) {
+    return UNAUTHORIZED_EVALUATED_AT;
+  }
+  return EVALUATED_AT_PATTERN.test(value) ? value : UNAUTHORIZED_EVALUATED_AT;
+}
+
+function decodeJsonBytes(raw: string | Uint8Array): string {
+  if (typeof raw === "string") {
+    return raw;
+  }
+  return FATAL_UTF8_DECODER.decode(raw);
+}
+
+function parseJsonText(text: string): unknown {
+  riskAdmissionStats.jsonParseCalls += 1;
+  return JSON.parse(text);
+}
+
+function admitParsedRiskJson(parsed: unknown): ParsedRiskInput {
+  const evaluatedAt = canonicalEvaluatedAt(extractEvaluatedAtRaw(parsed));
+  try {
+    enforceRiskJsonBudgets(parsed);
+  } catch (error) {
+    if (error instanceof RiskInputLimitError) {
+      return failClosedLimit(evaluatedAt);
+    }
+    throw error;
+  }
+  if (riskDecimalFieldsExceedBudget(parsed)) {
+    return failClosedLimit(evaluatedAt);
+  }
   if (!isStructurallyCompleteRiskInput(parsed)) {
     return failClosedParse(evaluatedAt);
   }
   return { ok: true, value: parsed };
+}
+
+function failFromObservation(error: unknown): ParsedRiskInput {
+  if (isLimitError(error)) {
+    return failClosedLimit(UNAUTHORIZED_EVALUATED_AT);
+  }
+  return failClosedParse(UNAUTHORIZED_EVALUATED_AT);
+}
+
+function isLimitError(error: unknown): boolean {
+  return (
+    error instanceof RiskInputLimitError ||
+    (error instanceof CanonicalJsonError && error.reasonCode === "RESOURCE_LIMIT_EXCEEDED")
+  );
 }
 
 function failClosedParse(evaluatedAt: string): ParsedRiskInput {
@@ -72,20 +158,26 @@ function failClosedParse(evaluatedAt: string): ParsedRiskInput {
   };
 }
 
-function extractEvaluatedAt(parsed: unknown): string {
+function failClosedLimit(evaluatedAt: string): ParsedRiskInput {
+  return {
+    ok: false,
+    reasonCodes: ["INVALID_RISK_INPUT", "RISK_INPUT_LIMIT_EXCEEDED"],
+    evaluatedAt,
+  };
+}
+
+function extractEvaluatedAtRaw(parsed: unknown): unknown {
   try {
     if (!isPlainObject(parsed)) {
-      return UNAUTHORIZED_EVALUATED_AT;
+      return undefined;
     }
     const freshness = parsed.freshness;
     if (!isPlainObject(freshness)) {
-      return UNAUTHORIZED_EVALUATED_AT;
+      return undefined;
     }
-    return typeof freshness.evaluatedAt === "string"
-      ? freshness.evaluatedAt
-      : UNAUTHORIZED_EVALUATED_AT;
+    return freshness.evaluatedAt;
   } catch {
-    return UNAUTHORIZED_EVALUATED_AT;
+    return undefined;
   }
 }
 

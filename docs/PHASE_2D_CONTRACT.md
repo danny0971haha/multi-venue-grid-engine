@@ -1,6 +1,6 @@
 # Phase 2D Implementation Contract — Risk Calculations and Continuation Gate
 
-**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REJECT; CORRECTIVE 2 REVIEW CANDIDATE; CUMULATIVE_PHASE_2_BASELINE=PASS
+**Status:** PHASE 2D REJECTED; CORRECTIVE 1 REJECT; CORRECTIVE 2 ACCEPT; CORRECTIVE 3 REVIEW CANDIDATE; CUMULATIVE_PHASE_2_BASELINE=PASS
 
 **Date:** 2026-08-25
 **Repository:** `danny0971haha/multi-venue-grid-engine`  
@@ -16,7 +16,8 @@ PHASE_2C_CORRECTIVE_2=PASS
 PHASE_2C_SELF_DECLARED_PASS=NO
 PHASE_2D=REJECT
 PHASE_2D_CORRECTIVE_1=REJECT
-PHASE_2D_CORRECTIVE_2=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_2=ACCEPT
+PHASE_2D_CORRECTIVE_3=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
 CUMULATIVE_PHASE_2_BASELINE=PASS
 ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
@@ -174,3 +175,30 @@ frozen limit fields retained
 If `freshness.evaluatedAt` cannot be read from the detached snapshot, `evaluatedAt` is the unauthorized diagnostic sentinel `"0"`. That sentinel is not market time and must not be treated as a fresh observation.
 
 The same malformed input must produce a byte-identical decision. Valid Phase 2D inputs keep prior 150U / -5U / 10U and boundary semantics. Zero-quantity policy is unchanged in this corrective.
+
+## 9. Corrective 3 addendum — bounded risk input admission
+
+This addendum does not raise frozen 100U / 5x / 30U / 150U / -5U / 10U limits and does not authorize `systemAllowRiskIncrease=true`. Independent reviewer disposition for Corrective 2 is ACCEPT. Corrective 3 is a review candidate only.
+
+Frozen risk-admission resource budgets (risk boundary only; persistence canonical serializer default behavior is unchanged):
+
+```text
+MAX_RISK_INPUT_UTF8_BYTES = 65_536
+MAX_RISK_INPUT_DEPTH = 8
+MAX_RISK_INPUT_NODES = 2_048
+MAX_RISK_COLLECTION_LENGTH = 128
+MAX_RISK_OBJECT_PROPERTIES = 64
+MAX_RISK_STRING_CHARS = 256
+MAX_RISK_OBJECT_KEY_CHARS = 128
+MAX_RISK_DECIMAL_CHARS = 128
+```
+
+Exact caps are accepted. Cap + 1 is `RISK_INPUT_LIMIT_EXCEEDED` and HALT. Parse errors, accessors, symbols, and other non-capacity failures keep `INVALID_RISK_INPUT` without the limit code. Limit failures also include `INVALID_RISK_INPUT`, `STALE_OR_MISSING_INPUT`, and `DURABLE_HALT_OR_ACK_UNAVAILABLE`. `RISK_INPUT_LIMIT_EXCEEDED` is appended after `HIGH_WATER_OBSERVED` and does not reorder other catalog entries.
+
+`evaluateRiskFromJsonBytes(raw: string | Uint8Array)` is the external trust boundary. It measures UTF-8 byte length before `JSON.parse`, fatal-decodes `Uint8Array`, fail-closes invalid UTF-8 and malformed JSON, then applies exact-shape plus every structural and decimal-length budget. Diagnostics must not echo raw input or secret-like values. Repeated evaluation of the same invalid bytes is deterministic.
+
+`evaluateRisk(input: unknown)` remains for in-process tests and already-bounded finite objects. It applies defensive fail-closed observation and the same resource budgets to inputs that return from property inspection. It is not a DoS-proof guarantee and has no hard completion-time timeout. Non-returning Proxy traps and process OOM can prevent a return. `Promise.race` cannot abort synchronous observation. Worker/process isolation is the way to obtain a hard timeout; this checkpoint does not implement worker/process isolation. External adapters, fixtures, CLI, and network boundaries must call `evaluateRiskFromJsonBytes`.
+
+`evaluatedAt` on a `RiskDecision` is only a canonical non-negative integer millisecond string of at most 13 digits. Malformed, overlong, accessor, symbol, object, or other non-canonical values become `"0"`. Invalid decisions must not echo attacker-provided giant `evaluatedAt` strings.
+
+Decimal-like fields are length-checked before decimal regex and `decimal.js` construction. Structure budgets are enforced before `cloneInput`, `freshnessFailures`, `computeExposure`, and exposure iteration. Traversal does not mutate caller input, does not invoke accessors, and stops at the first exceeded budget.

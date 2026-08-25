@@ -9,6 +9,16 @@ export const FROZEN_START_DRAWDOWN_USDT = "10";
 export const FROZEN_BOUNDARY_BUFFER = "0.01";
 export const FROZEN_GRID_HALF_BAND = "0.03";
 
+/** Risk admission resource budgets. They do not change persistence canonical limits. */
+export const MAX_RISK_INPUT_UTF8_BYTES = 65_536;
+export const MAX_RISK_INPUT_DEPTH = 8;
+export const MAX_RISK_INPUT_NODES = 2_048;
+export const MAX_RISK_COLLECTION_LENGTH = 128;
+export const MAX_RISK_OBJECT_PROPERTIES = 64;
+export const MAX_RISK_STRING_CHARS = 256;
+export const MAX_RISK_OBJECT_KEY_CHARS = 128;
+export const MAX_RISK_DECIMAL_CHARS = 128;
+
 export type RiskAction = "CONTINUE" | "REDUCE" | "HALT";
 
 export type RiskSide = "BUY" | "SELL";
@@ -144,6 +154,7 @@ export const PHASE_2D_REASON_CODE_CATALOG = [
   "CANCEL_ONLY_REDUCTION",
   "BOUNDARY_SEED_BLOCKED",
   "HIGH_WATER_OBSERVED",
+  "RISK_INPUT_LIMIT_EXCEEDED",
 ] as const;
 
 export type Phase2DReasonCode = (typeof PHASE_2D_REASON_CODE_CATALOG)[number];

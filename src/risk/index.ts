@@ -24,6 +24,14 @@ export {
   FROZEN_MARGIN_BUDGET_USDT,
   FROZEN_PLANNED_GROSS_NOTIONAL_USDT,
   FROZEN_START_DRAWDOWN_USDT,
+  MAX_RISK_COLLECTION_LENGTH,
+  MAX_RISK_DECIMAL_CHARS,
+  MAX_RISK_INPUT_DEPTH,
+  MAX_RISK_INPUT_NODES,
+  MAX_RISK_INPUT_UTF8_BYTES,
+  MAX_RISK_OBJECT_KEY_CHARS,
+  MAX_RISK_OBJECT_PROPERTIES,
+  MAX_RISK_STRING_CHARS,
   PHASE_2D_REASON_CODE_CATALOG,
 } from "./risk-types.js";
 export { computeExposure } from "./exposure.js";
@@ -31,6 +39,7 @@ export { freshnessFailures } from "./freshness.js";
 export {
   diagnosticContainsSecretLike,
   evaluateRisk,
+  evaluateRiskFromJsonBytes,
   formatRiskDecisionDiagnostic,
   sortPhase2DReasonCodes,
 } from "./risk-engine.js";

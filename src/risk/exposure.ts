@@ -23,6 +23,16 @@ export type ExposureComputation = {
   reasonCodes: string[];
 };
 
+export const exposureIterationStats = {
+  calls: 0,
+  iterationsStarted: 0,
+};
+
+export function resetExposureIterationStats(): void {
+  exposureIterationStats.calls = 0;
+  exposureIterationStats.iterationsStarted = 0;
+}
+
 export function computeExposure(args: {
   signedPosition: DecimalString | null;
   markOrMidPrice: DecimalString | null;
@@ -30,6 +40,7 @@ export function computeExposure(args: {
   unknownReservations: readonly RiskUnknownReservation[];
   proposedBatch: readonly RiskProposedIntent[];
 }): ExposureComputation {
+  exposureIterationStats.calls += 1;
   const reasons: string[] = [];
   if (args.signedPosition !== null && !isCanonicalDecimalString(args.signedPosition)) {
     reasons.push("INVALID_DECIMAL", "STALE_OR_MISSING_INPUT");
@@ -55,6 +66,7 @@ export function computeExposure(args: {
   let worstShortNotional = shortPositionNotional(position, mark);
   let unbounded = false;
 
+  exposureIterationStats.iterationsStarted += 1;
   for (const order of args.ownedActiveOrders) {
     const invalid = validateWorkingOrder(order);
     if (invalid.length > 0) {

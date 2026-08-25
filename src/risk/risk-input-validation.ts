@@ -1,4 +1,5 @@
 import { decimalCmp, isCanonicalDecimalString } from "../math/decimal.js";
+import { MAX_RISK_DECIMAL_CHARS } from "./risk-types.js";
 import type { FundingConvention, RiskBoundedReduction, RiskFreshness } from "./risk-types.js";
 
 export const RISK_INPUT_KEYS = [
@@ -83,6 +84,9 @@ export function validateRiskInput(input: unknown): string[] {
   codes.push(...validateNullableDecimal(record.funding));
   codes.push(...validateNullableDecimal(record.gridLower));
   codes.push(...validateNullableDecimal(record.gridUpper));
+  if (codes.includes("RISK_INPUT_LIMIT_EXCEEDED")) {
+    return [...new Set(codes)];
+  }
   if (record.fundingConvention !== null && !isFundingConvention(record.fundingConvention)) {
     codes.push("INVALID_RISK_INPUT");
   }
@@ -119,6 +123,9 @@ export function validateRiskInput(input: unknown): string[] {
     codes.push("INVALID_RISK_INPUT");
   }
   codes.push(...validateBoundedReduction(record.boundedReduction));
+  if (codes.includes("RISK_INPUT_LIMIT_EXCEEDED")) {
+    return [...new Set(codes)];
+  }
   if (!Array.isArray(record.ownedActiveOrders)) {
     codes.push("INVALID_RISK_INPUT");
   } else {
@@ -159,13 +166,21 @@ export function validateProposedIntent(intent: unknown): string[] {
   if (typeof record.reduceOnly !== "boolean") {
     codes.push("INVALID_RISK_INPUT");
   }
-  if (typeof record.quantity !== "string" || !isCanonicalDecimalString(record.quantity)) {
+  if (typeof record.quantity !== "string") {
+    codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
+  } else if (record.quantity.length > MAX_RISK_DECIMAL_CHARS) {
+    codes.push("RISK_INPUT_LIMIT_EXCEEDED");
+  } else if (!isCanonicalDecimalString(record.quantity)) {
     codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
   } else if (decimalCmp(record.quantity, "0") < 0) {
     codes.push("INVALID_RISK_INPUT");
   }
   if (record.price !== null) {
-    if (typeof record.price !== "string" || !isCanonicalDecimalString(record.price)) {
+    if (typeof record.price !== "string") {
+      codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
+    } else if (record.price.length > MAX_RISK_DECIMAL_CHARS) {
+      codes.push("RISK_INPUT_LIMIT_EXCEEDED");
+    } else if (!isCanonicalDecimalString(record.price)) {
       codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
     } else if (decimalCmp(record.price, "0") <= 0) {
       codes.push("INVALID_RISK_INPUT");
@@ -189,15 +204,20 @@ export function validateWorkingOrder(order: unknown): string[] {
   if (typeof record.reduceOnly !== "boolean" || typeof record.owned !== "boolean") {
     codes.push("INVALID_RISK_INPUT");
   }
-  if (typeof record.price !== "string" || !isCanonicalDecimalString(record.price)) {
+  if (typeof record.price !== "string") {
+    codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
+  } else if (record.price.length > MAX_RISK_DECIMAL_CHARS) {
+    codes.push("RISK_INPUT_LIMIT_EXCEEDED");
+  } else if (!isCanonicalDecimalString(record.price)) {
     codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
   } else if (decimalCmp(record.price, "0") <= 0) {
     codes.push("INVALID_RISK_INPUT");
   }
-  if (
-    typeof record.remainingQuantity !== "string" ||
-    !isCanonicalDecimalString(record.remainingQuantity)
-  ) {
+  if (typeof record.remainingQuantity !== "string") {
+    codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
+  } else if (record.remainingQuantity.length > MAX_RISK_DECIMAL_CHARS) {
+    codes.push("RISK_INPUT_LIMIT_EXCEEDED");
+  } else if (!isCanonicalDecimalString(record.remainingQuantity)) {
     codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
   } else if (decimalCmp(record.remainingQuantity, "0") < 0) {
     codes.push("INVALID_RISK_INPUT");
@@ -215,12 +235,20 @@ export function validateUnknownReservation(reservation: unknown): string[] {
     codes.push("INVALID_RISK_INPUT");
   }
   if (record.price !== null) {
-    if (typeof record.price !== "string" || !isCanonicalDecimalString(record.price)) {
+    if (typeof record.price !== "string") {
+      codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
+    } else if (record.price.length > MAX_RISK_DECIMAL_CHARS) {
+      codes.push("RISK_INPUT_LIMIT_EXCEEDED");
+    } else if (!isCanonicalDecimalString(record.price)) {
       codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
     }
   }
   if (record.quantity !== null) {
-    if (typeof record.quantity !== "string" || !isCanonicalDecimalString(record.quantity)) {
+    if (typeof record.quantity !== "string") {
+      codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
+    } else if (record.quantity.length > MAX_RISK_DECIMAL_CHARS) {
+      codes.push("RISK_INPUT_LIMIT_EXCEEDED");
+    } else if (!isCanonicalDecimalString(record.quantity)) {
       codes.push("INVALID_RISK_INPUT", "INVALID_DECIMAL");
     }
   }
@@ -231,12 +259,13 @@ export function validateGridDomain(gridLower: unknown, gridUpper: unknown): stri
   if (gridLower === null || gridUpper === null) {
     return [];
   }
-  if (
-    typeof gridLower !== "string" ||
-    typeof gridUpper !== "string" ||
-    !isCanonicalDecimalString(gridLower) ||
-    !isCanonicalDecimalString(gridUpper)
-  ) {
+  if (typeof gridLower !== "string" || typeof gridUpper !== "string") {
+    return [];
+  }
+  if (gridLower.length > MAX_RISK_DECIMAL_CHARS || gridUpper.length > MAX_RISK_DECIMAL_CHARS) {
+    return ["RISK_INPUT_LIMIT_EXCEEDED"];
+  }
+  if (!isCanonicalDecimalString(gridLower) || !isCanonicalDecimalString(gridUpper)) {
     return [];
   }
   if (
@@ -296,6 +325,9 @@ function validateNullableDecimal(value: unknown): string[] {
   }
   if (typeof value !== "string") {
     return ["INVALID_RISK_INPUT"];
+  }
+  if (value.length > MAX_RISK_DECIMAL_CHARS) {
+    return ["RISK_INPUT_LIMIT_EXCEEDED"];
   }
   if (!isCanonicalDecimalString(value)) {
     return ["INVALID_DECIMAL"];

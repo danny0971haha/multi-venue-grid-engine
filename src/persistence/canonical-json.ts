@@ -15,21 +15,58 @@ export class CanonicalJsonError extends Error {
   }
 }
 
-export function canonicalSerialize(value: unknown): Buffer {
-  return Buffer.from(serializeValue(value, new WeakSet<object>()), "utf8");
+/**
+ * Optional observation budgets. Omitted fields keep the historical unbounded
+ * persistence serializer behavior and must not change accepted canonical bytes.
+ */
+export type CanonicalSerializeLimits = {
+  maxDepth?: number;
+  maxNodes?: number;
+  maxCollectionLength?: number;
+  maxObjectProperties?: number;
+  maxStringChars?: number;
+  maxObjectKeyChars?: number;
+};
+
+type SerializeState = {
+  seen: WeakSet<object>;
+  limits: CanonicalSerializeLimits | undefined;
+  nodes: number;
+};
+
+export function canonicalSerialize(value: unknown, limits?: CanonicalSerializeLimits): Buffer {
+  return Buffer.from(
+    serializeValue(value, { seen: new WeakSet<object>(), limits, nodes: 0 }, 1),
+    "utf8",
+  );
 }
 
-export function canonicalSerializeToUtf8(value: unknown): string {
-  return canonicalSerialize(value).toString("utf8");
+export function canonicalSerializeToUtf8(
+  value: unknown,
+  limits?: CanonicalSerializeLimits,
+): string {
+  return canonicalSerialize(value, limits).toString("utf8");
 }
 
-function serializeValue(value: unknown, seen: WeakSet<object>): string {
+function exceedsCap(cap: number | undefined, actual: number): boolean {
+  return cap !== undefined && actual > cap;
+}
+
+function serializeValue(value: unknown, state: SerializeState, depth: number): string {
+  state.nodes += 1;
+  if (exceedsCap(state.limits?.maxNodes, state.nodes)) {
+    throw new CanonicalJsonError("RESOURCE_LIMIT_EXCEEDED");
+  }
+
   if (value === null) {
     return "null";
   }
 
   switch (typeof value) {
     case "string":
+      if (exceedsCap(state.limits?.maxStringChars, value.length)) {
+        throw new CanonicalJsonError("RESOURCE_LIMIT_EXCEEDED");
+      }
       return JSON.stringify(value);
     case "boolean":
       return value ? "true" : "false";
@@ -49,14 +86,19 @@ function serializeValue(value: unknown, seen: WeakSet<object>): string {
       throw new CanonicalJsonError("UNSUPPORTED_TYPE");
   }
 
-  if (seen.has(value)) {
+  if (exceedsCap(state.limits?.maxDepth, depth)) {
+    throw new CanonicalJsonError("RESOURCE_LIMIT_EXCEEDED");
+  }
+  if (state.seen.has(value)) {
     throw new CanonicalJsonError("CYCLIC_OBJECT");
   }
-  seen.add(value);
+  state.seen.add(value);
   try {
-    return Array.isArray(value) ? serializeArray(value, seen) : serializeObject(value, seen);
+    return Array.isArray(value)
+      ? serializeArray(value, state, depth)
+      : serializeObject(value, state, depth);
   } finally {
-    seen.delete(value);
+    state.seen.delete(value);
   }
 }
 
@@ -95,7 +137,7 @@ function isCanonicalArrayIndexKey(key: string, length: number): boolean {
   return index < length && String(index) === key;
 }
 
-function serializeArray(value: unknown[], seen: WeakSet<object>): string {
+function serializeArray(value: unknown[], state: SerializeState, depth: number): string {
   if (Object.getPrototypeOf(value) !== Array.prototype) {
     throw new CanonicalJsonError("NON_PLAIN_OBJECT");
   }
@@ -128,6 +170,10 @@ function serializeArray(value: unknown[], seen: WeakSet<object>): string {
     throw new CanonicalJsonError("NON_PLAIN_OBJECT");
   }
 
+  if (exceedsCap(state.limits?.maxCollectionLength, length)) {
+    throw new CanonicalJsonError("RESOURCE_LIMIT_EXCEEDED");
+  }
+
   const ownKeys = Reflect.ownKeys(descriptors);
   const indexValues = new Map<string, unknown>();
   for (const key of ownKeys) {
@@ -153,12 +199,12 @@ function serializeArray(value: unknown[], seen: WeakSet<object>): string {
 
   const parts: string[] = [];
   for (let index = 0; index < length; index += 1) {
-    parts.push(serializeValue(indexValues.get(String(index)), seen));
+    parts.push(serializeValue(indexValues.get(String(index)), state, depth + 1));
   }
   return `[${parts.join(",")}]`;
 }
 
-function serializeObject(value: object, seen: WeakSet<object>): string {
+function serializeObject(value: object, state: SerializeState, depth: number): string {
   if (Buffer.isBuffer(value) || ArrayBuffer.isView(value)) {
     throw new CanonicalJsonError("NON_PLAIN_OBJECT");
   }
@@ -186,13 +232,19 @@ function serializeObject(value: object, seen: WeakSet<object>): string {
     if (descriptor?.enumerable !== true) {
       throw new CanonicalJsonError("NON_ENUMERABLE_PROPERTY");
     }
+    if (exceedsCap(state.limits?.maxObjectKeyChars, key.length)) {
+      throw new CanonicalJsonError("RESOURCE_LIMIT_EXCEEDED");
+    }
     collected.push([key, propertyValue]);
+    if (exceedsCap(state.limits?.maxObjectProperties, collected.length)) {
+      throw new CanonicalJsonError("RESOURCE_LIMIT_EXCEEDED");
+    }
   }
   collected.sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0));
 
   const parts: string[] = [];
   for (const [key, propertyValue] of collected) {
-    parts.push(`${JSON.stringify(key)}:${serializeValue(propertyValue, seen)}`);
+    parts.push(`${JSON.stringify(key)}:${serializeValue(propertyValue, state, depth + 1)}`);
   }
   return `{${parts.join(",")}}`;
 }

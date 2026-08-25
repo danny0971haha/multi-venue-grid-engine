@@ -3,6 +3,7 @@ export {
   canonicalSerialize,
   canonicalSerializeToUtf8,
 } from "./canonical-json.js";
+export type { CanonicalSerializeLimits } from "./canonical-json.js";
 export type {
   BuiltDurableEnvelope,
   DurableEnvelope,

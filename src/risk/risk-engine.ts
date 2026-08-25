@@ -8,7 +8,12 @@ import {
 } from "../math/decimal.js";
 import { computeExposure } from "./exposure.js";
 import { freshnessFailures } from "./freshness.js";
-import { UNAUTHORIZED_EVALUATED_AT, parseAndSnapshotRiskInput } from "./risk-input-parser.js";
+import {
+  canonicalEvaluatedAt,
+  parseAndSnapshotRiskInput,
+  parseRiskInputFromJsonBytes,
+  UNAUTHORIZED_EVALUATED_AT,
+} from "./risk-input-parser.js";
 import {
   isFundingConvention,
   validateGridDomain,
@@ -25,6 +30,12 @@ import {
 const SECRET_KEY_PATTERN =
   /secret|password|token|apikey|api[_-]?key|private[_-]?key|credential|authorization|bearer/i;
 
+/**
+ * In-process object boundary. Defensive fail-closed for finite plain objects
+ * that return from property observation. This is not a DoS-proof or hard-timeout
+ * guarantee against non-returning Proxy traps or process OOM. External adapters,
+ * fixtures, CLI, and network boundaries must use `evaluateRiskFromJsonBytes`.
+ */
 export function evaluateRisk(input: unknown): RiskDecision {
   try {
     const parsed = parseAndSnapshotRiskInput(input);
@@ -37,8 +48,29 @@ export function evaluateRisk(input: unknown): RiskDecision {
   }
 }
 
+/**
+ * Authoritative external risk admission boundary. UTF-8 byte length is enforced
+ * before JSON.parse. Uint8Array uses fatal UTF-8 decode.
+ */
+export function evaluateRiskFromJsonBytes(raw: string | Uint8Array): RiskDecision {
+  try {
+    const parsed = parseRiskInputFromJsonBytes(raw);
+    if (!parsed.ok) {
+      return invalidInputDecision(parsed.evaluatedAt, parsed.reasonCodes);
+    }
+    return evaluateTrustedRiskInput(parsed.value);
+  } catch {
+    return invalidInputDecision(UNAUTHORIZED_EVALUATED_AT, ["INVALID_RISK_INPUT"]);
+  }
+}
+
 function evaluateTrustedRiskInput(input: RiskInput): RiskDecision {
   const inputCodes = validateRiskInput(input);
+  if (inputCodes.includes("RISK_INPUT_LIMIT_EXCEEDED")) {
+    return invalidInputDecision(canonicalEvaluatedAt(input.freshness.evaluatedAt), [
+      "RISK_INPUT_LIMIT_EXCEEDED",
+    ]);
+  }
   const snapshot = cloneInput(input);
   const codes: string[] = ["DURABLE_HALT_OR_ACK_UNAVAILABLE", ...inputCodes];
   if (snapshot.haltAuthorityClear !== false) {
@@ -137,7 +169,8 @@ function evaluateTrustedRiskInput(input: RiskInput): RiskDecision {
     uniqueCodes.includes("STALE_OR_MISSING_INPUT") ||
     uniqueCodes.includes("UNBOUNDED_EXPOSURE") ||
     uniqueCodes.includes("INVALID_DECIMAL") ||
-    uniqueCodes.includes("INVALID_RISK_INPUT");
+    uniqueCodes.includes("INVALID_RISK_INPUT") ||
+    uniqueCodes.includes("RISK_INPUT_LIMIT_EXCEEDED");
   const plannedBlocked = uniqueCodes.includes("PLANNED_NOTIONAL");
   const riskMetricsWithinLimits =
     !metricHalt &&
@@ -146,7 +179,8 @@ function evaluateTrustedRiskInput(input: RiskInput): RiskDecision {
     !uniqueCodes.includes("UNBOUNDED_EXPOSURE") &&
     !uniqueCodes.includes("STALE_OR_MISSING_INPUT") &&
     !uniqueCodes.includes("INVALID_DECIMAL") &&
-    !uniqueCodes.includes("INVALID_RISK_INPUT");
+    !uniqueCodes.includes("INVALID_RISK_INPUT") &&
+    !uniqueCodes.includes("RISK_INPUT_LIMIT_EXCEEDED");
 
   let action: RiskDecision["action"] = "CONTINUE";
   if (systemHalt || metricHalt || actualAction === "HALT") {
@@ -170,7 +204,7 @@ function evaluateTrustedRiskInput(input: RiskInput): RiskDecision {
     metrics,
     riskMetricsWithinLimits,
     systemAllowRiskIncrease: false,
-    evaluatedAt: snapshot.freshness.evaluatedAt,
+    evaluatedAt: canonicalEvaluatedAt(snapshot.freshness.evaluatedAt),
   };
 }
 

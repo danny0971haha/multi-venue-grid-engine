@@ -28,6 +28,7 @@
     "test:phase2d": "tsx --test test/risk/risk-engine.test.ts",
     "test:phase2d-corrective-1": "tsx --test test/risk/risk-engine-corrective-1.test.ts",
     "test:phase2d-corrective-2": "tsx --test test/risk/risk-engine-corrective-2.test.ts",
+    "test:phase2d-corrective-3": "tsx --test test/risk/risk-engine-corrective-3.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
