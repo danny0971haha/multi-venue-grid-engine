@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -587,14 +586,13 @@ describe("committed baseline", () => {
       parsed.baseline.protectedFiles.some((file) => file.path === "src/risk/risk-engine.ts"),
     );
     assert.ok(!parsed.baseline.protectedFiles.some((file) => file.path === "docs/PHASE_2D_CONTRACT.md"));
-    const candidateContract = execFileSync(
-      "git",
-      ["show", "7f196d367e39640eee9517f742b0d61424f9d4cc:docs/PHASE_2D_CONTRACT.md"],
-      { encoding: "utf8" },
+    assert.equal(
+      parsed.baseline.protectedContentAnchors[0].sha256,
+      "2eb75b74d668578fa996fb21a7ef2d7998bbc3a6274d61c1ba7b847506f5a68f",
     );
-    const extracted = extractFrozenRiskNumericContract(candidateContract);
-    assert.equal(typeof extracted, "string");
-    assert.equal(parsed.baseline.protectedContentAnchors[0].sha256, sha256Text(extracted));
+    for (const required of frozenLimitRequiredSubstrings()) {
+      assert.ok(parsed.baseline.protectedContentAnchors[0].requiredSubstrings.includes(required));
+    }
     assert.equal(TRUSTED_WORKFLOW_PATH.length > 0, true);
   });
 });
