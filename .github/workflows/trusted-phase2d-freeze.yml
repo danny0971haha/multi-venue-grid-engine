@@ -1,0 +1,74 @@
+name: Trusted Phase 2D freeze
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request:
+    paths:
+      - ".github/workflows/trusted-phase2d-freeze.yml"
+      - ".github/trusted/**"
+      - ".github/CODEOWNERS"
+      - "scripts/governance/**"
+      - "docs/TRUSTED_PHASE2D_REVIEW_BOUNDARY.md"
+  push:
+    branches:
+      - main
+      - governance/phase2d-trusted-review-boundary
+    paths:
+      - ".github/workflows/trusted-phase2d-freeze.yml"
+      - ".github/trusted/**"
+      - ".github/CODEOWNERS"
+      - "scripts/governance/**"
+      - "docs/TRUSTED_PHASE2D_REVIEW_BOUNDARY.md"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: trusted-phase2d-freeze-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trusted-phase2d-freeze-integrity:
+    name: trusted-phase2d-freeze-integrity
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.ref == 'experiment/v0.1-phase2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out protected main only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: danny0971haha/multi-venue-grid-engine
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Evaluate freeze against GitHub object metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REPO: ${{ github.repository }}
+        run: node scripts/governance/phase2d-trusted-freeze-check.mjs
+
+  governance-checker-fixtures:
+    name: governance-checker-fixtures
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the governance ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Run trusted-checker fixture tests
+        run: node --test scripts/governance/*.test.mjs

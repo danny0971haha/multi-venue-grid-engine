@@ -1,0 +1,15 @@
+# Repository owner is the only collaborator with admin rights.
+# CODEOWNERS is the review surface for trust-boundary and risk paths.
+# Placeholder accounts are not used.
+
+.github/CODEOWNERS @danny0971haha
+.github/workflows/ @danny0971haha
+.github/trusted/ @danny0971haha
+scripts/evidence/ @danny0971haha
+scripts/governance/ @danny0971haha
+test/evidence/ @danny0971haha
+package.json @danny0971haha
+package-lock.json @danny0971haha
+docs/*CONTRACT* @danny0971haha
+src/risk/ @danny0971haha
+src/persistence/ @danny0971haha
