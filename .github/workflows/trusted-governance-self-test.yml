@@ -1,0 +1,57 @@
+name: Trusted governance self-test
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/trusted-phase2d-freeze.yml"
+      - ".github/workflows/trusted-governance-self-test.yml"
+      - ".github/trusted/**"
+      - ".github/CODEOWNERS"
+      - "scripts/governance/**"
+      - "docs/TRUSTED_PHASE2D_REVIEW_BOUNDARY.md"
+  push:
+    branches:
+      - main
+      - governance/phase2d-trusted-review-boundary
+    paths:
+      - ".github/workflows/trusted-phase2d-freeze.yml"
+      - ".github/workflows/trusted-governance-self-test.yml"
+      - ".github/trusted/**"
+      - ".github/CODEOWNERS"
+      - "scripts/governance/**"
+      - "docs/TRUSTED_PHASE2D_REVIEW_BOUNDARY.md"
+
+permissions:
+  contents: read
+
+jobs:
+  trusted-governance-self-test:
+    name: trusted-governance-self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the governance revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Parse workflow YAML
+        run: |
+          ruby -e 'require "yaml"; ARGV.each { |f| YAML.parse_file(f) }' \
+            .github/workflows/trusted-phase2d-freeze.yml \
+            .github/workflows/trusted-governance-self-test.yml
+
+      - name: Check governance script syntax
+        run: |
+          for file in scripts/governance/*.mjs; do
+            node --check "$file"
+          done
+
+      - name: Run schema, fixture, post-merge, and negative controls
+        run: node --test scripts/governance/*.test.mjs
+
+      - name: Prove the self-test job executed
+        run: echo "trustedGovernanceSelfTestExecuted=true"

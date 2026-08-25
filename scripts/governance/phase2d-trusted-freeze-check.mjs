@@ -13,9 +13,12 @@ import {
   evaluateTrustedFreeze,
   formatMachineSummary,
   summaryContainsForbiddenDecisionWording,
+  sha256Bytes,
   TRUSTED_BASELINE_PATH,
 } from "./phase2d-trusted-freeze-lib.mjs";
+import { inspectTrustedCheckout } from "./phase2d-trusted-control.mjs";
 import {
+  fetchBlobBytes,
   fetchBlobUtf8,
   fetchCommitTreeSha,
   fetchCompareAncestor,
@@ -48,18 +51,29 @@ async function main() {
     });
   }
 
+  const trustedCheckout = inspectTrustedCheckout({ repoRoot, baseline: parsed.baseline });
+  if (!trustedCheckout.ok) {
+    return failClosed({
+      trustedBaselineIntegrityOk: false,
+      sourceHeadMatchesReviewedCandidate: false,
+      reasons: trustedCheckout.reasons,
+    });
+  }
+
   const token = process.env.GITHUB_TOKEN;
   const apiUrl = process.env.GITHUB_API_URL || DEFAULT_API;
   const sourceHeadSha = process.env.PR_HEAD_SHA;
   const eventSourceHeadSha = process.env.PR_HEAD_SHA;
   const repositoryFullName = process.env.PR_BASE_REPO;
   const prHeadRepositoryFullName = process.env.PR_HEAD_REPO;
+  const prHeadRef = process.env.PR_HEAD_REF;
 
   if (!token) {
     return failClosed(evaluateTrustedFreeze({
       baseline: parsed.baseline,
       repositoryFullName,
       prHeadRepositoryFullName,
+      prHeadRef,
       sourceHeadSha,
       eventSourceHeadSha,
       ancestorCheckComplete: false,
@@ -132,6 +146,41 @@ async function main() {
     anchorContentComplete = false;
   }
 
+
+  const observedBlobSha256ByKey = {};
+  let blobHashesComplete = true;
+  if (baseTree.complete && headTree.complete) {
+    const requests = new Map();
+    for (const file of parsed.baseline.protectedFiles) {
+      requests.set(`head:${file.path}`, file.blobSha);
+    }
+    for (const item of parsed.baseline.candidateChangedFiles) {
+      if (item.base) requests.set(`base:${item.path}`, item.base.blobSha);
+      if (item.head) requests.set(`head:${item.path}`, item.head.blobSha);
+    }
+    const cache = new Map();
+    for (const [key, blobSha] of requests) {
+      let promise = cache.get(blobSha);
+      if (!promise) {
+        promise = fetchBlobBytes({
+          apiUrl,
+          repository: parsed.baseline.repository,
+          blobSha,
+          token,
+        });
+        cache.set(blobSha, promise);
+      }
+      const blob = await promise;
+      if (!blob.complete) {
+        blobHashesComplete = false;
+        continue;
+      }
+      observedBlobSha256ByKey[key] = sha256Bytes(blob.bytes);
+    }
+  } else {
+    blobHashesComplete = false;
+  }
+
   const extraReasons = [];
   if (!baseCommit.complete) extraReasons.push(baseCommit.reason ?? "base_commit_incomplete");
   if (!headCommit.complete) extraReasons.push(headCommit.reason ?? "head_commit_incomplete");
@@ -139,11 +188,13 @@ async function main() {
   if (!headTree.complete) extraReasons.push(headTree.reason ?? "head_tree_incomplete");
   if (!compare.complete) extraReasons.push(compare.reason ?? "ancestor_check_incomplete");
   if (!anchorContentComplete) extraReasons.push("anchor_content_unavailable");
+  if (!blobHashesComplete) extraReasons.push("blob_sha256_unavailable");
 
   const evaluation = evaluateTrustedFreeze({
     baseline: parsed.baseline,
     repositoryFullName,
     prHeadRepositoryFullName,
+    prHeadRef,
     sourceHeadSha,
     eventSourceHeadSha,
     ancestorCheckComplete: compare.complete === true,
@@ -156,6 +207,7 @@ async function main() {
     compareFiles: compare.files,
     compareFilesIncomplete: compare.reason === "compare_files_unpaginated_limit",
     headTextByPath,
+    observedBlobSha256ByKey,
   });
   evaluation.reasons = [...new Set([...extraReasons, ...evaluation.reasons])];
   if (extraReasons.length > 0) {

@@ -1,6 +1,8 @@
 {
-  "schemaVersion": "multi-venue-phase2d-trusted-baseline/1",
+  "schemaVersion": "multi-venue-phase2d-trusted-baseline/2",
   "repository": "danny0971haha/multi-venue-grid-engine",
+  "minimumTrustedAncestorSha": "ed320fbf6558fcf249a6685031f5280a0e402def",
+  "candidateHeadRef": "experiment/v0.1-phase2",
   "acceptedImplementationBaseSha": "c64fa291af0d53139c6c526cd25ede434c08c17b",
   "acceptedImplementationBaseTreeSha": "7eb995e35a65f94ab32921133e756268c0339a2d",
   "currentAcceptedCandidateSourceHead": "7f196d367e39640eee9517f742b0d61424f9d4cc",
@@ -473,6 +475,359 @@
       "objectType": "blob",
       "blobSha": "fe9542d7cfe8bfa264fffdfbc26629923d311673",
       "sha256": "8c6eed9b6fdb0ca07cbc477ea4b9528f2dfa392829fe4470ca8765fd7ca6b00c"
+    }
+  ],
+  "candidateChangedFiles": [
+    {
+      "path": ".github/workflows/README.md",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "90b75a7048b9f6caf2c12d074eeafa08b7c6a01c",
+        "sha256": "ad89b16a0a00bea58d4c43eb58729ab9904dc019647c022757f06d530f3d7614"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "96cbdfb0825d507a5a952f8d3657dc1e37b30e15",
+        "sha256": "039ebf9230eaeb07013d3634e77eea8988fd6bf8aa2c8f3434dbe14ffc36b853"
+      }
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "81b6461c558da092a2dec715697a8762ce6a0ac9",
+        "sha256": "a4dcc8dc4721b46251f3e4b226d39b4ecb9139dbaf8efcfe16e4ea8708800e17"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "832405694109b043fed8ea2f5eeceba6549b2ecb",
+        "sha256": "61c28e349a990e88113d6804a8b619da2ece15400aede194a3d972dc1504dc1f"
+      }
+    },
+    {
+      "path": ".gitignore",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "ef9517227ef7ec3c42bd616ad2f17b3b62e8295e",
+        "sha256": "731076ed1b7c1e92cb588d746c0648dafe48de71b230dee1e0b7eb5c409f57a9"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "9a6bc8d976ae2d02cca8dbd78b2d55378f9162c7",
+        "sha256": "6ecf5d0e42cd4f8cdb20e629d0d0e70f10844236043ecb41b0d032639d5ac932"
+      }
+    },
+    {
+      "path": "docs/IMPLEMENTATION_CONTRACT.md",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "fba1794f9d797b500f520342438f1201a0b6948d",
+        "sha256": "48811a77f6bcd940e3e8b47d5291f1b3b99292be4ab0bd755e0d6b4f3eeb33a4"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "e0a2ff0f4a357665026536264fa46d1168d79e62",
+        "sha256": "0255038bf65fcf4a13bf784deaf20f33a02ddfbfd6c81f312109700e02673bdd"
+      }
+    },
+    {
+      "path": "docs/PHASE_2D_CONTRACT.md",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "0623514c83121cec9b90f6508bc7d54bfd273ac1",
+        "sha256": "385abfe89ea4d01f5f33d4518d3fb8615ecd3969f49ef66d8cd77ecc39248a4c"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "374b70d28b41c1e70bb7aa4891ef1fab22953c7a",
+        "sha256": "f6ff78a218e4092264118664e56a7eed8b18fd0c3210b736daa1bdbebc005c4b"
+      }
+    },
+    {
+      "path": "docs/PHASE_2D_CORRECTIVE_4_EVIDENCE.md",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "2ec52f6f037190a1f52fa72699a96ed58398cf78",
+        "sha256": "b8e4cb776dacf4a46ca64fbf3e52d285937c64877481bfbac4c76c5a0af76aac"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "50ef03b0301624ba9dba5aa1e013bcc48227459c",
+        "sha256": "f28c1bfede01102ad5921cd5d6aecfcb2788b8f0310480b0e4f23633b920c581"
+      }
+    },
+    {
+      "path": "docs/PHASE_2D_CORRECTIVE_4_EVIDENCE_SCHEMA.md",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "552ee49777723f35a48b1eb31d363821a2692755",
+        "sha256": "eafe6f984c93ae0e99a249cfa7662b0c762fc87906cd89d0f732884629fbd30f"
+      }
+    },
+    {
+      "path": "package.json",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "abe789651f6641267df4b2eb42a3a47a51afa1ba",
+        "sha256": "5b967775f54e81dd9f53c009889fc746a60e0eb8a90f519dc65ba58f1f298bb1"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "116838b8ebe73d7a29ec2c6ae7504e809d45aaf9",
+        "sha256": "9e8ae1015eab925470a9622d48c981cdf1a151acb41d12131bcee871c8385cca"
+      }
+    },
+    {
+      "path": "scripts/evidence/phase2d-corrective4-generate.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "355112c6f9c7c138e654a60d3e8fb0a5676fcb0d",
+        "sha256": "ecdd254b6089f7612029be8321a6419de775c848c97fe3b181e4de580dbcdf5f"
+      }
+    },
+    {
+      "path": "scripts/evidence/phase2d-corrective4-lib.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "7524165a918a5e6304eb01167ba54cf4b7ab7481",
+        "sha256": "3c2995fe0e863129eacbd61ed7fb8a8ebe18ced4b318d9fda39be0df7fcd1462"
+      }
+    },
+    {
+      "path": "scripts/evidence/phase2d-corrective4-schema.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "fa5c9e97244f0936c419bc87d7fa39494fa9d292",
+        "sha256": "6d6ef999e50c2857ebc0b259abdbd00051e99276d57ddc0ba22cc2a9781a8802"
+      }
+    },
+    {
+      "path": "scripts/evidence/phase2d-corrective4-verify-lib.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "3f13eb54230c5e3fd7473e2ad953947a638b2264",
+        "sha256": "716477c4bd8c9af895d26f5520d7ed8a20610cd36d471adb23c63c44dd483be8"
+      }
+    },
+    {
+      "path": "scripts/evidence/phase2d-corrective4-verify.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "41e9ee8543ee82a5cb6582ff2717701fc5339053",
+        "sha256": "dc546e320652f48157c56c84312a303d20ea6ae1ff48a08c7526ad6b4f251191"
+      }
+    },
+    {
+      "path": "scripts/evidence/phase2d-corrective4-write-fixture.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "d0fa3c34a929a713d3c04eba58c024f2875e7bf4",
+        "sha256": "40369ad1acf894eca10a5cd47b0928b0a745f8807a8aee0dcf796bb4f0f182a9"
+      }
+    },
+    {
+      "path": "test/evidence/fixtures/assert-package-scripts.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "c235c22014c445d29d5ac5d17de75c0ec7729781",
+        "sha256": "3eef508a7b529d912cd69efed9ac2b2333920c9f8701190d7e5cf3a1df014410"
+      }
+    },
+    {
+      "path": "test/evidence/fixtures/check-zero-audit.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "3a05fa2a4c7b79983eafe145f7412d76daeb45ab",
+        "sha256": "ac8f806bc8dcb013f9eccd1a11bd884b139e907178b9610bcdd8bba238f1c0e9"
+      }
+    },
+    {
+      "path": "test/evidence/fixtures/handwritten-intact.mjs",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "ea29837593810c1aed8a4c42cd806c861c1d77d8",
+        "sha256": "3cab4e8098c81ff2fc900fe82778ea08759d8281f33209a6a01882daf6acee9e"
+      }
+    },
+    {
+      "path": "test/evidence/fixtures/zero-audit.json",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "ccd3a7971e8e801f0f5b38be32799094d1732e5a",
+        "sha256": "a91e7964903a4a1e89134e53ac68e258a6fd916c1e26604995a8b7f39f786232"
+      }
+    },
+    {
+      "path": "test/evidence/phase2d-corrective4-evidence.test.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "a41177585a22451db702e96de69fad41dc0f3e04",
+        "sha256": "ed5190e694d6224733bc729b54d3faf99d0612d71279edac841d70364fc86888"
+      }
+    }
+  ],
+  "trustedGovernancePathRules": [
+    ".github/workflows/trusted-phase2d-freeze.yml",
+    ".github/workflows/trusted-governance-self-test.yml",
+    ".github/trusted/**",
+    "scripts/governance/**",
+    ".github/CODEOWNERS"
+  ],
+  "trustedGovernanceFiles": [
+    {
+      "path": ".github/CODEOWNERS",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "a61c40ee969aa826a049d1a51823c16fd662779b",
+      "sha256": "52065b56c2bd40a1ac3ed86448a84e560b8474cef68281930c7dd823e6279a04"
+    },
+    {
+      "path": ".github/workflows/trusted-governance-self-test.yml",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "c16e176e4a4d749774dfd0ffefefd4d3ff7d5627",
+      "sha256": "2f7cc5cfaeacd7d32c48ff5c78709f20fb6fdfcc096c72b276ac643a6970cc35"
+    },
+    {
+      "path": ".github/workflows/trusted-phase2d-freeze.yml",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "3bc1bd6cb8444d7a116c494f26c1b64aa4934997",
+      "sha256": "b7885a047ee563d921100f05f9a906aae9bc0df3366fd36cfa8cb9751c557cc2"
+    },
+    {
+      "path": "scripts/governance/generate-phase2d-corrective4-baseline.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "3d1064ff76db9f69ec479c6c92da568a093ab62d",
+      "sha256": "9cf0f6825323472349b7473caeaed8f520e2f1f0c4250616477be5e0b66aa72b"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-control.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "034ec7ca56a17719beff237bd8b1b1e42049342c",
+      "sha256": "6470bbc1164964e1c0e0a53c0d3b7aad4c8f5d4febda3bf15d1ffd8a98af22fd"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-control.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "f2727880cf66a75592a81b073afc20e3935353ac",
+      "sha256": "1c9e116125d02269e7b52bb8618e08afa054d2d9a3e6f7fd061268ea50abb849"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-freeze-check.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "78a3d6061171f6876cb860f96fd63522f9eddae9",
+      "sha256": "f6512063161cb18311d4be4022f279f9e0352709e2a7a0872bd46392b60ee3f3"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-freeze-github.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "4b6923d244d327a410135441bfa44e68ccb48d8f",
+      "sha256": "f15d14ec728c646145f182bb1b4de363d3c3c8c41b17dba549e6c1605278a760"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-freeze-github.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "6f4cfc5adf4be411cd37fe46a91e2124f7bd7ebf",
+      "sha256": "4d8d49601dbf73c711b38023de5eca76f85ac893c2377d1f3e0e4eb3facff42a"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-freeze-lib.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "40b116d09acc99aed52b9a07c7ba1523e42ea002",
+      "sha256": "ea39dfe56850f41cbad2be19324cf77494083bda44291e14ee356c4138284755"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-freeze-lib.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "ecb942a362492f1dbb89eeaaea7cff385ffef2a0",
+      "sha256": "2f2e70f9988878494a43a3ed50fe02cdefe259787dd3c16c418a581997f9e151"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-gate.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "2e8f69ca7ee114b7bd3642412beab75f5501fc34",
+      "sha256": "bc9368e053d4614a5d6548f0570545ae2bedef678f609a62c03102d81aa5989b"
+    },
+    {
+      "path": "scripts/governance/phase2d-trusted-gate.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "9d8fe6f97e9bc39608b187c95dd94cd9a06b4bd9",
+      "sha256": "37350e21e189bb617343a23c381c46a4aeb42da07d10a329467001c234be86f0"
+    },
+    {
+      "path": "scripts/governance/phase2d-workflow-structure.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "630b2bac731a28ef92f3f3b5322250153e6fca9b",
+      "sha256": "e6cde7c144f48bd059316ee637fb3a452c66fb3bb133fe8e787765db92f5ed53"
     }
   ]
 }

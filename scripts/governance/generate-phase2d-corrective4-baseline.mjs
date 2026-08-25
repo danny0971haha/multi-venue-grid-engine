@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +23,8 @@ import {
 
 const IMPLEMENTATION_BASE = "c64fa291af0d53139c6c526cd25ede434c08c17b";
 const CANDIDATE_HEAD = "7f196d367e39640eee9517f742b0d61424f9d4cc";
+const MINIMUM_TRUSTED_ANCESTOR = "ed320fbf6558fcf249a6685031f5280a0e402def";
+const CANDIDATE_HEAD_REF = "experiment/v0.1-phase2";
 const REPOSITORY = "danny0971haha/multi-venue-grid-engine";
 
 const PROTECTED_PATH_RULES = [
@@ -51,6 +53,14 @@ const ALLOWED_EVIDENCE_ONLY_CHANGED_PATH_RULES = [
   "test/evidence/**",
 ];
 
+const TRUSTED_GOVERNANCE_PATH_RULES = [
+  ".github/workflows/trusted-phase2d-freeze.yml",
+  ".github/workflows/trusted-governance-self-test.yml",
+  ".github/trusted/**",
+  "scripts/governance/**",
+  ".github/CODEOWNERS",
+];
+
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
@@ -63,7 +73,12 @@ function main() {
   const baseSha = git(["rev-parse", IMPLEMENTATION_BASE]);
   const treeSha = git(["rev-parse", `${IMPLEMENTATION_BASE}^{tree}`]);
   const candidateSha = git(["rev-parse", CANDIDATE_HEAD]);
-  if (baseSha !== IMPLEMENTATION_BASE || candidateSha !== CANDIDATE_HEAD) {
+  const trustedAncestorSha = git(["rev-parse", MINIMUM_TRUSTED_ANCESTOR]);
+  if (
+    baseSha !== IMPLEMENTATION_BASE ||
+    candidateSha !== CANDIDATE_HEAD ||
+    trustedAncestorSha !== MINIMUM_TRUSTED_ANCESTOR
+  ) {
     throw new Error("git_rev_parse_mismatch");
   }
   const ancestor = spawnExit(["merge-base", "--is-ancestor", IMPLEMENTATION_BASE, CANDIDATE_HEAD]);
@@ -98,6 +113,23 @@ function main() {
   }
   protectedFiles.sort((a, b) => a.path.localeCompare(b.path));
 
+  const baseIndex = treeIndex(IMPLEMENTATION_BASE);
+  const headIndex = treeIndex(CANDIDATE_HEAD);
+  const candidateChangedFiles = [];
+  for (const filePath of [...new Set([...baseIndex.keys(), ...headIndex.keys()])].sort()) {
+    const base = baseIndex.get(filePath) ?? null;
+    const head = headIndex.get(filePath) ?? null;
+    if (base && head && base.mode === head.mode && base.objectType === head.objectType && base.blobSha === head.blobSha) {
+      continue;
+    }
+    candidateChangedFiles.push({
+      path: filePath,
+      change: base === null ? "added" : head === null ? "deleted" : "modified",
+      base: base ? snapshotWithHash(base) : null,
+      head: head ? snapshotWithHash(head) : null,
+    });
+  }
+
   const contract = execFileSync("git", ["show", `${CANDIDATE_HEAD}:docs/PHASE_2D_CONTRACT.md`], {
     encoding: "utf8",
   });
@@ -110,6 +142,8 @@ function main() {
   const manifest = {
     schemaVersion: SCHEMA_VERSION,
     repository: REPOSITORY,
+    minimumTrustedAncestorSha: MINIMUM_TRUSTED_ANCESTOR,
+    candidateHeadRef: CANDIDATE_HEAD_REF,
     acceptedImplementationBaseSha: IMPLEMENTATION_BASE,
     acceptedImplementationBaseTreeSha: treeSha,
     currentAcceptedCandidateSourceHead: CANDIDATE_HEAD,
@@ -126,16 +160,68 @@ function main() {
       },
     ],
     protectedFiles,
+    candidateChangedFiles,
+    trustedGovernancePathRules: TRUSTED_GOVERNANCE_PATH_RULES,
+    trustedGovernanceFiles: trustedGovernanceManifest(repoRoot()),
   };
 
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const repoRoot = path.resolve(here, "..", "..");
-  const outPath = path.join(repoRoot, TRUSTED_BASELINE_PATH);
+  const outPath = path.join(repoRoot(), TRUSTED_BASELINE_PATH);
   mkdirSync(path.dirname(outPath), { recursive: true });
   writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
   process.stdout.write(
     `wrote ${TRUSTED_BASELINE_PATH} files=${protectedFiles.length} tree=${treeSha}\n`,
   );
+}
+
+function repoRoot() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  return path.resolve(here, "..", "..");
+}
+
+function treeIndex(ref) {
+  const result = new Map();
+  const output = execFileSync("git", ["ls-tree", "-r", "-z", ref]);
+  for (const record of output.toString("utf8").split("\0")) {
+    if (!record) continue;
+    const tab = record.indexOf("\t");
+    if (tab < 0) throw new Error("ls_tree_malformed");
+    const [mode, objectType, blobSha] = record.slice(0, tab).split(" ");
+    const filePath = record.slice(tab + 1);
+    if (objectType !== "blob") throw new Error(`candidate_non_blob:${filePath}`);
+    result.set(filePath, { mode, objectType, blobSha });
+  }
+  return result;
+}
+
+function snapshotWithHash(snapshot) {
+  return {
+    ...snapshot,
+    sha256: sha256Bytes(gitBytes(["cat-file", "blob", snapshot.blobSha])),
+  };
+}
+
+function trustedGovernanceManifest(root) {
+  const listed = git(["ls-files", "--cached", "--others", "--exclude-standard"])
+    .split("\n")
+    .filter(Boolean)
+    .filter((filePath) =>
+      filePath !== TRUSTED_BASELINE_PATH &&
+      pathMatchesAnyRule(filePath, TRUSTED_GOVERNANCE_PATH_RULES),
+    )
+    .sort();
+  return listed.map((filePath) => {
+    const absolute = path.join(root, filePath);
+    const stat = lstatSync(absolute);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`trusted_non_blob:${filePath}`);
+    const bytes = readFileSync(absolute);
+    return {
+      path: filePath,
+      mode: stat.mode & 0o111 ? "100755" : "100644",
+      objectType: "blob",
+      blobSha: execFileSync("git", ["hash-object", "--stdin"], { input: bytes, encoding: "utf8" }).trim(),
+      sha256: sha256Bytes(bytes),
+    };
+  });
 }
 
 function spawnExit(args) {

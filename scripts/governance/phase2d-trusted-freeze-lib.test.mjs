@@ -67,6 +67,8 @@ function baseline(overrides = {}) {
   return {
     schemaVersion: SCHEMA_VERSION,
     repository: "danny0971haha/multi-venue-grid-engine",
+    minimumTrustedAncestorSha: "9".repeat(40),
+    candidateHeadRef: "experiment/v0.1-phase2",
     acceptedImplementationBaseSha: SHA.impl,
     acceptedImplementationBaseTreeSha: SHA.tree,
     currentAcceptedCandidateSourceHead: SHA.head,
@@ -99,6 +101,42 @@ function baseline(overrides = {}) {
         objectType: "blob",
         blobSha: SHA.lock,
         sha256: "b".repeat(64),
+      },
+    ],
+    candidateChangedFiles: [
+      {
+        path: "docs/PHASE_2D_CONTRACT.md",
+        change: "modified",
+        base: { mode: "100644", objectType: "blob", blobSha: SHA.contractBase, sha256: "c".repeat(64) },
+        head: { mode: "100644", objectType: "blob", blobSha: SHA.contractHead, sha256: "d".repeat(64) },
+      },
+      {
+        path: "package.json",
+        change: "modified",
+        base: { mode: "100644", objectType: "blob", blobSha: SHA.pkgBase, sha256: "e".repeat(64) },
+        head: { mode: "100644", objectType: "blob", blobSha: SHA.pkgHead, sha256: "f".repeat(64) },
+      },
+      {
+        path: "scripts/evidence/phase2d-corrective4-verify.mjs",
+        change: "added",
+        base: null,
+        head: { mode: "100644", objectType: "blob", blobSha: SHA.extra, sha256: "1".repeat(64) },
+      },
+    ],
+    trustedGovernancePathRules: [
+      ".github/workflows/trusted-phase2d-freeze.yml",
+      ".github/workflows/trusted-governance-self-test.yml",
+      ".github/trusted/**",
+      "scripts/governance/**",
+      ".github/CODEOWNERS",
+    ],
+    trustedGovernanceFiles: [
+      {
+        path: ".github/CODEOWNERS",
+        mode: "100644",
+        objectType: "blob",
+        blobSha: "2".repeat(40),
+        sha256: "2".repeat(64),
       },
     ],
     ...overrides,
@@ -148,6 +186,7 @@ function evalInput(overrides = {}) {
     baseline: baseline(),
     repositoryFullName: "danny0971haha/multi-venue-grid-engine",
     prHeadRepositoryFullName: "danny0971haha/multi-venue-grid-engine",
+    prHeadRef: "experiment/v0.1-phase2",
     sourceHeadSha: SHA.head,
     eventSourceHeadSha: SHA.head,
     implementationBaseIsAncestor: true,
@@ -158,6 +197,15 @@ function evalInput(overrides = {}) {
     baseTree,
     headTree,
     headTextByPath,
+    observedBlobSha256ByKey: {
+      "head:src/risk/risk-engine.ts": "a".repeat(64),
+      "head:package-lock.json": "b".repeat(64),
+      "base:docs/PHASE_2D_CONTRACT.md": "c".repeat(64),
+      "head:docs/PHASE_2D_CONTRACT.md": "d".repeat(64),
+      "base:package.json": "e".repeat(64),
+      "head:package.json": "f".repeat(64),
+      "head:scripts/evidence/phase2d-corrective4-verify.mjs": "1".repeat(64),
+    },
     ...overrides,
   };
 }
@@ -220,6 +268,15 @@ describe("parseBaseline", () => {
     const parsed = parseBaseline(JSON.stringify({ schemaVersion: "nope" }));
     assert.equal(parsed.ok, false);
     assert.ok(parsed.reasons.includes("baseline_schema_version"));
+  });
+
+  it("rejects unknown root and nested critical fields", () => {
+    const value = baseline({ unexpectedPolicy: true });
+    value.protectedFiles[0].unexpectedHash = "ignored";
+    const parsed = parseBaseline(JSON.stringify(value));
+    assert.equal(parsed.ok, false);
+    assert.ok(parsed.reasons.includes("baseline_unknown_field"));
+    assert.ok(parsed.reasons.includes("baseline_protected_file_unknown_field"));
   });
 });
 
@@ -386,6 +443,51 @@ describe("evaluateTrustedFreeze", () => {
     assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
     assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
     assert.equal(evaluation.trustedBaselineIntegrityOk, true);
+  });
+
+  it("fails when the exact candidate SHA changes by one character", () => {
+    const oneCharacterChanged = `${SHA.head.slice(0, -1)}b`;
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({ sourceHeadSha: oneCharacterChanged, eventSourceHeadSha: oneCharacterChanged }),
+    );
+    assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
+    assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
+  });
+
+  it("fails the exact manifest when the candidate has one extra file", () => {
+    const { baseTree, headTree, headTextByPath } = trees();
+    const evaluation = evaluateTrustedFreeze(evalInput({
+      baseTree,
+      headTree: headTree.concat({ path: "scripts/evidence/extra.mjs", mode: "100644", type: "blob", sha: SHA.otherHead }),
+      headTextByPath,
+    }));
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("candidate_manifest_unexpected_path"));
+  });
+
+  it("fails the exact manifest when the candidate is missing one file", () => {
+    const { baseTree, headTree, headTextByPath } = trees();
+    const evaluation = evaluateTrustedFreeze(evalInput({
+      baseTree,
+      headTree: headTree.filter((item) => item.path !== "scripts/evidence/phase2d-corrective4-verify.mjs"),
+      headTextByPath,
+    }));
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("candidate_manifest_missing_path"));
+  });
+
+  it("fails per-file identity and SHA-256 when one candidate byte changes", () => {
+    const { baseTree, headTree, headTextByPath } = trees();
+    const nextHead = headTree.map((item) => item.path === "package.json" ? { ...item, sha: SHA.otherHead } : item);
+    const evaluation = evaluateTrustedFreeze(evalInput({ baseTree, headTree: nextHead, headTextByPath }));
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("candidate_manifest_head_identity_mismatch"));
+  });
+
+  it("fails when the candidate branch is renamed", () => {
+    const evaluation = evaluateTrustedFreeze(evalInput({ prHeadRef: "experiment/v0.1-phase2-renamed" }));
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("pr_head_ref_mismatch"));
   });
 
   it("11. fail closed when the implementation base is not an ancestor", () => {
@@ -573,6 +675,8 @@ describe("committed baseline", () => {
     const parsed = parseBaseline(jsonText);
     assert.equal(parsed.ok, true);
     assert.equal(parsed.baseline.acceptedImplementationBaseSha, "c64fa291af0d53139c6c526cd25ede434c08c17b");
+    assert.equal(parsed.baseline.minimumTrustedAncestorSha, "ed320fbf6558fcf249a6685031f5280a0e402def");
+    assert.equal(parsed.baseline.candidateHeadRef, "experiment/v0.1-phase2");
     assert.equal(
       parsed.baseline.currentAcceptedCandidateSourceHead,
       "7f196d367e39640eee9517f742b0d61424f9d4cc",

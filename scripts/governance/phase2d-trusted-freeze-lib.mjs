@@ -5,7 +5,7 @@
 
 import { createHash } from "node:crypto";
 
-export const SCHEMA_VERSION = "multi-venue-phase2d-trusted-baseline/1";
+export const SCHEMA_VERSION = "multi-venue-phase2d-trusted-baseline/2";
 
 export const TRUSTED_BASELINE_PATH =
   ".github/trusted/phase2d-corrective4-baseline.json";
@@ -17,6 +17,34 @@ export const GIT_SHA256_RE = /^[0-9a-f]{64}$/;
 
 const ALLOWED_BLOB_MODES = new Set(["100644", "100755"]);
 const OBJECT_TYPES = new Set(["blob", "tree", "commit"]);
+const CHANGE_TYPES = new Set(["added", "modified", "deleted"]);
+
+const ROOT_FIELDS = new Set([
+  "schemaVersion",
+  "repository",
+  "minimumTrustedAncestorSha",
+  "candidateHeadRef",
+  "acceptedImplementationBaseSha",
+  "acceptedImplementationBaseTreeSha",
+  "currentAcceptedCandidateSourceHead",
+  "protectedPathRules",
+  "allowedEvidenceOnlyChangedPathRules",
+  "protectedContentAnchors",
+  "protectedFiles",
+  "candidateChangedFiles",
+  "trustedGovernancePathRules",
+  "trustedGovernanceFiles",
+]);
+const FILE_FIELDS = new Set(["path", "mode", "objectType", "blobSha", "sha256"]);
+const ANCHOR_FIELDS = new Set([
+  "path",
+  "description",
+  "startMarker",
+  "endExclusiveMarker",
+  "sha256",
+  "requiredSubstrings",
+]);
+const CHANGE_FIELDS = new Set(["path", "change", "base", "head"]);
 
 const FROZEN_LIMIT_LINES = [
   "capital ceiling=100 USDT",
@@ -146,6 +174,13 @@ export function parseBaseline(jsonText) {
   if (parsed.repository !== "danny0971haha/multi-venue-grid-engine") {
     reasons.push("baseline_repository");
   }
+  rejectUnknownFields(parsed, ROOT_FIELDS, "baseline_unknown_field", reasons);
+  if (!GIT_SHA1_RE.test(parsed.minimumTrustedAncestorSha ?? "")) {
+    reasons.push("baseline_minimum_trusted_ancestor_sha");
+  }
+  if (parsed.candidateHeadRef !== "experiment/v0.1-phase2") {
+    reasons.push("baseline_candidate_head_ref");
+  }
   if (!GIT_SHA1_RE.test(parsed.acceptedImplementationBaseSha ?? "")) {
     reasons.push("baseline_implementation_base_sha");
   }
@@ -192,6 +227,7 @@ export function parseBaseline(jsonText) {
         reasons.push("baseline_protected_file_entry");
         continue;
       }
+      rejectUnknownFields(file, FILE_FIELDS, "baseline_protected_file_unknown_field", reasons);
       const path = file.path;
       if (!isSafeGitPath(path)) {
         reasons.push("baseline_protected_file_path");
@@ -227,6 +263,7 @@ export function parseBaseline(jsonText) {
         reasons.push("baseline_anchor_entry");
         continue;
       }
+      rejectUnknownFields(anchor, ANCHOR_FIELDS, "baseline_anchor_unknown_field", reasons);
       if (!isSafeGitPath(anchor.path)) {
         reasons.push("baseline_anchor_path");
       }
@@ -252,6 +289,20 @@ export function parseBaseline(jsonText) {
     }
   }
 
+  validateChangedFiles(parsed.candidateChangedFiles, reasons);
+
+  const trustedRules = parsed.trustedGovernancePathRules;
+  if (!isStringRuleList(trustedRules)) {
+    reasons.push("baseline_trusted_governance_path_rules");
+  } else if (trustedRules.some((rule) => !isSupportedRule(rule))) {
+    reasons.push("baseline_trusted_governance_path_rule_unsupported");
+  }
+  validateFileManifest(
+    parsed.trustedGovernanceFiles,
+    "baseline_trusted_governance",
+    reasons,
+  );
+
   if (reasons.length > 0) {
     return {
       ok: false,
@@ -265,6 +316,71 @@ export function parseBaseline(jsonText) {
     baseline: parsed,
     reasons: [],
   };
+}
+
+function rejectUnknownFields(value, allowed, reason, reasons) {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      reasons.push(reason);
+    }
+  }
+}
+
+function validateFileManifest(files, prefix, reasons) {
+  if (!Array.isArray(files) || files.length === 0) {
+    reasons.push(`${prefix}_files`);
+    return;
+  }
+  const seen = new Set();
+  for (const file of files) {
+    if (file === null || typeof file !== "object" || Array.isArray(file)) {
+      reasons.push(`${prefix}_file_entry`);
+      continue;
+    }
+    rejectUnknownFields(file, FILE_FIELDS, `${prefix}_file_unknown_field`, reasons);
+    if (!isSafeGitPath(file.path)) reasons.push(`${prefix}_file_path`);
+    if (seen.has(file.path)) reasons.push(`${prefix}_duplicate_path`);
+    seen.add(file.path);
+    if (!ALLOWED_BLOB_MODES.has(file.mode)) reasons.push(`${prefix}_file_mode`);
+    if (file.objectType !== "blob") reasons.push(`${prefix}_file_type`);
+    if (!GIT_SHA1_RE.test(file.blobSha ?? "")) reasons.push(`${prefix}_file_blob_sha`);
+    if (!GIT_SHA256_RE.test(file.sha256 ?? "")) reasons.push(`${prefix}_file_sha256`);
+  }
+}
+
+function validateChangedFiles(files, reasons) {
+  if (!Array.isArray(files) || files.length === 0) {
+    reasons.push("baseline_candidate_changed_files");
+    return;
+  }
+  const seen = new Set();
+  for (const item of files) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      reasons.push("baseline_candidate_changed_file_entry");
+      continue;
+    }
+    rejectUnknownFields(item, CHANGE_FIELDS, "baseline_candidate_changed_file_unknown_field", reasons);
+    if (!isSafeGitPath(item.path)) reasons.push("baseline_candidate_changed_file_path");
+    if (seen.has(item.path)) reasons.push("baseline_candidate_changed_file_duplicate_path");
+    seen.add(item.path);
+    if (!CHANGE_TYPES.has(item.change)) reasons.push("baseline_candidate_change_type");
+    if (item.change === "added" && item.base !== null) reasons.push("baseline_candidate_change_base");
+    if (item.change === "deleted" && item.head !== null) reasons.push("baseline_candidate_change_head");
+    if (item.change !== "added") validateSnapshot(item.base, "base", reasons);
+    if (item.change !== "deleted") validateSnapshot(item.head, "head", reasons);
+  }
+}
+
+function validateSnapshot(snapshot, side, reasons) {
+  if (snapshot === null || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    reasons.push(`baseline_candidate_${side}_snapshot`);
+    return;
+  }
+  rejectUnknownFields(snapshot, new Set(["mode", "objectType", "blobSha", "sha256"]), `baseline_candidate_${side}_unknown_field`, reasons);
+  if (!ALLOWED_BLOB_MODES.has(snapshot.mode)) reasons.push(`baseline_candidate_${side}_mode`);
+  if (snapshot.objectType !== "blob") reasons.push(`baseline_candidate_${side}_type`);
+  if (!GIT_SHA1_RE.test(snapshot.blobSha ?? "")) reasons.push(`baseline_candidate_${side}_blob_sha`);
+  if (!GIT_SHA256_RE.test(snapshot.sha256 ?? "")) reasons.push(`baseline_candidate_${side}_sha256`);
 }
 
 function failParse(reason, reasons) {
@@ -327,6 +443,9 @@ export function evaluateTrustedFreeze(input) {
   if (!sourceHeadMatchesReviewedCandidate) {
     reasons.push("source_head_not_reviewed_candidate");
   }
+  if (input.prHeadRef !== baseline.candidateHeadRef) {
+    reasons.push("pr_head_ref_mismatch");
+  }
 
   if (input.repositoryFullName !== baseline.repository) {
     reasons.push("repository_identity_mismatch");
@@ -374,6 +493,13 @@ export function evaluateTrustedFreeze(input) {
     checkCaseCollisions(baseline, headIndex, reasons);
     checkTypeAndModeAttacks(baseline, headIndex, reasons);
     const changedPaths = collectChangedPaths(baseIndex.map, headIndex.map);
+    checkExactCandidateManifest(
+      baseline,
+      changedPaths,
+      input.observedBlobSha256ByKey,
+      reasons,
+    );
+    checkProtectedFileSha256(baseline, input.observedBlobSha256ByKey, reasons);
     checkAllowedChangedPaths(baseline, changedPaths, reasons);
     checkRenamesAndCopies(input.compareFiles, baseline, reasons);
     checkVerifierCommitmentCombo(changedPaths, reasons);
@@ -388,6 +514,51 @@ export function evaluateTrustedFreeze(input) {
     sourceHeadMatchesReviewedCandidate,
     unique(reasons),
   );
+}
+
+function checkExactCandidateManifest(baseline, changed, observedHashes, reasons) {
+  const expected = baseline.candidateChangedFiles;
+  if (!Array.isArray(expected)) {
+    reasons.push("candidate_manifest_missing");
+    return;
+  }
+  const actualByPath = new Map(changed.map((item) => [item.path, item]));
+  const expectedByPath = new Map(expected.map((item) => [item.path, item]));
+  if (actualByPath.size !== expectedByPath.size) reasons.push("candidate_manifest_path_count_mismatch");
+  for (const [path, actual] of actualByPath) {
+    const item = expectedByPath.get(path);
+    if (!item) {
+      reasons.push("candidate_manifest_unexpected_path");
+      continue;
+    }
+    if (item.change !== actual.change) reasons.push("candidate_manifest_change_mismatch");
+    checkSnapshotMatch(item.base, actual.base, "base", path, observedHashes, reasons);
+    checkSnapshotMatch(item.head, actual.head, "head", path, observedHashes, reasons);
+  }
+  for (const path of expectedByPath.keys()) {
+    if (!actualByPath.has(path)) reasons.push("candidate_manifest_missing_path");
+  }
+}
+
+function checkSnapshotMatch(expected, actual, side, path, observedHashes, reasons) {
+  if (expected === null || actual === undefined) {
+    if (!(expected === null && actual === undefined)) reasons.push(`candidate_manifest_${side}_presence_mismatch`);
+    return;
+  }
+  if (!actual || expected.mode !== actual.mode || expected.objectType !== actual.type || expected.blobSha !== actual.sha) {
+    reasons.push(`candidate_manifest_${side}_identity_mismatch`);
+    return;
+  }
+  const observed = observedHashes?.[`${side}:${path}`];
+  if (observed !== expected.sha256) reasons.push(`candidate_manifest_${side}_sha256_mismatch`);
+}
+
+function checkProtectedFileSha256(baseline, observedHashes, reasons) {
+  for (const file of baseline.protectedFiles) {
+    if (observedHashes?.[`head:${file.path}`] !== file.sha256) {
+      reasons.push("protected_file_sha256_mismatch");
+    }
+  }
 }
 
 function result(trustedBaselineIntegrityOk, sourceHeadMatchesReviewedCandidate, reasons) {

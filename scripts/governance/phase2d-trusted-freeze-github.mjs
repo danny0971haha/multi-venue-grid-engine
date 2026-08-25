@@ -254,24 +254,32 @@ export async function fetchCompareAncestor({
 }
 
 export async function fetchBlobUtf8({ apiUrl, repository, blobSha, token, fetchImpl }) {
+  const blob = await fetchBlobBytes({ apiUrl, repository, blobSha, token, fetchImpl });
+  if (!blob.complete) {
+    return { ...blob, text: null };
+  }
+  return { complete: true, reason: null, text: blob.bytes.toString("utf8") };
+}
+
+export async function fetchBlobBytes({ apiUrl, repository, blobSha, token, fetchImpl }) {
   if (!GIT_SHA1_RE.test(blobSha ?? "")) {
-    return { complete: false, reason: "blob_sha_invalid", text: null };
+    return { complete: false, reason: "blob_sha_invalid", bytes: null };
   }
   const root = repoApiRoot(apiUrl, repository);
   if (!root) {
-    return { complete: false, reason: "repository_identity_mismatch", text: null };
+    return { complete: false, reason: "repository_identity_mismatch", bytes: null };
   }
   const page = await githubGetJson(`${root}/git/blobs/${blobSha}`, { token, fetchImpl });
   if (!page.ok) {
-    return { complete: false, reason: page.reason, text: null, status: page.status };
+    return { complete: false, reason: page.reason, bytes: null, status: page.status };
   }
   if (page.json?.encoding !== "base64" || typeof page.json?.content !== "string") {
-    return { complete: false, reason: "blob_encoding_unsupported", text: null };
+    return { complete: false, reason: "blob_encoding_unsupported", bytes: null };
   }
   try {
-    const text = Buffer.from(page.json.content.replace(/\s+/g, ""), "base64").toString("utf8");
-    return { complete: true, reason: null, text };
+    const bytes = Buffer.from(page.json.content.replace(/\s+/g, ""), "base64");
+    return { complete: true, reason: null, bytes };
   } catch {
-    return { complete: false, reason: "blob_decode_failed", text: null };
+    return { complete: false, reason: "blob_decode_failed", bytes: null };
   }
 }
