@@ -1,10 +1,7 @@
 import process from "node:process";
 
-import {
-  EvidenceError,
-  generateEvidence,
-  repositoryRootFromImportMeta,
-} from "./phase2d-corrective4-lib.mjs";
+import { EvidenceError } from "./phase2d-corrective4-schema.mjs";
+import { generateEvidence, repositoryRootFromImportMeta } from "./phase2d-corrective4-lib.mjs";
 
 const repositoryRoot = repositoryRootFromImportMeta(import.meta.url);
 
@@ -18,6 +15,7 @@ try {
       `testedCheckoutSha=${manifest.identity.testedCheckoutSha}`,
       `fullTests=${manifest.testFacts.full.total}`,
       `corrective4Tests=${manifest.testFacts.corrective4.total}`,
+      `evidenceVerifierTests=${manifest.testFacts.evidenceVerifier.total}`,
       "gateStatus=NOT_EMITTED",
       "",
     ].join("\n"),
