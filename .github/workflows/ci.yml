@@ -20,12 +20,13 @@ jobs:
   verify:
     name: Clean install, static checks, tests, secret scan, and dry-run
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Record implementation checkpoint
         run: echo "implementationCheckpoint=PHASE_2D_CORRECTIVE_4"
@@ -66,3 +67,17 @@ jobs:
 
       - name: Dry-run
         run: npm run dry-run
+
+      - name: Generate Phase 2D Corrective 4 evidence
+        run: npm run evidence:phase2d-corrective4
+
+      - name: Verify Phase 2D Corrective 4 evidence independently
+        run: npm run evidence:phase2d-corrective4:verify
+
+      - name: Upload Phase 2D Corrective 4 evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: multi-venue-phase2d-c4-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/phase2d-corrective4/
+          if-no-files-found: error
+          retention-days: 90

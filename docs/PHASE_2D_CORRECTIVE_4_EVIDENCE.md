@@ -1,9 +1,9 @@
 # Phase 2D Corrective 4 Evidence Packet
 
-Version: `0.1.0`  
-Checkpoint: object/raw UTF-8 budget parity and ambiguous JSON fail-closed  
-Requested reviewer decision: independent review of Phase 2D Corrective 4 only  
-The implementation agent does **not** declare `PHASE_2D=PASS`, `PHASE_2D_CORRECTIVE_4=PASS`, or `GATE_2=PASS`.
+Version: `0.2.0`  
+Checkpoint: evidence closure for frozen Corrective 4 implementation  
+Requested reviewer decision: independent ACCEPT / REJECT / BLOCKED of Phase 2D Corrective 4 **and** its evidence closure  
+The implementation agent does **not** declare `PHASE_2D=PASS`, `PHASE_2D_CORRECTIVE_4=PASS`, `PHASE_2D_CORRECTIVE_4_EVIDENCE=PASS`, or `GATE_2=PASS`.
 
 ```text
 CUMULATIVE_PHASE_2_BASELINE=PASS
@@ -11,7 +11,9 @@ PHASE_2C_CORRECTIVE_2=PASS
 PHASE_2D_CORRECTIVE_2=ACCEPT
 PHASE_2D_CORRECTIVE_3=REJECT
 PHASE_2D_CORRECTIVE_4=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_4_EVIDENCE=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
+PHASE_2E_AUTHORIZED=NO
 PHASE_2E_STARTED=NO
 GATE_2=NOT_REVIEWED
 SYSTEM_ALLOW_RISK_INCREASE=false
@@ -19,105 +21,96 @@ LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
 MERGE_AUTHORIZED=NO
 DEPLOYMENT_AUTHORIZED=NO
 ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
-AUTHORITATIVE_START_HEAD=4af26dac5f2e50b335e998e925e0a1d97b4164b4
-AUTHORITATIVE_START_TREE=a46a3d8a72dfda6bb5f3a16b7b649ed0d08e0e93
-CORRECTIVE_2_BASE=848006f9f9397097a8a099fe82970ffd3d9c97c4
-WORKTREE_CLEAN_BEFORE=YES
-LOCAL_EQUALS_REMOTE_BEFORE=YES
-NODE_VERSION=v22.23.2
-NPM_VERSION=10.9.8
-TEST_TOTAL=428
-TEST_PASS=428
-TEST_FAIL=0
-TEST_SKIP=0
-TEST_TODO=0
-TEST_CANCELLED=0
-PRIOR_CUMULATIVE_TEST_TOTAL=413
-TEST_PHASE2D_CORRECTIVE_3_TOTAL=35
+CORRECTIVE_4_IMPLEMENTATION_BASE=c64fa291af0d53139c6c526cd25ede434c08c17b
+AUTHORITATIVE_START_HEAD=c64fa291af0d53139c6c526cd25ede434c08c17b
+AUTHORITATIVE_START_TREE=7eb995e35a65f94ab32921133e756268c0339a2d
+HISTORICAL_CORRECTIVE_3_CANDIDATE=4af26dac5f2e50b335e998e925e0a1d97b4164b4
+PRIOR_CUMULATIVE_TEST_TOTAL=428
 TEST_PHASE2D_CORRECTIVE_4_TOTAL=15
-AUDIT_VULNERABILITIES=0
 LIVE_EXCHANGE_WRITES=false
 liveExchangeWrite=false
 productionCredentialUsed=false
 mergePerformed=false
 deployPerformed=false
+phase2EStarted=false
 ```
 
-Exact result HEAD/TREE and GitHub Actions run IDs for that HEAD are recorded on Draft PR #3 after push.
+Exact `EVIDENCE_CLOSURE_HEAD`, `EVIDENCE_CLOSURE_TREE`, CI run ID, artifact ID, and artifact digest are recorded on Draft PR #3 after the evidence-closure push. They are not self-declared as PASS.
+
+Schema: `docs/PHASE_2D_CORRECTIVE_4_EVIDENCE_SCHEMA.md` (`multi-venue-phase2d-corrective4/1`).
 
 ## 1. Identity
 
 ```text
-PHASE=2D_CORRECTIVE_4
+PHASE=2D_CORRECTIVE_4_EVIDENCE_CLOSURE
 REQUESTED_GATE=PHASE_2D_CORRECTIVE_4_REVIEW
 REPOSITORY=danny0971haha/multi-venue-grid-engine
 IMPLEMENTATION_PHASE=2D_CORRECTIVE_4
-CHECKPOINT=OBJECT_RAW_UTF8_BUDGET_PARITY
+CHECKPOINT=EVIDENCE_CLOSURE
 BRANCH=experiment/v0.1-phase2
 PR_NUMBER=3
 PR_BASE=057732cee021889d17573425ee4f24e2065df1e9
-AUTHORITATIVE_START_HEAD=4af26dac5f2e50b335e998e925e0a1d97b4164b4
-AUTHORITATIVE_START_TREE=a46a3d8a72dfda6bb5f3a16b7b649ed0d08e0e93
+CORRECTIVE_4_IMPLEMENTATION_BASE=c64fa291af0d53139c6c526cd25ede434c08c17b
+AUTHORITATIVE_START_HEAD=c64fa291af0d53139c6c526cd25ede434c08c17b
+AUTHORITATIVE_START_TREE=7eb995e35a65f94ab32921133e756268c0339a2d
 WORKTREE_CLEAN_BEFORE=YES
 PHASE_2D_CORRECTIVE_3=REJECT
 PHASE_2D_CORRECTIVE_4=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_4_EVIDENCE=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
 PHASE_2E_STARTED=NO
 CUMULATIVE_PHASE_2_BASELINE=PASS
 ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
 ```
 
+`4af26dac5f2e50b335e998e925e0a1d97b4164b4` is the historical Corrective 3 candidate only. It is not the current candidate.
+
 ## 2. Toolchain
 
 ```text
-OS=Darwin
-ARCH=arm64
 PINNED_NODE_VERSION=v22.23.2
 PINNED_NPM_VERSION=10.9.8
 TYPESCRIPT_VERSION=7.0.2
 ```
 
-Local default `node` was v26.5.0. Validation used `/Users/apple/.local/node-v22.23.2/bin/node` so the recorded toolchain matches the pin.
+Machine evidence records the exact Node/npm versions observed on the generating runner together with OS and architecture.
 
-## 3. Reproduction (Corrective 3 bytes)
+## 3. Frozen Corrective 4 implementation
 
-Structurally in-budget valid fixture with 100 ownedActiveOrders, 100 unknownReservations, 100 proposedBatch entries, and 128-character decimal strings:
+Corrective 4 risk bytes remain frozen at `CORRECTIVE_4_IMPLEMENTATION_BASE`. This evidence-closure checkpoint does not modify:
 
 ```text
-CANONICAL_UTF8_BYTES=97850
-STRUCTURAL_DEPTH=4
-STRUCTURAL_NODES=1637
-COLLECTION_MAXIMA=100
-MAX_RISK_INPUT_UTF8_BYTES=65536
-OBJECT_API_BEFORE=CONTINUE with Decimal calls=9929 exposureCalls=1
-RAW_BYTE_API_BEFORE=HALT RISK_INPUT_LIMIT_EXCEEDED jsonParseCalls=0 Decimal=0 exposure=0
-PARITY=BROKEN
+src/risk/risk-engine.ts
+src/risk/risk-input-parser.ts
+src/risk/risk-input-admission.ts
+src/risk/risk-json-text.ts
+src/risk/risk-types.ts
+test/risk/**
+capital / leverage / notional / loss / drawdown / boundary numeric limits
 ```
 
-Inclusive raw-byte cap observed on Corrective 3: 65,535 and 65,536 admit; 65,537 rejects before `JSON.parse`. Corrective 4 preserves that boundary on both APIs.
+Object/raw UTF-8 budget parity, duplicate-key fail-closed, and unpaired-surrogate rejection remain as implemented in that base. The original Corrective 4 suite must stay 15 tests / 15 pass.
 
-## 4. Corrective behavior
+## 4. Evidence closure behavior
 
-1. Canonical serialize with existing structural limits.
-2. Measure UTF-8 byte length of the canonical result.
-3. Apply `MAX_RISK_INPUT_UTF8_BYTES` via `enforceRiskUtf8ByteLimit` (shared by the raw-byte path).
-4. Reject before snapshot `JSON.parse` and before Decimal/exposure.
-5. Return `RISK_INPUT_LIMIT_EXCEEDED` without echoing payload.
-6. Object admission delegates to `parseRiskInputFromJsonBytes` after serialize.
-7. Duplicate JSON keys fail closed as `INVALID_RISK_INPUT` (not the limit code) before math.
-8. Unpaired JS surrogates on string input fail closed before parse, matching fatal UTF-8 `Uint8Array` policy.
+1. `npm run evidence:phase2d-corrective4` generates `artifacts/phase2d-corrective4/` using spawn/execFile argv execution.
+2. Required commands are recorded with exact argv, exit code, stdout/stderr files, SHA-256 hashes, and timestamps.
+3. Test totals are parsed from TAP output. Prior cumulative total is 428. Full total must be >= 428 with fail=skip=todo=cancelled=0.
+4. Safety attestations are derived from dry-run output, environment, workflow text, and source/contract scans.
+5. Tracked file SHA-256 inventory is sorted by relative path.
+6. `npm run evidence:phase2d-corrective4:verify` recomputes identity, toolchain, logs, TAP, hashes, audit JSON, schema, and attestations and fails closed on tamper.
+7. GitHub Action dependencies are pinned by immutable commit SHA. Tested checkout follows the GitHub event checkout. Source HEAD and pull_request merge checkout are recorded separately.
+8. The generator does not write ACCEPT / PASS. The verifier writes `gateStatus=NOT_EMITTED`.
 
-## 5. Changed files
+## 5. Changed files for evidence closure
 
 ```text
-ALLOWED_WRITE_PATHS=src/risk/**; test/risk/risk-engine-corrective-4.test.ts; package.json; docs/PHASE_2D_CONTRACT.md; docs/PHASE_2D_CORRECTIVE_4_EVIDENCE.md; docs/IMPLEMENTATION_CONTRACT.md; .github/workflows/ci.yml
-FILES_ADDED=src/risk/risk-json-text.ts; test/risk/risk-engine-corrective-4.test.ts; docs/PHASE_2D_CORRECTIVE_4_EVIDENCE.md
-FILES_CHANGED=src/risk/risk-engine.ts; src/risk/risk-input-parser.ts; src/risk/risk-input-admission.ts; package.json; docs/PHASE_2D_CONTRACT.md; docs/IMPLEMENTATION_CONTRACT.md; .github/workflows/ci.yml
+ALLOWED_WRITE_PATHS=.github/workflows/ci.yml; .github/workflows/README.md; .gitignore; package.json; scripts/evidence/**; test/evidence/**; docs/PHASE_2D_CORRECTIVE_4_EVIDENCE.md; docs/PHASE_2D_CORRECTIVE_4_EVIDENCE_SCHEMA.md; docs/IMPLEMENTATION_CONTRACT.md; docs/PHASE_2D_CONTRACT.md
 FILES_DELETED=NONE
-INTENTIONALLY_UNTOUCHED_AREAS=Phase 2C coordination; accepted Phase 1 simulator; venue adapters; execution coordinator; network/auth/signing; live mode; Phase 2E; Phase 2F; capital/leverage/risk limits; lockfile; zero-quantity policy; persistence accepted-byte vectors; Corrective 1/2/3 test files
+INTENTIONALLY_UNTOUCHED_AREAS=src/**; test/risk/**; test/persistence/**; test/simulator/**; lockfile; venue adapters; live mode; Phase 2E; frozen risk limits
 ```
 
-## 6. Corrective 4 matrix
+## 6. Corrective 4 matrix (frozen implementation, still required)
 
 ```text
 C4-01 structurally valid oversized object/raw parity PASS
@@ -137,17 +130,15 @@ C4-14 unpaired surrogate JS string fails closed before parse PASS
 C4-15 in-budget valid object remains byte-identical PASS
 ```
 
-Corrective 1 (18), Corrective 2 (20), and Corrective 3 (35) suites remain present and passing.
+Evidence verifier tamper cases live in `test/evidence/phase2d-corrective4-evidence.test.ts`.
 
 ## 7. Unresolved risks
 
 ```text
 KNOWN_GAPS=Phase 2E durable halt/ACK unimplemented; Phase 2F restart integration unimplemented; CONTINUE is not live authorization; evaluateRisk(unknown) is not DoS-proof against non-returning Proxy traps or process OOM; no worker isolation in this checkpoint
 UNVERIFIED_ASSUMPTIONS=raw-byte API is the external trust boundary going forward; object API remains in-process only
-FOLLOW_UP_REQUIRED=independent review of Phase 2D Corrective 4; do not start Phase 2E, Gate 2, merge, live mode, or deploy
+FOLLOW_UP_REQUIRED=independent review of Phase 2D Corrective 4 and evidence closure; do not start Phase 2E, Gate 2, merge, live mode, or deploy
 ```
-
-Duplicate-key policy is now fail-closed at the raw JSON boundary. Unpaired JS surrogates on string input are rejected before parse. Valid JSON `\uD800` escapes remain ordinary string content.
 
 ## 8. Prohibited-action attestation
 
@@ -169,14 +160,18 @@ liveExchangeWrite=false
 productionCredentialUsed=false
 mergePerformed=false
 deployPerformed=false
+phase2EStarted=false
+PHASE_2D_SELF_DECLARED_PASS=NO
 ```
 
 ## 9. Requested reviewer decision
 
 ```text
-REQUESTED_DECISION=PASS
+REQUESTED_DECISION=independent ACCEPT or REJECT or BLOCKED
 REQUESTED_GATE=PHASE_2D_CORRECTIVE_4
 PHASE_2D_SELF_DECLARED_PASS=NO
+PHASE_2D_CORRECTIVE_4=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_4_EVIDENCE=REVIEW_CANDIDATE
 ```
 
-This is only the implementation agent's request. The independent reviewer owns ACCEPT / REJECT / BLOCKED.
+This is only a request for independent review. The implementation agent does not declare the gate outcome.
