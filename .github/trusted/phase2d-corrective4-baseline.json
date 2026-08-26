@@ -798,15 +798,15 @@
       "path": "scripts/governance/phase2d-trusted-freeze-lib.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "40b116d09acc99aed52b9a07c7ba1523e42ea002",
-      "sha256": "ea39dfe56850f41cbad2be19324cf77494083bda44291e14ee356c4138284755"
+      "blobSha": "c0e007c8a4783ab9898c8248a824355d5445477b",
+      "sha256": "5ab27c7e73ef56bf732500e383f7a223a8a2b809e2a3457b4a96e282b6555752"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-lib.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "ecb942a362492f1dbb89eeaaea7cff385ffef2a0",
-      "sha256": "2f2e70f9988878494a43a3ed50fe02cdefe259787dd3c16c418a581997f9e151"
+      "blobSha": "681c542b65897ee7c297a8c1d4fb7e1df2273aa3",
+      "sha256": "04af08f152b4593109f96a17712471a9ace87f829837de3ccd902d590c8fb565"
     },
     {
       "path": "scripts/governance/phase2d-trusted-gate.mjs",

@@ -292,6 +292,31 @@ describe("evaluateTrustedFreeze", () => {
     assert.match(summary, /^sourceHeadMatchesReviewedCandidate=true$/m);
   });
 
+  it("ignores recursive GitHub directory nodes when checking the exact file manifest", () => {
+    const { baseTree, headTree, headTextByPath } = trees();
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({
+        baseTree: [
+          { path: "src", mode: "040000", type: "tree", sha: "0".repeat(40) },
+          { path: "src/risk", mode: "040000", type: "tree", sha: "1".repeat(40) },
+          { path: "docs", mode: "040000", type: "tree", sha: "2".repeat(40) },
+          ...baseTree,
+        ],
+        headTree: [
+          { path: "src", mode: "040000", type: "tree", sha: "0".repeat(40) },
+          { path: "src/risk", mode: "040000", type: "tree", sha: "1".repeat(40) },
+          { path: "docs", mode: "040000", type: "tree", sha: "3".repeat(40) },
+          { path: "scripts", mode: "040000", type: "tree", sha: "4".repeat(40) },
+          { path: "scripts/evidence", mode: "040000", type: "tree", sha: "5".repeat(40) },
+          ...headTree,
+        ],
+        headTextByPath,
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, true);
+    assert.deepEqual(evaluation.reasons, []);
+  });
+
   it("1. fail closed when src/risk/risk-engine.ts bytes change", () => {
     const { baseTree, headTree, headTextByPath } = trees({
       risk: { sha: SHA.riskNew },

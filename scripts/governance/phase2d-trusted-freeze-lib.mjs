@@ -595,6 +595,14 @@ function indexTree(entries, reasons, label) {
     if (typeof entry.mode !== "string" || typeof entry.sha !== "string") {
       reasons.push(`${label}_tree_entry_fields`);
     }
+    // GitHub's recursive tree API includes directory entries. Their tree SHA
+    // changes whenever any descendant changes, so they are not candidate file
+    // identities and must not participate in the exact file manifest. Blobs
+    // (including symlinks) and commit entries (gitlinks) remain indexed and
+    // therefore retain the fail-closed type/mode checks below.
+    if (entry.type === "tree") {
+      continue;
+    }
     map.set(entry.path, entry);
     const lower = entry.path.toLowerCase();
     if (!caseIndex.has(lower)) {
