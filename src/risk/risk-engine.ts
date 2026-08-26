@@ -1,3 +1,4 @@
+// GOVERNANCE_NEGATIVE_CONTROL_DO_NOT_MERGE
 import type { DecimalString } from "../math/decimal.js";
 import {
   decimalAdd,
