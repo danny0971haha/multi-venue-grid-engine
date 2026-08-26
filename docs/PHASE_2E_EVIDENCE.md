@@ -1,8 +1,8 @@
 # Phase 2E Evidence Packet — Halt / Kill-Switch / Durable ACK
 
-Version: `0.1.0`  
-Checkpoint: durable halt state machine, kill-switch remediation, durable-authoritative acknowledgement  
-Requested reviewer decision: independent review of Phase 2E only  
+Version: `0.1.0`
+Checkpoint: durable halt state machine, kill-switch remediation, durable-authoritative acknowledgement
+Requested reviewer decision: independent review of Phase 2E only
 The implementation agent does **not** declare `PHASE_2E=PASS`, `GATE_2=PASS`, or live readiness.
 
 ## 1. Identity
@@ -133,6 +133,7 @@ AUDIT_TOTAL_VULNERABILITIES=0
 
 DIFF_CHECK_COMMAND=git diff --check
 DIFF_CHECK_EXIT=0
+DIFF_CHECK_NOTE=Trailing markdown hard-breaks in this packet were removed before the final evidence commit so git diff --check is clean against the frozen Phase 2 base.
 ```
 
 The Phase 2D evidence verifier fail-closes on this stacked branch name. That is expected: the verifier is bound to `experiment/v0.1-phase2`. It is not a Phase 2E implementation defect and was not “fixed” by editing governance or the verifier.
