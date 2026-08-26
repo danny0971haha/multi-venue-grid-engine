@@ -742,8 +742,8 @@
       "path": ".github/trusted/repository-governance-policy.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "806cae0420b984f48ec75d9044b84710fec1243f",
-      "sha256": "d2b444a8a52b5c8395f088ba97a7f16bb06e666fe1a9a9ecf0c83027fd751178"
+      "blobSha": "260ecfda6055ceae6851589dbbf814193ebfa27f",
+      "sha256": "3e511807546e618d24baae231eb2a52bb0caaef1450b06c8eb47d4e031694fb4"
     },
     {
       "path": ".github/workflows/trusted-governance-self-test.yml",
@@ -763,29 +763,29 @@
       "path": "scripts/governance/fixtures/policy/negative/deployment-authorized.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "db05ff34c1649053bf757ef74e124252143adea3",
-      "sha256": "474d7c7b13d22c053d6c81f2c678277fdf249f679e57450ba6b45a69e3e82676"
+      "blobSha": "3d685396363e8ac71c0a23a355f6249504edac21",
+      "sha256": "ad5bb53ed4ec1f31736c39665e55aff5891bd8981e81825d62956b0137008d09"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/duplicate-required-checks.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "a702740c9c2e8ea1b915a385759e7eaec51a793d",
-      "sha256": "88e89a2d26663331ca1ee57166ca28fe0522f30d65fb6ad11b91553d70a3c52d"
+      "blobSha": "200cac2160ba45b8df8283d1ffe1516aef8c8598",
+      "sha256": "1ddf40f5fa6049704b6a2a70a7ca3bd641c31b5ca4edd007629e9d5aa43a94b6"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/empty-required-checks.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "6661a29e04b633835a8e1e8bb34e9720e16ac06c",
-      "sha256": "6629ff86d67762e1aad5dfc592ecb5167e2bedc8960d905515aa201dd1e545b8"
+      "blobSha": "8d64acc33d3546018ee95434900a3cb1ef4d4461",
+      "sha256": "2dbc6c35ee1a61619b3a1dc2eafa8205fac6f6eb743c0e22aa71d6262cd15dcc"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/live-authorized.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "de8212387428f6ff9fe67ab2dc423baa03f07425",
-      "sha256": "59675cc8bfe6c2de03a18e9e4634437c5b22729a19687f57c21f0618794d14bc"
+      "blobSha": "9171a20318c8e9d3dbcbde3298343496a7561038",
+      "sha256": "168744dc64050430c97a79fe4ce890986ee23f283681041f56e0f508413fea96"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/malformed.json.txt",
@@ -798,120 +798,120 @@
       "path": "scripts/governance/fixtures/policy/negative/self-test-in-required-checks.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "a0de6a08fa77dfa7457d6e86a684c6b39dfabad0",
-      "sha256": "ebb2e31bf1e43468348d08773bf7ae740e2ff7b2ee227b8d03bed52d178a02e8"
+      "blobSha": "bb3fc716105c101a2d0374f171db64aa0fc9301b",
+      "sha256": "2ffe08cdf7297e30ee3be2095e30064a869f20fffdc55b39c5d84da495028b72"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/solo-code-owner-review.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "6686cc5deaae29399fad53339a8c96204c65a83b",
-      "sha256": "1df56a761a4ffd90194777fea7367942ce5e5ed4a096750d26bb28b0012fc8bd"
+      "blobSha": "78f349e6820231b02209f079492bfdc4eaa47354",
+      "sha256": "802e5522ac7cd7524bb585e2a160c496b45aa3dc4bb16826dc6602457e52a521"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/solo-global-self-test.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "83febaff7f68e723c84d13198d08dfa39288aee5",
-      "sha256": "6fe4a499fedf8a340eab090a292230d1ba7198966d70b57b2f0cd98c8ec3d759"
+      "blobSha": "8cea93a3c187e3132bd044297b6805927fcd7d6f",
+      "sha256": "fbc3be86daed4a6f6217a670c3fa4b4fc71293c2920fa993d889bcab53252eda"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/solo-last-push-approval.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "28e9e3cb367d8afdc6bc92b7f95a1da76b3e60fd",
-      "sha256": "d30054dd2b741708b1d59cda195e8dfa25f9cbebe31b4b029c383905656c13c6"
+      "blobSha": "f9394f3d42630f5841f152c46570d01da2b203b7",
+      "sha256": "d077ae7825fd40e17b07c8a06bc73bc60d9e009be56135edbf55d3b6a36a9e33"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/solo-nonzero-approvals.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "f6292e278cba98fd7b3526583041c70f25c00a8e",
-      "sha256": "0f19b43b9728139181ac409206de763aba0bbaec61299f7b24f0e72541030564"
+      "blobSha": "f4f85230cc373d003f4690e1f3a964b1677e1053",
+      "sha256": "67f59107e4d22999e49e7ac31a92be82a11c606f3eb8f1ea0ab7d6b01717e594"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/solo-ruleset-workflow.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "de1e19c2698b4dce8732f32150f82aab2a908f09",
-      "sha256": "c63544299baf4a3dff1bf128af6c96ba59fd35c205520c54352b8fc4db96f483"
+      "blobSha": "f17976b36d240263c80865f6023c7bc455f79ece",
+      "sha256": "9a8c330bf570f8156f7b91855e2c9b3a3dcb60ea93f0fd209f5f231e87b87f29"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/solo-strict-up-to-date.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "3455666e4bfdd48caef609f70c28d7c5268db51e",
-      "sha256": "3181975559ed5db65462c406f06b84896b4701527dba9f163a4566809dcba7af"
+      "blobSha": "bf6bd9878eccb8451cd92f6b59f722a734996564",
+      "sha256": "1c18706bf0d8a1e1d1143be036fda1ff1fdda7cc94db4247ddfeaa043f7d7acb"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/squash-merge.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "2b9af553b78e8b80f868e714d6533f2a79dd665d",
-      "sha256": "bde4039a7bf8cad08ba5a7686c90ad943c8505d73e651931b78365a5403aad46"
+      "blobSha": "7ed245118bab2028f1b366206a4ea2bb079e559e",
+      "sha256": "c3a87e57881dfcd27fabe1eecd37289bf0076429e678526d4eda2fced6a518f4"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/strict-active.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "d41f942dac62394e8a3ca9a5f791c663c231ecdd",
-      "sha256": "859b9abdffed44e21624707a011d14847563a236173e9481024bf3bcce478980"
+      "blobSha": "a9fa663c3a5997ffcca52c5886be7a81826eb149",
+      "sha256": "18175be7ede665cfe7d76bef82654c0bfa63d362fb1d9c273e5351bda8f8352f"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/unknown-profile.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "a9fa40b2a5c258f823a0a303ba6b68dd22cd247b",
-      "sha256": "591dcddd5f1da4d598eb948ebd5de17ef01ba741a2f38929b69ecb400db3b16a"
+      "blobSha": "73534b93b988e46a15ef0fe4ef81f8392d6966c7",
+      "sha256": "c6f1332ffdc551dc065b53770030b0442d50c1bbf73802b83ee27a201b7bc163"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/unknown-root-field.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "1c9cef95c7638dbdfd0a3da98687a69b3ac8882a",
-      "sha256": "8d6000c2fc820c3f0d564883352d55ee57ce72d95203cb5cdfa44c5ecd0bae0e"
+      "blobSha": "ee3b0c6bcc605b9b0cdb0eaa8e717c05b604cedb",
+      "sha256": "f9f514324ef9637c34fa3d708b302519ffc47de6dc681a825fedfeb343e862de"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/wrong-integration-order.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "dce9012bdd6fbe9fde79c8284be5070d26eda193",
-      "sha256": "c0f3807c4b9ec739af686c8219cbc2fc5a944b3881c21780bcd888fe2dc24da6"
+      "blobSha": "ecf59946fde4669613058551283f9f0baaf6806a",
+      "sha256": "e3ccbe6624f3156a9b398da945b87f60eb6aa5d817d1d48d15dc8063b6138a4e"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/wrong-phase2-sha.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "8b9fdfcf4bc8f5266e0f989406d035be82316bb7",
-      "sha256": "c7fbd3e2b2d39a2fb823bd8f3bcf300a9388cbc330ae4a19e2c6d459d3b4d879"
+      "blobSha": "5210f6e4c7f501ebf9d269ed8c1e01c625ed3db4",
+      "sha256": "3037b20e286c0e562c1de004d1fb8f60b72cfaff3bd6d224f014e860cc89014a"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/wrong-required-checks.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "586f3e9142886635d74e807e144d71448c9c83d6",
-      "sha256": "f07e35673f5a6983a7644f3416bccee01b2b58442f2eccb8f836cf210a3cc575"
+      "blobSha": "73327b0fe4f2be861031003784a759be04ede7eb",
+      "sha256": "2d79df33c25bbd85389d1fb053bbaf0ff230c8aa441a0eb4e5739294328f6f49"
     },
     {
       "path": "scripts/governance/fixtures/policy/positive-solo-owner-bootstrap.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "806cae0420b984f48ec75d9044b84710fec1243f",
-      "sha256": "d2b444a8a52b5c8395f088ba97a7f16bb06e666fe1a9a9ecf0c83027fd751178"
+      "blobSha": "260ecfda6055ceae6851589dbbf814193ebfa27f",
+      "sha256": "3e511807546e618d24baae231eb2a52bb0caaef1450b06c8eb47d4e031694fb4"
     },
     {
       "path": "scripts/governance/generate-phase2d-corrective4-baseline.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "ac87c06ee6dbad5365eff6859244feb71ebb36ce",
-      "sha256": "ae2c39c8fff74ec42526ed7bdeca6cdc1dd538949c2eed01a9dd5a11cd1b69dc"
+      "blobSha": "b490ed8ca888a389c346f07710d9838ee0f943bf",
+      "sha256": "102bb65ca4390419b3e480f44c41604f8a95ff1d6406473e297a82dc3e3afdf8"
     },
     {
       "path": "scripts/governance/generate-phase2d-corrective4-baseline.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "7f56b86829a89686508cffd171a0854c26a0ea06",
-      "sha256": "4015692df71fc8365de15c78712bc89eb0e30a82da899761ead1e3815f2d4573"
+      "blobSha": "62852d4ce8ad76014d41049e5ef76ab7c6bc5b0f",
+      "sha256": "8a56c8ada2f527782a32740e225663f3d541a6dc7f0205b11f3aace61719571d"
     },
     {
       "path": "scripts/governance/phase2d-trusted-control.mjs",
@@ -924,15 +924,15 @@
       "path": "scripts/governance/phase2d-trusted-control.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "13407df90ac62e5207ecd94846fcf373cb5ace0d",
-      "sha256": "06913b018ae62583796b917daea0abba947e2a140342971616056bff81b0ace9"
+      "blobSha": "23d3f63683b1cd924332083c1c2e1072ab2f6a43",
+      "sha256": "3cff7ea18cdcd861c5eaf7cd7c92cd736df993b1f7d9ff2ad1c4554182304af2"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-check.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "78a3d6061171f6876cb860f96fd63522f9eddae9",
-      "sha256": "f6512063161cb18311d4be4022f279f9e0352709e2a7a0872bd46392b60ee3f3"
+      "blobSha": "2d3db15f1fb754b79df29e7e0cda49acf5531f0a",
+      "sha256": "5b09ed284fb07405e285f1ebf4e229b8de0da9db7719aefcd8cdb5f7ca10634e"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-github.mjs",
@@ -945,57 +945,57 @@
       "path": "scripts/governance/phase2d-trusted-freeze-github.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "6f4cfc5adf4be411cd37fe46a91e2124f7bd7ebf",
-      "sha256": "4d8d49601dbf73c711b38023de5eca76f85ac893c2377d1f3e0e4eb3facff42a"
+      "blobSha": "6f539d15f5c65a42c794fa1128367d878c028648",
+      "sha256": "3a7d959855a33d2e4f7e6f3095f7e748f7d4a15b794c22033945e0afcef0e1b6"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-lib.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "c0e007c8a4783ab9898c8248a824355d5445477b",
-      "sha256": "5ab27c7e73ef56bf732500e383f7a223a8a2b809e2a3457b4a96e282b6555752"
+      "blobSha": "b85764087aeb446f815349771a1b3d9af6361161",
+      "sha256": "9cab07cff8abfa9db607070342c32c3fb5bb53dd59b32e820c6c0f494592028d"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-lib.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "c4085a22c80a8a21f25f98e10b0c90ec860c79a9",
-      "sha256": "deee065bbdc46b5c3630c519f8ec4ff678562ad52abb6ed2bfe7a30467caf311"
+      "blobSha": "be4c6ce9a67446ba42347a7189bf7e95bcde9933",
+      "sha256": "1ec2a9cbf2f5a5352993057ad63b10998dbe425b5c6af57107f071a9e5a40db7"
     },
     {
       "path": "scripts/governance/phase2d-trusted-gate.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "2e8f69ca7ee114b7bd3642412beab75f5501fc34",
-      "sha256": "bc9368e053d4614a5d6548f0570545ae2bedef678f609a62c03102d81aa5989b"
+      "blobSha": "b4318dc3ad938cfe36fdde13c64318b04401f839",
+      "sha256": "237fc43266b740405410a0c29d2061f3adf18bad4b47f1a28edfd745ea715d13"
     },
     {
       "path": "scripts/governance/phase2d-trusted-gate.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "b5b2bc04b84b4974f117eea6466be53880208767",
-      "sha256": "c71d7bd07d907e6bcbc58968c5723cbe6a00e22fbf0b851e62b16cb7edb4eb48"
+      "blobSha": "5c4d32090e1ffeec3357d91583cabe410579859f",
+      "sha256": "d73190972ea074f0e53f5984a6605d69b05ab8aea4ec7d2344a25d339103b192"
     },
     {
       "path": "scripts/governance/phase2d-workflow-structure.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "f917d3eb1f69988231e7b10b8fb460462961afc8",
-      "sha256": "a07feb02c41f1952b5524b09ad25d0480ce00bc3336ff3bf463497a16edb5203"
+      "blobSha": "8450ebe149903a28d69246ca3275513d3a419d78",
+      "sha256": "410dd8f0a79f30719220a882fb46153b702b521a7e115645353984eb71f2243a"
     },
     {
       "path": "scripts/governance/repository-governance-policy.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "7c84795b2f687603c9241f56480658c43535550f",
-      "sha256": "9b0b61870a252191a24f0ea9349680419991daf2f39fa65c36ca55e4d885b25e"
+      "blobSha": "54551343448157c532c2474b31c096d1ffa904be",
+      "sha256": "85fb9113c7f81a0537cbd1fbe427a902099182c44edc4d2cf63a956a8ac42df0"
     },
     {
       "path": "scripts/governance/repository-governance-policy.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "d397e62ff3efe58604fe69e081cbd4b2f962fcd7",
-      "sha256": "22a9bbad2c3690570288c3b62f3dcef6102ccea344a32a49bf9046c9f2fff2ae"
+      "blobSha": "7cb79e9b2067f36904aa57d322fdd41a811ec684",
+      "sha256": "5746a375ed162c6e62d3e5797431811a7831cb4026e0f77946adbd82b10408bc"
     }
   ]
 }
