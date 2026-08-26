@@ -1,0 +1,71 @@
+name: Trusted Phase 2D freeze gate
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: trusted-phase2d-freeze-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trusted-phase2d-freeze-gate:
+    name: trusted-phase2d-freeze-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out the exact protected base commit only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: danny0971haha/multi-venue-grid-engine
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Classify the pull request from trusted base code
+        id: classify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REPO: ${{ github.repository }}
+        run: node scripts/governance/phase2d-trusted-gate.mjs
+
+      - name: Enforce exact Phase 2 candidate integrity
+        id: enforce
+        if: steps.classify.outputs.mode == 'ENFORCE'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REPO: ${{ github.repository }}
+        run: node scripts/governance/phase2d-trusted-freeze-check.mjs
+
+      - name: Record the stable required context result
+        if: always()
+        env:
+          MODE: ${{ steps.classify.outputs.mode }}
+          ENFORCE_OUTCOME: ${{ steps.enforce.outcome }}
+        run: |
+          if [ "$MODE" = "ENFORCE" ] && [ "$ENFORCE_OUTCOME" != "success" ]; then
+            echo "trustedPhase2dFreezeGateExecuted=true"
+            echo "trustedPhase2dFreezeGateMode=$MODE"
+            exit 1
+          fi
+          case "$MODE" in
+            ENFORCE|NOT_APPLICABLE|GOVERNANCE_REVIEW_REQUIRED) ;;
+            *) exit 1 ;;
+          esac
+          echo "trustedPhase2dFreezeGateExecuted=true"
+          echo "trustedPhase2dFreezeGateMode=$MODE"

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "multi-venue-repository-governance-policy/1",
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "activeProfile": "SOLO_OWNER_BOOTSTRAP",
+  "postBootstrapTargetProfile": "STRICT_MULTI_REVIEWER",
+  "frozenPhase2CandidateHead": "7f196d367e39640eee9517f742b0d61424f9d4cc",
+  "acceptedPhase1Head": "057732cee021889d17573425ee4f24e2065df1e9",
+  "acceptedPhase0Head": "ee0c25664f14ea8ef7e68d070d46e544c3c93ee4",
+  "mergeMethod": "merge",
+  "integrationOrder": [
+    "PR1",
+    "PR2",
+    "PR4",
+    "RETARGET_PR3"
+  ],
+  "requiredStatusChecks": [
+    "trusted-phase2d-freeze-gate",
+    "Clean install, static checks, tests, secret scan, and dry-run"
+  ],
+  "globallyRequiredGovernanceSelfTest": false,
+  "rulesetWorkflowRequired": false,
+  "requiredApprovingReviewCount": 0,
+  "requireCodeOwnerReview": false,
+  "requireLastPushApproval": false,
+  "strictRequiredStatusChecks": true,
+  "requireConversationResolution": true,
+  "blockForcePushes": true,
+  "blockDeletions": true,
+  "allowDirectMainPush": false,
+  "liveExchangeWriteAuthorized": false,
+  "deploymentAuthorized": false,
+  "profiles": {
+    "SOLO_OWNER_BOOTSTRAP": {
+      "requiredApprovingReviewCount": 0,
+      "requireCodeOwnerReview": false,
+      "requireLastPushApproval": false,
+      "strictRequiredStatusChecks": false,
+      "requireConversationResolution": true,
+      "blockForcePushes": true,
+      "blockDeletions": true,
+      "allowDirectMainPush": false,
+      "rulesetWorkflowRequired": false,
+      "globallyRequiredGovernanceSelfTest": false,
+      "mergeMethod": "merge",
+      "requiredStatusChecks": [
+        "trusted-phase2d-freeze-gate",
+        "Clean install, static checks, tests, secret scan, and dry-run"
+      ],
+      "liveExchangeWriteAuthorized": false,
+      "deploymentAuthorized": false
+    },
+    "STRICT_MULTI_REVIEWER": {
+      "requiredApprovingReviewCount": 2,
+      "requireCodeOwnerReview": true,
+      "requireLastPushApproval": true,
+      "dismissStaleReviews": true,
+      "strictRequiredStatusChecks": true,
+      "requireConversationResolution": true,
+      "blockForcePushes": true,
+      "blockDeletions": true,
+      "allowDirectMainPush": false,
+      "rulesetWorkflowRequired": false,
+      "globallyRequiredGovernanceSelfTest": false,
+      "mergeMethod": "merge",
+      "requiredStatusChecks": [
+        "trusted-phase2d-freeze-gate",
+        "Clean install, static checks, tests, secret scan, and dry-run"
+      ],
+      "liveExchangeWriteAuthorized": false,
+      "deploymentAuthorized": false,
+      "activationPrerequisites": {
+        "independentEligibleCollaboratorsAtLeast": 2,
+        "sameOwnerMultipleAccountsCountAsIndependent": false,
+        "placeholderReviewerAccountsAllowed": false,
+        "frozenPhase2BootstrapCompleted": true
+      }
+    }
+  }
+}
