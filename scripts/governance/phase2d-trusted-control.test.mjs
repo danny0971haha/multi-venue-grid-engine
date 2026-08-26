@@ -11,7 +11,10 @@ import { inspectTrustedCheckout } from "./phase2d-trusted-control.mjs";
 describe("trusted protected-main checkout", () => {
   it("accepts the trusted control commit and a simulated post-merge descendant", () => {
     const fixture = repositoryFixture();
-    assert.equal(inspectTrustedCheckout({ repoRoot: fixture.root, baseline: fixture.baseline }).ok, true);
+    assert.equal(
+      inspectTrustedCheckout({ repoRoot: fixture.root, baseline: fixture.baseline }).ok,
+      true,
+    );
     writeFileSync(path.join(fixture.root, "post-merge.txt"), "merge result\n");
     git(fixture.root, ["add", "post-merge.txt"]);
     git(fixture.root, ["commit", "-m", "simulated post-merge main"]);
@@ -26,7 +29,10 @@ describe("trusted protected-main checkout", () => {
     createGovernanceFiles(fixture.root);
     git(fixture.root, ["add", "."]);
     git(fixture.root, ["commit", "-m", "unrelated root"]);
-    const baseline = { ...fixture.baseline, trustedGovernanceFiles: governanceManifest(fixture.root) };
+    const baseline = {
+      ...fixture.baseline,
+      trustedGovernanceFiles: governanceManifest(fixture.root),
+    };
     const result = inspectTrustedCheckout({ repoRoot: fixture.root, baseline });
     assert.equal(result.ok, false);
     assert.ok(result.reasons.includes("minimum_trusted_ancestor_not_ancestor"));
@@ -45,7 +51,7 @@ describe("trusted protected-main checkout", () => {
     const fixture = repositoryFixture();
     writeFileSync(
       path.join(fixture.root, ".github", "trusted", "repository-governance-policy.json"),
-      "{\"tampered\":true}\n",
+      '{"tampered":true}\n',
     );
     const result = inspectTrustedCheckout({ repoRoot: fixture.root, baseline: fixture.baseline });
     assert.equal(result.ok, false);
@@ -56,11 +62,11 @@ describe("trusted protected-main checkout", () => {
     const fixture = repositoryFixture();
     const baseline = {
       ...fixture.baseline,
-      trustedGovernanceFiles: fixture.baseline.trustedGovernanceFiles.map((file) => (
+      trustedGovernanceFiles: fixture.baseline.trustedGovernanceFiles.map((file) =>
         file.path === ".github/CODEOWNERS"
           ? { ...file, sha256: "0".repeat(64), blobSha: "0".repeat(40) }
-          : file
-      )),
+          : file,
+      ),
     };
     const result = inspectTrustedCheckout({ repoRoot: fixture.root, baseline });
     assert.equal(result.ok, false);
@@ -104,7 +110,10 @@ function createGovernanceFiles(root) {
   writeFileSync(path.join(root, ".github", "trusted", "phase2d-corrective4-baseline.json"), "{}\n");
   writeFileSync(path.join(root, ".github", "trusted", "repository-governance-policy.json"), "{}\n");
   writeFileSync(path.join(root, ".github", "CODEOWNERS"), "* @owner\n");
-  writeFileSync(path.join(root, ".github", "workflows", "trusted-phase2d-freeze.yml"), "name: fixture\n");
+  writeFileSync(
+    path.join(root, ".github", "workflows", "trusted-phase2d-freeze.yml"),
+    "name: fixture\n",
+  );
   writeFileSync(path.join(root, "scripts", "governance", "check.mjs"), "export {};\n");
 }
 

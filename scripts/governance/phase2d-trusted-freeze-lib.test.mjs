@@ -107,8 +107,18 @@ function baseline(overrides = {}) {
       {
         path: "docs/PHASE_2D_CONTRACT.md",
         change: "modified",
-        base: { mode: "100644", objectType: "blob", blobSha: SHA.contractBase, sha256: "c".repeat(64) },
-        head: { mode: "100644", objectType: "blob", blobSha: SHA.contractHead, sha256: "d".repeat(64) },
+        base: {
+          mode: "100644",
+          objectType: "blob",
+          blobSha: SHA.contractBase,
+          sha256: "c".repeat(64),
+        },
+        head: {
+          mode: "100644",
+          objectType: "blob",
+          blobSha: SHA.contractHead,
+          sha256: "d".repeat(64),
+        },
       },
       {
         path: "package.json",
@@ -321,9 +331,7 @@ describe("evaluateTrustedFreeze", () => {
     const { baseTree, headTree, headTextByPath } = trees({
       risk: { sha: SHA.riskNew },
     });
-    const evaluation = evaluateTrustedFreeze(
-      evalInput({ baseTree, headTree, headTextByPath }),
-    );
+    const evaluation = evaluateTrustedFreeze(evalInput({ baseTree, headTree, headTextByPath }));
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("protected_file_blob_mismatch"));
   });
@@ -374,9 +382,7 @@ describe("evaluateTrustedFreeze", () => {
     const { baseTree, headTree, headTextByPath } = trees({
       risk: { mode: "120000", sha: SHA.symlink },
     });
-    const evaluation = evaluateTrustedFreeze(
-      evalInput({ baseTree, headTree, headTextByPath }),
-    );
+    const evaluation = evaluateTrustedFreeze(evalInput({ baseTree, headTree, headTextByPath }));
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("protected_file_mode_change"));
     assert.ok(evaluation.reasons.includes("protected_file_symlink"));
@@ -386,9 +392,7 @@ describe("evaluateTrustedFreeze", () => {
     const { baseTree, headTree, headTextByPath } = trees({
       risk: { mode: "160000", type: "commit", sha: SHA.symlink },
     });
-    const evaluation = evaluateTrustedFreeze(
-      evalInput({ baseTree, headTree, headTextByPath }),
-    );
+    const evaluation = evaluateTrustedFreeze(evalInput({ baseTree, headTree, headTextByPath }));
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("protected_file_gitlink"));
     assert.ok(evaluation.reasons.includes("protected_file_type_change"));
@@ -398,9 +402,7 @@ describe("evaluateTrustedFreeze", () => {
     const { baseTree, headTree, headTextByPath } = trees({
       risk: { mode: "100755" },
     });
-    const evaluation = evaluateTrustedFreeze(
-      evalInput({ baseTree, headTree, headTextByPath }),
-    );
+    const evaluation = evaluateTrustedFreeze(evalInput({ baseTree, headTree, headTextByPath }));
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("protected_file_mode_change"));
   });
@@ -481,52 +483,65 @@ describe("evaluateTrustedFreeze", () => {
 
   it("fails the exact manifest when the candidate has one extra file", () => {
     const { baseTree, headTree, headTextByPath } = trees();
-    const evaluation = evaluateTrustedFreeze(evalInput({
-      baseTree,
-      headTree: headTree.concat({ path: "scripts/evidence/extra.mjs", mode: "100644", type: "blob", sha: SHA.otherHead }),
-      headTextByPath,
-    }));
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({
+        baseTree,
+        headTree: headTree.concat({
+          path: "scripts/evidence/extra.mjs",
+          mode: "100644",
+          type: "blob",
+          sha: SHA.otherHead,
+        }),
+        headTextByPath,
+      }),
+    );
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("candidate_manifest_unexpected_path"));
   });
 
   it("fails the exact manifest when the candidate is missing one file", () => {
     const { baseTree, headTree, headTextByPath } = trees();
-    const evaluation = evaluateTrustedFreeze(evalInput({
-      baseTree,
-      headTree: headTree.filter((item) => item.path !== "scripts/evidence/phase2d-corrective4-verify.mjs"),
-      headTextByPath,
-    }));
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({
+        baseTree,
+        headTree: headTree.filter(
+          (item) => item.path !== "scripts/evidence/phase2d-corrective4-verify.mjs",
+        ),
+        headTextByPath,
+      }),
+    );
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("candidate_manifest_missing_path"));
   });
 
   it("fails per-file identity and SHA-256 when one candidate byte changes", () => {
     const { baseTree, headTree, headTextByPath } = trees();
-    const nextHead = headTree.map((item) => item.path === "package.json" ? { ...item, sha: SHA.otherHead } : item);
-    const evaluation = evaluateTrustedFreeze(evalInput({ baseTree, headTree: nextHead, headTextByPath }));
+    const nextHead = headTree.map((item) =>
+      item.path === "package.json" ? { ...item, sha: SHA.otherHead } : item,
+    );
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({ baseTree, headTree: nextHead, headTextByPath }),
+    );
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("candidate_manifest_head_identity_mismatch"));
   });
 
   it("fails when the candidate branch is renamed", () => {
-    const evaluation = evaluateTrustedFreeze(evalInput({ prHeadRef: "experiment/v0.1-phase2-renamed" }));
+    const evaluation = evaluateTrustedFreeze(
+      evalInput({ prHeadRef: "experiment/v0.1-phase2-renamed" }),
+    );
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("pr_head_ref_mismatch"));
   });
 
   it("11. fail closed when the implementation base is not an ancestor", () => {
-    const evaluation = evaluateTrustedFreeze(
-      evalInput({ implementationBaseIsAncestor: false }),
-    );
+    const evaluation = evaluateTrustedFreeze(evalInput({ implementationBaseIsAncestor: false }));
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("implementation_base_not_ancestor"));
   });
 
   it("12. fail closed when GitHub tree metadata is incomplete", () => {
-    const evaluation = evaluateTrustedFreeze(
-      evalInput({ headTreeComplete: false, headTree: [] }),
-    );
+    const evaluation = evaluateTrustedFreeze(evalInput({ headTreeComplete: false, headTree: [] }));
     assert.equal(evaluation.trustedBaselineIntegrityOk, false);
     assert.ok(evaluation.reasons.includes("head_tree_incomplete"));
   });
@@ -699,8 +714,14 @@ describe("committed baseline", () => {
     const jsonText = readFileSync(path.join(repoRoot, TRUSTED_BASELINE_PATH), "utf8");
     const parsed = parseBaseline(jsonText);
     assert.equal(parsed.ok, true);
-    assert.equal(parsed.baseline.acceptedImplementationBaseSha, "c64fa291af0d53139c6c526cd25ede434c08c17b");
-    assert.equal(parsed.baseline.minimumTrustedAncestorSha, "ed320fbf6558fcf249a6685031f5280a0e402def");
+    assert.equal(
+      parsed.baseline.acceptedImplementationBaseSha,
+      "c64fa291af0d53139c6c526cd25ede434c08c17b",
+    );
+    assert.equal(
+      parsed.baseline.minimumTrustedAncestorSha,
+      "ed320fbf6558fcf249a6685031f5280a0e402def",
+    );
     assert.equal(parsed.baseline.candidateHeadRef, "experiment/v0.1-phase2");
     assert.equal(
       parsed.baseline.currentAcceptedCandidateSourceHead,
@@ -714,7 +735,9 @@ describe("committed baseline", () => {
     assert.ok(
       parsed.baseline.protectedFiles.some((file) => file.path === "src/risk/risk-engine.ts"),
     );
-    assert.ok(!parsed.baseline.protectedFiles.some((file) => file.path === "docs/PHASE_2D_CONTRACT.md"));
+    assert.ok(
+      !parsed.baseline.protectedFiles.some((file) => file.path === "docs/PHASE_2D_CONTRACT.md"),
+    );
     assert.ok(
       parsed.baseline.trustedGovernanceFiles.some(
         (file) => file.path === ".github/trusted/repository-governance-policy.json",
