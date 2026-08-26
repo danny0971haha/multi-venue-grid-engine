@@ -59,7 +59,10 @@ describe("repository governance policy parser positive fixtures", () => {
     for (const [key, expected] of Object.entries(SOLO_OWNER_BOOTSTRAP_EFFECTIVE)) {
       assert.equal(parsed.policy[key], expected, key);
     }
-    const evaluated = evaluateRepositoryGovernancePolicy(parsed.policy, SOLO_OWNER_BOOTSTRAP_OBSERVED);
+    const evaluated = evaluateRepositoryGovernancePolicy(
+      parsed.policy,
+      SOLO_OWNER_BOOTSTRAP_OBSERVED,
+    );
     assert.equal(evaluated.ok, true, evaluated.reasons.join(","));
   });
 
@@ -78,14 +81,19 @@ describe("repository governance policy parser negative fixtures", () => {
   });
 
   it("rejects every committed negative fixture", () => {
-    const files = readdirSync(negativeDir).filter((name) => name.endsWith(".json") || name.endsWith(".json.txt"));
+    const files = readdirSync(negativeDir).filter(
+      (name) => name.endsWith(".json") || name.endsWith(".json.txt"),
+    );
     assert.ok(files.length >= 15, "expected dedicated negative fixtures");
     for (const name of files) {
       const text = readFileSync(path.join(negativeDir, name), "utf8");
       const parsed = parseRepositoryGovernancePolicy(text);
       if (name === "strict-active.json") {
         assert.equal(parsed.ok, true, `${name} should parse so evaluation can reject it`);
-        const evaluated = evaluateRepositoryGovernancePolicy(parsed.policy, SOLO_OWNER_BOOTSTRAP_OBSERVED);
+        const evaluated = evaluateRepositoryGovernancePolicy(
+          parsed.policy,
+          SOLO_OWNER_BOOTSTRAP_OBSERVED,
+        );
         assert.equal(evaluated.ok, false, name);
         assert.ok(evaluated.reasons.includes("strict_profile_prerequisites_unsatisfied"));
         assert.ok(evaluated.reasons.includes("strict_up_to_date_while_phase2_unmerged"));
@@ -131,16 +139,66 @@ describe("repository governance policy parser negative fixtures", () => {
 
   it("rejects SOLO_OWNER_BOOTSTRAP values that recreate the bootstrap deadlock", () => {
     const cases = [
-      [(value) => { value.requiredApprovingReviewCount = 2; }, "policy_solo_required_approving_review_count"],
-      [(value) => { value.requireCodeOwnerReview = true; }, "policy_solo_require_code_owner_review"],
-      [(value) => { value.requireLastPushApproval = true; }, "policy_solo_require_last_push_approval"],
-      [(value) => { value.strictRequiredStatusChecks = true; }, "policy_solo_strict_required_status_checks"],
-      [(value) => { value.rulesetWorkflowRequired = true; }, "policy_solo_ruleset_workflow_required"],
-      [(value) => { value.globallyRequiredGovernanceSelfTest = true; }, "policy_solo_globally_required_governance_self_test"],
-      [(value) => { value.mergeMethod = "squash"; }, "policy_solo_merge_method"],
-      [(value) => { value.frozenPhase2CandidateHead = "a".repeat(40); }, "policy_frozen_phase2_candidate_head"],
-      [(value) => { value.liveExchangeWriteAuthorized = true; }, "policy_solo_live_exchange_write_authorized"],
-      [(value) => { value.deploymentAuthorized = true; }, "policy_solo_deployment_authorized"],
+      [
+        (value) => {
+          value.requiredApprovingReviewCount = 2;
+        },
+        "policy_solo_required_approving_review_count",
+      ],
+      [
+        (value) => {
+          value.requireCodeOwnerReview = true;
+        },
+        "policy_solo_require_code_owner_review",
+      ],
+      [
+        (value) => {
+          value.requireLastPushApproval = true;
+        },
+        "policy_solo_require_last_push_approval",
+      ],
+      [
+        (value) => {
+          value.strictRequiredStatusChecks = true;
+        },
+        "policy_solo_strict_required_status_checks",
+      ],
+      [
+        (value) => {
+          value.rulesetWorkflowRequired = true;
+        },
+        "policy_solo_ruleset_workflow_required",
+      ],
+      [
+        (value) => {
+          value.globallyRequiredGovernanceSelfTest = true;
+        },
+        "policy_solo_globally_required_governance_self_test",
+      ],
+      [
+        (value) => {
+          value.mergeMethod = "squash";
+        },
+        "policy_solo_merge_method",
+      ],
+      [
+        (value) => {
+          value.frozenPhase2CandidateHead = "a".repeat(40);
+        },
+        "policy_frozen_phase2_candidate_head",
+      ],
+      [
+        (value) => {
+          value.liveExchangeWriteAuthorized = true;
+        },
+        "policy_solo_live_exchange_write_authorized",
+      ],
+      [
+        (value) => {
+          value.deploymentAuthorized = true;
+        },
+        "policy_solo_deployment_authorized",
+      ],
     ];
     for (const [mutator, reason] of cases) {
       const parsed = parseMutated(mutator);
@@ -157,7 +215,10 @@ describe("repository governance policy parser negative fixtures", () => {
     assert.equal(parsed.ok, false);
     assert.ok(parsed.reasons.includes("policy_governance_self_test_in_required_checks"));
     const committed = loadCommittedRepositoryGovernancePolicy(root);
-    assert.equal(committed.policy.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT), false);
+    assert.equal(
+      committed.policy.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT),
+      false,
+    );
     assert.equal(committed.policy.globallyRequiredGovernanceSelfTest, false);
   });
 
@@ -180,7 +241,10 @@ describe("repository governance policy parser negative fixtures", () => {
     value.strictRequiredStatusChecks = true;
     const parsed = parseRepositoryGovernancePolicy(JSON.stringify(value));
     assert.equal(parsed.ok, true, parsed.reasons.join(","));
-    const evaluated = evaluateRepositoryGovernancePolicy(parsed.policy, SOLO_OWNER_BOOTSTRAP_OBSERVED);
+    const evaluated = evaluateRepositoryGovernancePolicy(
+      parsed.policy,
+      SOLO_OWNER_BOOTSTRAP_OBSERVED,
+    );
     assert.equal(evaluated.ok, false);
     assert.ok(evaluated.reasons.includes("strict_profile_prerequisites_unsatisfied"));
   });
@@ -205,7 +269,10 @@ describe("repository governance policy parser negative fixtures", () => {
 
 describe("bootstrap sequence vs classifier whitelist", () => {
   it("keeps predecessor src/** PRs ENFORCE and records PR1->PR2->PR4->RETARGET_PR3", () => {
-    const gateSource = readFileSync(path.join(root, "scripts", "governance", "phase2d-trusted-gate.mjs"), "utf8");
+    const gateSource = readFileSync(
+      path.join(root, "scripts", "governance", "phase2d-trusted-gate.mjs"),
+      "utf8",
+    );
     assert.doesNotMatch(gateSource, /experiment\/v0\.1-phase0/);
     assert.doesNotMatch(gateSource, /experiment\/v0\.1-phase1/);
     assert.doesNotMatch(gateSource, /whitelist/);

@@ -7,10 +7,8 @@ import { createHash } from "node:crypto";
 
 export const SCHEMA_VERSION = "multi-venue-phase2d-trusted-baseline/2";
 
-export const TRUSTED_BASELINE_PATH =
-  ".github/trusted/phase2d-corrective4-baseline.json";
-export const TRUSTED_WORKFLOW_PATH =
-  ".github/workflows/trusted-phase2d-freeze.yml";
+export const TRUSTED_BASELINE_PATH = ".github/trusted/phase2d-corrective4-baseline.json";
+export const TRUSTED_WORKFLOW_PATH = ".github/workflows/trusted-phase2d-freeze.yml";
 
 export const GIT_SHA1_RE = /^[0-9a-f]{40}$/;
 export const GIT_SHA256_RE = /^[0-9a-f]{64}$/;
@@ -270,10 +268,7 @@ export function parseBaseline(jsonText) {
       if (typeof anchor.startMarker !== "string" || anchor.startMarker.length === 0) {
         reasons.push("baseline_anchor_start_marker");
       }
-      if (
-        typeof anchor.endExclusiveMarker !== "string" ||
-        anchor.endExclusiveMarker.length === 0
-      ) {
+      if (typeof anchor.endExclusiveMarker !== "string" || anchor.endExclusiveMarker.length === 0) {
         reasons.push("baseline_anchor_end_marker");
       }
       if (!GIT_SHA256_RE.test(anchor.sha256 ?? "")) {
@@ -297,11 +292,7 @@ export function parseBaseline(jsonText) {
   } else if (trustedRules.some((rule) => !isSupportedRule(rule))) {
     reasons.push("baseline_trusted_governance_path_rule_unsupported");
   }
-  validateFileManifest(
-    parsed.trustedGovernanceFiles,
-    "baseline_trusted_governance",
-    reasons,
-  );
+  validateFileManifest(parsed.trustedGovernanceFiles, "baseline_trusted_governance", reasons);
 
   if (reasons.length > 0) {
     return {
@@ -359,13 +350,20 @@ function validateChangedFiles(files, reasons) {
       reasons.push("baseline_candidate_changed_file_entry");
       continue;
     }
-    rejectUnknownFields(item, CHANGE_FIELDS, "baseline_candidate_changed_file_unknown_field", reasons);
+    rejectUnknownFields(
+      item,
+      CHANGE_FIELDS,
+      "baseline_candidate_changed_file_unknown_field",
+      reasons,
+    );
     if (!isSafeGitPath(item.path)) reasons.push("baseline_candidate_changed_file_path");
     if (seen.has(item.path)) reasons.push("baseline_candidate_changed_file_duplicate_path");
     seen.add(item.path);
     if (!CHANGE_TYPES.has(item.change)) reasons.push("baseline_candidate_change_type");
-    if (item.change === "added" && item.base !== null) reasons.push("baseline_candidate_change_base");
-    if (item.change === "deleted" && item.head !== null) reasons.push("baseline_candidate_change_head");
+    if (item.change === "added" && item.base !== null)
+      reasons.push("baseline_candidate_change_base");
+    if (item.change === "deleted" && item.head !== null)
+      reasons.push("baseline_candidate_change_head");
     if (item.change !== "added") validateSnapshot(item.base, "base", reasons);
     if (item.change !== "deleted") validateSnapshot(item.head, "head", reasons);
   }
@@ -376,10 +374,16 @@ function validateSnapshot(snapshot, side, reasons) {
     reasons.push(`baseline_candidate_${side}_snapshot`);
     return;
   }
-  rejectUnknownFields(snapshot, new Set(["mode", "objectType", "blobSha", "sha256"]), `baseline_candidate_${side}_unknown_field`, reasons);
+  rejectUnknownFields(
+    snapshot,
+    new Set(["mode", "objectType", "blobSha", "sha256"]),
+    `baseline_candidate_${side}_unknown_field`,
+    reasons,
+  );
   if (!ALLOWED_BLOB_MODES.has(snapshot.mode)) reasons.push(`baseline_candidate_${side}_mode`);
   if (snapshot.objectType !== "blob") reasons.push(`baseline_candidate_${side}_type`);
-  if (!GIT_SHA1_RE.test(snapshot.blobSha ?? "")) reasons.push(`baseline_candidate_${side}_blob_sha`);
+  if (!GIT_SHA1_RE.test(snapshot.blobSha ?? ""))
+    reasons.push(`baseline_candidate_${side}_blob_sha`);
   if (!GIT_SHA256_RE.test(snapshot.sha256 ?? "")) reasons.push(`baseline_candidate_${side}_sha256`);
 }
 
@@ -389,7 +393,9 @@ function failParse(reason, reasons) {
 }
 
 function isStringRuleList(value) {
-  return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string")
+  );
 }
 
 function isSupportedRule(rule) {
@@ -493,12 +499,7 @@ export function evaluateTrustedFreeze(input) {
     checkCaseCollisions(baseline, headIndex, reasons);
     checkTypeAndModeAttacks(baseline, headIndex, reasons);
     const changedPaths = collectChangedPaths(baseIndex.map, headIndex.map);
-    checkExactCandidateManifest(
-      baseline,
-      changedPaths,
-      input.observedBlobSha256ByKey,
-      reasons,
-    );
+    checkExactCandidateManifest(baseline, changedPaths, input.observedBlobSha256ByKey, reasons);
     checkProtectedFileSha256(baseline, input.observedBlobSha256ByKey, reasons);
     checkAllowedChangedPaths(baseline, changedPaths, reasons);
     checkRenamesAndCopies(input.compareFiles, baseline, reasons);
@@ -509,11 +510,7 @@ export function evaluateTrustedFreeze(input) {
   const trustedBaselineIntegrityOk =
     reasons.filter((code) => code !== "source_head_not_reviewed_candidate").length === 0;
 
-  return result(
-    trustedBaselineIntegrityOk,
-    sourceHeadMatchesReviewedCandidate,
-    unique(reasons),
-  );
+  return result(trustedBaselineIntegrityOk, sourceHeadMatchesReviewedCandidate, unique(reasons));
 }
 
 function checkExactCandidateManifest(baseline, changed, observedHashes, reasons) {
@@ -524,7 +521,8 @@ function checkExactCandidateManifest(baseline, changed, observedHashes, reasons)
   }
   const actualByPath = new Map(changed.map((item) => [item.path, item]));
   const expectedByPath = new Map(expected.map((item) => [item.path, item]));
-  if (actualByPath.size !== expectedByPath.size) reasons.push("candidate_manifest_path_count_mismatch");
+  if (actualByPath.size !== expectedByPath.size)
+    reasons.push("candidate_manifest_path_count_mismatch");
   for (const [path, actual] of actualByPath) {
     const item = expectedByPath.get(path);
     if (!item) {
@@ -542,10 +540,16 @@ function checkExactCandidateManifest(baseline, changed, observedHashes, reasons)
 
 function checkSnapshotMatch(expected, actual, side, path, observedHashes, reasons) {
   if (expected === null || actual === undefined) {
-    if (!(expected === null && actual === undefined)) reasons.push(`candidate_manifest_${side}_presence_mismatch`);
+    if (!(expected === null && actual === undefined))
+      reasons.push(`candidate_manifest_${side}_presence_mismatch`);
     return;
   }
-  if (!actual || expected.mode !== actual.mode || expected.objectType !== actual.type || expected.blobSha !== actual.sha) {
+  if (
+    !actual ||
+    expected.mode !== actual.mode ||
+    expected.objectType !== actual.type ||
+    expected.blobSha !== actual.sha
+  ) {
     reasons.push(`candidate_manifest_${side}_identity_mismatch`);
     return;
   }
@@ -703,11 +707,7 @@ function collectChangedPaths(baseMap, headMap) {
       changed.push({ path, change: "deleted", base, head });
       continue;
     }
-    if (
-      base.sha !== head.sha ||
-      base.mode !== head.mode ||
-      base.type !== head.type
-    ) {
+    if (base.sha !== head.sha || base.mode !== head.mode || base.type !== head.type) {
       changed.push({ path, change: "modified", base, head });
     }
   }
@@ -772,8 +772,7 @@ function checkRenamesAndCopies(compareFiles, baseline, reasons) {
 function checkVerifierCommitmentCombo(changed, reasons) {
   const paths = changed.map((item) => item.path);
   const verifierChanged = paths.some(
-    (path) =>
-      path === TRUSTED_WORKFLOW_PATH || path.startsWith("scripts/governance/"),
+    (path) => path === TRUSTED_WORKFLOW_PATH || path.startsWith("scripts/governance/"),
   );
   const commitmentChanged = paths.some(
     (path) => path === TRUSTED_BASELINE_PATH || path.startsWith(".github/trusted/"),
@@ -832,7 +831,6 @@ export function summaryContainsForbiddenDecisionWording(text) {
     return false;
   }
   return (
-    /\b(ACCEPT|PASS)\b/.test(text) ||
-    /release approval|merge approval|Gate 2 approval/i.test(text)
+    /\b(ACCEPT|PASS)\b/.test(text) || /release approval|merge approval|Gate 2 approval/i.test(text)
   );
 }

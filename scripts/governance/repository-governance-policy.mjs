@@ -175,13 +175,17 @@ export function parseRepositoryGovernancePolicy(jsonText) {
   if (parsed.frozenPhase2CandidateHead !== FROZEN_PHASE2_CANDIDATE_HEAD) {
     reasons.push("policy_frozen_phase2_candidate_head");
   }
-  if (parsed.acceptedPhase1Head !== ACCEPTED_PHASE1_HEAD) reasons.push("policy_accepted_phase1_head");
-  if (parsed.acceptedPhase0Head !== ACCEPTED_PHASE0_HEAD) reasons.push("policy_accepted_phase0_head");
+  if (parsed.acceptedPhase1Head !== ACCEPTED_PHASE1_HEAD)
+    reasons.push("policy_accepted_phase1_head");
+  if (parsed.acceptedPhase0Head !== ACCEPTED_PHASE0_HEAD)
+    reasons.push("policy_accepted_phase0_head");
   if (!GIT_SHA1_RE.test(parsed.frozenPhase2CandidateHead ?? "")) {
     reasons.push("policy_frozen_phase2_candidate_head_sha");
   }
-  if (!GIT_SHA1_RE.test(parsed.acceptedPhase1Head ?? "")) reasons.push("policy_accepted_phase1_head_sha");
-  if (!GIT_SHA1_RE.test(parsed.acceptedPhase0Head ?? "")) reasons.push("policy_accepted_phase0_head_sha");
+  if (!GIT_SHA1_RE.test(parsed.acceptedPhase1Head ?? ""))
+    reasons.push("policy_accepted_phase1_head_sha");
+  if (!GIT_SHA1_RE.test(parsed.acceptedPhase0Head ?? ""))
+    reasons.push("policy_accepted_phase0_head_sha");
 
   validateRequiredStatusChecks(parsed.requiredStatusChecks, "policy", reasons);
   if (!Array.isArray(parsed.integrationOrder)) {
@@ -204,7 +208,11 @@ export function parseRepositoryGovernancePolicy(jsonText) {
   if (!Number.isInteger(parsed.requiredApprovingReviewCount)) {
     reasons.push("policy_required_approving_review_count");
   }
-  if (parsed.mergeMethod !== "merge" && parsed.mergeMethod !== "squash" && parsed.mergeMethod !== "rebase") {
+  if (
+    parsed.mergeMethod !== "merge" &&
+    parsed.mergeMethod !== "squash" &&
+    parsed.mergeMethod !== "rebase"
+  ) {
     reasons.push("policy_merge_method");
   }
 
@@ -227,14 +235,24 @@ export function parseRepositoryGovernancePolicy(jsonText) {
 
   if (parsed.activeProfile === ACTIVE_PROFILE) {
     validateSoloEffective(parsed, "policy_solo_", reasons);
-    if (profiles && typeof profiles === "object" && !Array.isArray(profiles) && profiles[ACTIVE_PROFILE]) {
+    if (
+      profiles &&
+      typeof profiles === "object" &&
+      !Array.isArray(profiles) &&
+      profiles[ACTIVE_PROFILE]
+    ) {
       assertRootMatchesProfile(parsed, profiles[ACTIVE_PROFILE], reasons);
     }
   }
 
   if (parsed.activeProfile === FUTURE_PROFILE) {
     validateStrictActiveRoot(parsed, reasons);
-    if (profiles && typeof profiles === "object" && !Array.isArray(profiles) && profiles[FUTURE_PROFILE]) {
+    if (
+      profiles &&
+      typeof profiles === "object" &&
+      !Array.isArray(profiles) &&
+      profiles[FUTURE_PROFILE]
+    ) {
       assertRootMatchesStrictProfile(parsed, profiles[FUTURE_PROFILE], reasons);
     }
   }
@@ -245,7 +263,10 @@ export function parseRepositoryGovernancePolicy(jsonText) {
   return { ok: true, policy: parsed, reasons: [] };
 }
 
-export function evaluateRepositoryGovernancePolicy(policy, observed = SOLO_OWNER_BOOTSTRAP_OBSERVED) {
+export function evaluateRepositoryGovernancePolicy(
+  policy,
+  observed = SOLO_OWNER_BOOTSTRAP_OBSERVED,
+) {
   const reasons = [];
   if (!policy || typeof policy !== "object" || Array.isArray(policy)) {
     return { ok: false, reasons: ["policy_evaluation_input_invalid"] };
@@ -269,7 +290,8 @@ export function evaluateRepositoryGovernancePolicy(policy, observed = SOLO_OWNER
       reasons.push("strict_profile_prerequisites_unsatisfied");
     }
   }
-  if (policy.liveExchangeWriteAuthorized === true) reasons.push("policy_live_exchange_write_authorized");
+  if (policy.liveExchangeWriteAuthorized === true)
+    reasons.push("policy_live_exchange_write_authorized");
   if (policy.deploymentAuthorized === true) reasons.push("policy_deployment_authorized");
 
   return { ok: reasons.length === 0, reasons: unique(reasons) };
@@ -343,8 +365,10 @@ export function comparePolicyToDocs(policy, markdown) {
   for (const claim of forbiddenCurrentClaims) {
     if (markdown.includes(claim)) reasons.push("docs_forbidden_current_claim");
   }
-  if (!markdown.includes("ACTIVE: SOLO_OWNER_BOOTSTRAP")) reasons.push("docs_active_profile_section_missing");
-  if (!markdown.includes("FUTURE: STRICT_MULTI_REVIEWER")) reasons.push("docs_future_profile_section_missing");
+  if (!markdown.includes("ACTIVE: SOLO_OWNER_BOOTSTRAP"))
+    reasons.push("docs_active_profile_section_missing");
+  if (!markdown.includes("FUTURE: STRICT_MULTI_REVIEWER"))
+    reasons.push("docs_future_profile_section_missing");
   if (!markdown.includes("does not provide independent human separation of duties")) {
     reasons.push("docs_reduced_assurance_missing");
   }
@@ -366,7 +390,10 @@ function validateSoloEffective(value, prefix, reasons) {
   if (value.globallyRequiredGovernanceSelfTest === true) {
     reasons.push(`${prefix}globally_required_governance_self_test`);
   }
-  if (Array.isArray(value.requiredStatusChecks) && value.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT)) {
+  if (
+    Array.isArray(value.requiredStatusChecks) &&
+    value.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT)
+  ) {
     reasons.push(`${prefix}governance_self_test_in_required_checks`);
   }
 }
@@ -376,7 +403,10 @@ function validateStrictActiveRoot(value, reasons) {
     if (key === "dismissStaleReviews") continue;
     if (value[key] !== expected) reasons.push(`policy_strict_active_${camelToReason(key)}`);
   }
-  if (Array.isArray(value.requiredStatusChecks) && value.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT)) {
+  if (
+    Array.isArray(value.requiredStatusChecks) &&
+    value.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT)
+  ) {
     reasons.push("policy_strict_active_governance_self_test_in_required_checks");
   }
 }
@@ -408,12 +438,20 @@ function validateStrictProfile(profile, reasons) {
     reasons.push("policy_strict_profile_entry");
     return;
   }
-  rejectUnknownFields(profile, STRICT_PROFILE_FIELDS, "policy_strict_profile_unknown_field", reasons);
+  rejectUnknownFields(
+    profile,
+    STRICT_PROFILE_FIELDS,
+    "policy_strict_profile_unknown_field",
+    reasons,
+  );
   for (const [key, expected] of Object.entries(STRICT_MULTI_REVIEWER_DEFINED)) {
     if (profile[key] !== expected) reasons.push(`policy_strict_profile_${camelToReason(key)}`);
   }
   validateRequiredStatusChecks(profile.requiredStatusChecks, "policy_strict_profile", reasons);
-  if (Array.isArray(profile.requiredStatusChecks) && profile.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT)) {
+  if (
+    Array.isArray(profile.requiredStatusChecks) &&
+    profile.requiredStatusChecks.includes(GOVERNANCE_SELF_TEST_CONTEXT)
+  ) {
     reasons.push("policy_strict_profile_governance_self_test_in_required_checks");
   }
   const prerequisites = profile.activationPrerequisites;
@@ -421,9 +459,15 @@ function validateStrictProfile(profile, reasons) {
     reasons.push("policy_strict_profile_prerequisites");
     return;
   }
-  rejectUnknownFields(prerequisites, PREREQUISITE_FIELDS, "policy_strict_prerequisite_unknown_field", reasons);
+  rejectUnknownFields(
+    prerequisites,
+    PREREQUISITE_FIELDS,
+    "policy_strict_prerequisite_unknown_field",
+    reasons,
+  );
   for (const [key, expected] of Object.entries(STRICT_ACTIVATION_PREREQUISITES)) {
-    if (prerequisites[key] !== expected) reasons.push(`policy_strict_prerequisite_${camelToReason(key)}`);
+    if (prerequisites[key] !== expected)
+      reasons.push(`policy_strict_prerequisite_${camelToReason(key)}`);
   }
 }
 
@@ -476,9 +520,11 @@ function rejectUnknownFields(value, allowed, reason, reasons) {
 }
 
 function sameStringList(actual, expected) {
-  return Array.isArray(actual) &&
+  return (
+    Array.isArray(actual) &&
     actual.length === expected.length &&
-    actual.every((item, index) => item === expected[index]);
+    actual.every((item, index) => item === expected[index])
+  );
 }
 
 function camelToReason(key) {
@@ -504,7 +550,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.stdout.write(`governancePolicyOk=false\nreasonCodes=${parsed.reasons.join(",")}\n`);
     process.exit(1);
   }
-  const evaluated = evaluateRepositoryGovernancePolicy(parsed.policy, SOLO_OWNER_BOOTSTRAP_OBSERVED);
+  const evaluated = evaluateRepositoryGovernancePolicy(
+    parsed.policy,
+    SOLO_OWNER_BOOTSTRAP_OBSERVED,
+  );
   if (!evaluated.ok) {
     process.stdout.write(`governancePolicyOk=false\nreasonCodes=${evaluated.reasons.join(",")}\n`);
     process.exit(1);

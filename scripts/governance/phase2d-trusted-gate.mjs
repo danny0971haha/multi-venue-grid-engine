@@ -62,13 +62,15 @@ async function main() {
   if (!files.complete || files.items.some((item) => typeof item?.filename !== "string")) {
     return finish({ mode: "FAIL_CLOSED", reason: files.reason ?? "pull_files_invalid" });
   }
-  return finish(classifyGate({
-    baseline: parsed.baseline,
-    changedPaths: files.items.map((item) => item.filename),
-    headRef: process.env.PR_HEAD_REF,
-    headRepository: process.env.PR_HEAD_REPO,
-    baseRepository: process.env.PR_BASE_REPO,
-  }));
+  return finish(
+    classifyGate({
+      baseline: parsed.baseline,
+      changedPaths: files.items.map((item) => item.filename),
+      headRef: process.env.PR_HEAD_REF,
+      headRepository: process.env.PR_HEAD_REPO,
+      baseRepository: process.env.PR_BASE_REPO,
+    }),
+  );
 }
 
 function finish(result) {

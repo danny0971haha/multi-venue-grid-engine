@@ -69,20 +69,22 @@ async function main() {
   const prHeadRef = process.env.PR_HEAD_REF;
 
   if (!token) {
-    return failClosed(evaluateTrustedFreeze({
-      baseline: parsed.baseline,
-      repositoryFullName,
-      prHeadRepositoryFullName,
-      prHeadRef,
-      sourceHeadSha,
-      eventSourceHeadSha,
-      ancestorCheckComplete: false,
-      implementationBaseIsAncestor: false,
-      baseTreeComplete: false,
-      headTreeComplete: false,
-      baseTree: [],
-      headTree: [],
-    }));
+    return failClosed(
+      evaluateTrustedFreeze({
+        baseline: parsed.baseline,
+        repositoryFullName,
+        prHeadRepositoryFullName,
+        prHeadRef,
+        sourceHeadSha,
+        eventSourceHeadSha,
+        ancestorCheckComplete: false,
+        implementationBaseIsAncestor: false,
+        baseTreeComplete: false,
+        headTreeComplete: false,
+        baseTree: [],
+        headTree: [],
+      }),
+    );
   }
 
   const baseCommit = await fetchCommitTreeSha({
@@ -145,7 +147,6 @@ async function main() {
   } else {
     anchorContentComplete = false;
   }
-
 
   const observedBlobSha256ByKey = {};
   let blobHashesComplete = true;
@@ -219,9 +220,7 @@ async function main() {
 function failClosed(evaluation) {
   return finish({
     trustedBaselineIntegrityOk: false,
-    sourceHeadMatchesReviewedCandidate: Boolean(
-      evaluation.sourceHeadMatchesReviewedCandidate,
-    ),
+    sourceHeadMatchesReviewedCandidate: Boolean(evaluation.sourceHeadMatchesReviewedCandidate),
     reasons: evaluation.reasons ?? ["fail_closed"],
   });
 }
@@ -245,9 +244,7 @@ function finish(evaluation) {
       `sourceHeadMatchesReviewedCandidate=${evaluation.sourceHeadMatchesReviewedCandidate ? "true" : "false"}\n`,
     );
   }
-  const ok =
-    evaluation.trustedBaselineIntegrityOk &&
-    evaluation.sourceHeadMatchesReviewedCandidate;
+  const ok = evaluation.trustedBaselineIntegrityOk && evaluation.sourceHeadMatchesReviewedCandidate;
   process.exit(ok ? 0 : 1);
 }
 

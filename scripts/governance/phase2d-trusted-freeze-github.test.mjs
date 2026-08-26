@@ -91,8 +91,7 @@ describe("GitHub API fail-closed wrappers", () => {
   it("12. fail closed on GitHub HTTP 429", async () => {
     const page = await githubGetJson(`${API}/rate_limit`, {
       token: "none",
-      fetchImpl: async () =>
-        response({ message: "API rate limit exceeded" }, { status: 429 }),
+      fetchImpl: async () => response({ message: "API rate limit exceeded" }, { status: 429 }),
     });
     assert.equal(page.ok, false);
     assert.equal(page.reason, "github_http_error");
@@ -126,7 +125,10 @@ describe("GitHub API fail-closed wrappers", () => {
       perPage: 100,
       itemsFrom: (json) => json.files,
       fetchImpl: async () =>
-        response({ files: Array.from({ length: 100 }, (_, index) => ({ filename: `f${index}` })) }, { link }),
+        response(
+          { files: Array.from({ length: 100 }, (_, index) => ({ filename: `f${index}` })) },
+          { link },
+        ),
     });
     assert.equal(collected.complete, false);
     assert.equal(collected.reason, "github_pagination_unfollowed");

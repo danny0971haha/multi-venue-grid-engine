@@ -39,44 +39,67 @@ describe("stable required gate classification", () => {
   });
 
   it("renamed candidate branches cannot bypass protected Phase 2 paths", () => {
-    assert.equal(classifyGate(input({ headRef: "renamed", changedPaths: ["src/risk/risk-engine.ts"] })).mode, "ENFORCE");
+    assert.equal(
+      classifyGate(input({ headRef: "renamed", changedPaths: ["src/risk/risk-engine.ts"] })).mode,
+      "ENFORCE",
+    );
   });
 
   it("fork candidates touching Phase 2 paths are still enforced", () => {
-    assert.equal(classifyGate(input({ headRepository: "fork/engine", changedPaths: ["test/risk/x.ts"] })).mode, "ENFORCE");
+    assert.equal(
+      classifyGate(input({ headRepository: "fork/engine", changedPaths: ["test/risk/x.ts"] })).mode,
+      "ENFORCE",
+    );
   });
 
   it("candidate attempts to modify trusted workflow are enforced", () => {
-    assert.equal(classifyGate(input({
-      headRef: "experiment/v0.1-phase2",
-      changedPaths: [".github/workflows/trusted-phase2d-freeze.yml"],
-    })).mode, "ENFORCE");
+    assert.equal(
+      classifyGate(
+        input({
+          headRef: "experiment/v0.1-phase2",
+          changedPaths: [".github/workflows/trusted-phase2d-freeze.yml"],
+        }),
+      ).mode,
+      "ENFORCE",
+    );
   });
 
   it("same-repository governance changes require protected review", () => {
-    assert.equal(classifyGate(input({ changedPaths: ["scripts/governance/check.mjs"] })).mode, "GOVERNANCE_REVIEW_REQUIRED");
+    assert.equal(
+      classifyGate(input({ changedPaths: ["scripts/governance/check.mjs"] })).mode,
+      "GOVERNANCE_REVIEW_REQUIRED",
+    );
   });
 
   it("fork governance changes fail closed", () => {
-    assert.equal(classifyGate(input({
-      headRepository: "fork/engine",
-      changedPaths: [".github/CODEOWNERS"],
-    })).mode, "FAIL_CLOSED");
+    assert.equal(
+      classifyGate(
+        input({
+          headRepository: "fork/engine",
+          changedPaths: [".github/CODEOWNERS"],
+        }),
+      ).mode,
+      "FAIL_CLOSED",
+    );
   });
 
   it("does not whitelist Phase 0 or Phase 1 predecessors that touch src/**", () => {
     assert.equal(
-      classifyGate(input({
-        headRef: "experiment/v0.1-phase0",
-        changedPaths: ["src/index.ts"],
-      })).mode,
+      classifyGate(
+        input({
+          headRef: "experiment/v0.1-phase0",
+          changedPaths: ["src/index.ts"],
+        }),
+      ).mode,
       "ENFORCE",
     );
     assert.equal(
-      classifyGate(input({
-        headRef: "experiment/v0.1-phase1",
-        changedPaths: ["src/domain/types.ts"],
-      })).mode,
+      classifyGate(
+        input({
+          headRef: "experiment/v0.1-phase1",
+          changedPaths: ["src/domain/types.ts"],
+        }),
+      ).mode,
       "ENFORCE",
     );
   });

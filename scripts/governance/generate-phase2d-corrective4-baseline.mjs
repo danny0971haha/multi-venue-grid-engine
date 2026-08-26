@@ -88,7 +88,9 @@ function uncommittedGovernancePaths(porcelain) {
 }
 
 function assertGeneratorInputsCommitted() {
-  const dirty = uncommittedGovernancePaths(git(["status", "--porcelain=v1", "--untracked-files=all"]));
+  const dirty = uncommittedGovernancePaths(
+    git(["status", "--porcelain=v1", "--untracked-files=all"]),
+  );
   if (dirty.length > 0) {
     throw new Error(`generator_uncommitted_governance:${dirty.join(",")}`);
   }
@@ -145,7 +147,13 @@ function main() {
   for (const filePath of [...new Set([...baseIndex.keys(), ...headIndex.keys()])].sort()) {
     const base = baseIndex.get(filePath) ?? null;
     const head = headIndex.get(filePath) ?? null;
-    if (base && head && base.mode === head.mode && base.objectType === head.objectType && base.blobSha === head.blobSha) {
+    if (
+      base &&
+      head &&
+      base.mode === head.mode &&
+      base.objectType === head.objectType &&
+      base.blobSha === head.blobSha
+    ) {
       continue;
     }
     candidateChangedFiles.push({
@@ -230,9 +238,10 @@ function trustedGovernanceManifest(root) {
   const listed = git(["ls-files", "--cached"])
     .split("\n")
     .filter(Boolean)
-    .filter((filePath) =>
-      filePath !== TRUSTED_BASELINE_PATH &&
-      pathMatchesAnyRule(filePath, TRUSTED_GOVERNANCE_PATH_RULES),
+    .filter(
+      (filePath) =>
+        filePath !== TRUSTED_BASELINE_PATH &&
+        pathMatchesAnyRule(filePath, TRUSTED_GOVERNANCE_PATH_RULES),
     )
     .sort();
   if (!listed.includes(POLICY_PATH)) {
