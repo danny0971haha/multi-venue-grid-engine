@@ -715,6 +715,19 @@ describe("committed baseline", () => {
       parsed.baseline.protectedFiles.some((file) => file.path === "src/risk/risk-engine.ts"),
     );
     assert.ok(!parsed.baseline.protectedFiles.some((file) => file.path === "docs/PHASE_2D_CONTRACT.md"));
+    assert.ok(
+      parsed.baseline.trustedGovernanceFiles.some(
+        (file) => file.path === ".github/trusted/repository-governance-policy.json",
+      ),
+    );
+    for (const file of parsed.baseline.trustedGovernanceFiles) {
+      if (file.path === ".github/trusted/repository-governance-policy.json") {
+        assert.equal(file.mode, "100644");
+        assert.equal(file.objectType, "blob");
+        assert.match(file.blobSha, /^[0-9a-f]{40}$/);
+        assert.match(file.sha256, /^[0-9a-f]{64}$/);
+      }
+    }
     assert.equal(
       parsed.baseline.protectedContentAnchors[0].sha256,
       "2eb75b74d668578fa996fb21a7ef2d7998bbc3a6274d61c1ba7b847506f5a68f",

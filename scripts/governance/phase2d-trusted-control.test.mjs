@@ -40,6 +40,33 @@ describe("trusted protected-main checkout", () => {
     assert.ok(result.reasons.includes("trusted_checkout_dirty"));
     assert.ok(result.reasons.includes("trusted_governance_file_sha256_mismatch"));
   });
+
+  it("fails closed when the governance policy bytes are tampered", () => {
+    const fixture = repositoryFixture();
+    writeFileSync(
+      path.join(fixture.root, ".github", "trusted", "repository-governance-policy.json"),
+      "{\"tampered\":true}\n",
+    );
+    const result = inspectTrustedCheckout({ repoRoot: fixture.root, baseline: fixture.baseline });
+    assert.equal(result.ok, false);
+    assert.ok(result.reasons.includes("trusted_governance_file_sha256_mismatch"));
+  });
+
+  it("fails closed when the trusted manifest identity is tampered", () => {
+    const fixture = repositoryFixture();
+    const baseline = {
+      ...fixture.baseline,
+      trustedGovernanceFiles: fixture.baseline.trustedGovernanceFiles.map((file) => (
+        file.path === ".github/CODEOWNERS"
+          ? { ...file, sha256: "0".repeat(64), blobSha: "0".repeat(40) }
+          : file
+      )),
+    };
+    const result = inspectTrustedCheckout({ repoRoot: fixture.root, baseline });
+    assert.equal(result.ok, false);
+    assert.ok(result.reasons.includes("trusted_governance_file_sha256_mismatch"));
+    assert.ok(result.reasons.includes("trusted_governance_file_blob_mismatch"));
+  });
 });
 
 function repositoryFixture() {
@@ -75,6 +102,7 @@ function createGovernanceFiles(root) {
   mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
   mkdirSync(path.join(root, "scripts", "governance"), { recursive: true });
   writeFileSync(path.join(root, ".github", "trusted", "phase2d-corrective4-baseline.json"), "{}\n");
+  writeFileSync(path.join(root, ".github", "trusted", "repository-governance-policy.json"), "{}\n");
   writeFileSync(path.join(root, ".github", "CODEOWNERS"), "* @owner\n");
   writeFileSync(path.join(root, ".github", "workflows", "trusted-phase2d-freeze.yml"), "name: fixture\n");
   writeFileSync(path.join(root, "scripts", "governance", "check.mjs"), "export {};\n");
@@ -83,6 +111,7 @@ function createGovernanceFiles(root) {
 function governanceManifest(root) {
   return [
     ".github/CODEOWNERS",
+    ".github/trusted/repository-governance-policy.json",
     ".github/workflows/trusted-phase2d-freeze.yml",
     "scripts/governance/check.mjs",
   ].map((filePath) => {

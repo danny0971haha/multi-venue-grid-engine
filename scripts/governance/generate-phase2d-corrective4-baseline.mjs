@@ -20,6 +20,7 @@ import {
   sha256Bytes,
   sha256Text,
 } from "./phase2d-trusted-freeze-lib.mjs";
+import { POLICY_PATH } from "./repository-governance-policy.mjs";
 
 const IMPLEMENTATION_BASE = "c64fa291af0d53139c6c526cd25ede434c08c17b";
 const CANDIDATE_HEAD = "7f196d367e39640eee9517f742b0d61424f9d4cc";
@@ -61,15 +62,40 @@ const TRUSTED_GOVERNANCE_PATH_RULES = [
   ".github/CODEOWNERS",
 ];
 
-function git(args) {
-  return execFileSync("git", args, { encoding: "utf8" }).trim();
+function git(args, options = {}) {
+  return execFileSync("git", args, {
+    encoding: "utf8",
+    cwd: options.cwd ?? repoRoot(),
+    input: options.input,
+  }).trim();
 }
 
 function gitBytes(args) {
-  return execFileSync("git", args);
+  return execFileSync("git", args, { cwd: repoRoot() });
+}
+
+function uncommittedGovernancePaths(porcelain) {
+  const paths = [];
+  for (const line of porcelain.split("\n").filter(Boolean)) {
+    const pathPart = line.slice(3);
+    const filePath = pathPart.includes(" -> ") ? pathPart.split(" -> ").pop() : pathPart;
+    if (filePath === TRUSTED_BASELINE_PATH) continue;
+    if (pathMatchesAnyRule(filePath, TRUSTED_GOVERNANCE_PATH_RULES)) {
+      paths.push(filePath);
+    }
+  }
+  return paths;
+}
+
+function assertGeneratorInputsCommitted() {
+  const dirty = uncommittedGovernancePaths(git(["status", "--porcelain=v1", "--untracked-files=all"]));
+  if (dirty.length > 0) {
+    throw new Error(`generator_uncommitted_governance:${dirty.join(",")}`);
+  }
 }
 
 function main() {
+  assertGeneratorInputsCommitted();
   const baseSha = git(["rev-parse", IMPLEMENTATION_BASE]);
   const treeSha = git(["rev-parse", `${IMPLEMENTATION_BASE}^{tree}`]);
   const candidateSha = git(["rev-parse", CANDIDATE_HEAD]);
@@ -180,7 +206,7 @@ function repoRoot() {
 
 function treeIndex(ref) {
   const result = new Map();
-  const output = execFileSync("git", ["ls-tree", "-r", "-z", ref]);
+  const output = execFileSync("git", ["ls-tree", "-r", "-z", ref], { cwd: repoRoot() });
   for (const record of output.toString("utf8").split("\0")) {
     if (!record) continue;
     const tab = record.indexOf("\t");
@@ -201,7 +227,7 @@ function snapshotWithHash(snapshot) {
 }
 
 function trustedGovernanceManifest(root) {
-  const listed = git(["ls-files", "--cached", "--others", "--exclude-standard"])
+  const listed = git(["ls-files", "--cached"])
     .split("\n")
     .filter(Boolean)
     .filter((filePath) =>
@@ -209,6 +235,9 @@ function trustedGovernanceManifest(root) {
       pathMatchesAnyRule(filePath, TRUSTED_GOVERNANCE_PATH_RULES),
     )
     .sort();
+  if (!listed.includes(POLICY_PATH)) {
+    throw new Error("governance_policy_missing");
+  }
   return listed.map((filePath) => {
     const absolute = path.join(root, filePath);
     const stat = lstatSync(absolute);
@@ -218,7 +247,7 @@ function trustedGovernanceManifest(root) {
       path: filePath,
       mode: stat.mode & 0o111 ? "100755" : "100644",
       objectType: "blob",
-      blobSha: execFileSync("git", ["hash-object", "--stdin"], { input: bytes, encoding: "utf8" }).trim(),
+      blobSha: git(["hash-object", "--stdin"], { input: bytes }),
       sha256: sha256Bytes(bytes),
     };
   });
@@ -226,11 +255,15 @@ function trustedGovernanceManifest(root) {
 
 function spawnExit(args) {
   try {
-    execFileSync("git", args, { stdio: "ignore" });
+    execFileSync("git", args, { cwd: repoRoot(), stdio: "ignore" });
     return 0;
   } catch (error) {
     return error.status ?? 1;
   }
 }
 
-main();
+export { uncommittedGovernancePaths, TRUSTED_GOVERNANCE_PATH_RULES };
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

@@ -50,8 +50,16 @@ jobs:
             node --check "$file"
           done
 
+      - name: Validate machine-readable governance policy
+        run: node scripts/governance/repository-governance-policy.mjs
+
       - name: Run schema, fixture, post-merge, and negative controls
         run: node --test scripts/governance/*.test.mjs
+
+      - name: Prove baseline generator idempotence from committed bytes
+        run: |
+          node scripts/governance/generate-phase2d-corrective4-baseline.mjs
+          git diff --exit-code -- .github/trusted/phase2d-corrective4-baseline.json
 
       - name: Prove the self-test job executed
         run: echo "trustedGovernanceSelfTestExecuted=true"

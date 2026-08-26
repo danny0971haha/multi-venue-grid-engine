@@ -63,4 +63,21 @@ describe("stable required gate classification", () => {
       changedPaths: [".github/CODEOWNERS"],
     })).mode, "FAIL_CLOSED");
   });
+
+  it("does not whitelist Phase 0 or Phase 1 predecessors that touch src/**", () => {
+    assert.equal(
+      classifyGate(input({
+        headRef: "experiment/v0.1-phase0",
+        changedPaths: ["src/index.ts"],
+      })).mode,
+      "ENFORCE",
+    );
+    assert.equal(
+      classifyGate(input({
+        headRef: "experiment/v0.1-phase1",
+        changedPaths: ["src/domain/types.ts"],
+      })).mode,
+      "ENFORCE",
+    );
+  });
 });

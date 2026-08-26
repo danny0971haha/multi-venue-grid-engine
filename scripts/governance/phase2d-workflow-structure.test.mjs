@@ -33,5 +33,7 @@ describe("trusted workflow structure", () => {
     assert.match(text, /^  trusted-governance-self-test:\n    name: trusted-governance-self-test\n    runs-on:/m);
     assert.doesNotMatch(text, /^  trusted-governance-self-test:[\s\S]*?^    if:/m);
     assert.match(text, /trustedGovernanceSelfTestExecuted=true/);
+    assert.match(text, /paths:/);
+    assert.match(text, /Validate machine-readable governance policy/);
   });
 });
