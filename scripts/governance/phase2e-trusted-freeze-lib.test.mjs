@@ -102,6 +102,14 @@ describe("Phase 2E trusted baseline parse", () => {
     assert.equal(baseline.allowedChangedPaths.length, 14);
     assert.equal(baseline.protectedFrozenFiles.length, 61);
     assert.equal(baseline.candidateHeadSha.startsWith("7b98c888"), false);
+    assert.equal(
+      baseline.npmTestHistoricalMismatch.boundCandidateHeadSha,
+      PHASE2E_CANDIDATE_HEAD_SHA,
+    );
+    assert.equal(baseline.npmTestHistoricalMismatch.expectedTapFail, 43);
+    assert.equal(baseline.npmTestHistoricalMismatch.expectedFailureNames.length, 43);
+    const committed = readFileSync(path.join(root, PHASE2E_TRUSTED_BASELINE_PATH), "utf8");
+    assert.match(committed, /"allowedScriptKeysChanged": \["test", "test:phase2e"\]/);
   });
 
   it("rejects malformed JSON", () => {
@@ -243,6 +251,65 @@ describe("Phase 2E integrity evaluation", () => {
     );
     assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
     assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
+  });
+
+  it("fail closed when an additional protected-path file appears", () => {
+    const { headTree } = trees();
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({
+        headTree: [
+          ...headTree,
+          { path: "src/risk/extra.ts", mode: "100644", type: "blob", sha: "c".repeat(40) },
+        ],
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("candidate_manifest_unexpected_path"));
+  });
+
+  it("fail closed when a protected file object type changes", () => {
+    const { headTree } = trees();
+    const mutated = headTree.map((entry) =>
+      entry.path === "src/risk/risk-engine.ts"
+        ? { ...entry, type: "commit", mode: "160000" }
+        : entry,
+    );
+    const evaluation = evaluatePhase2eIntegrity(evalInput({ headTree: mutated }));
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("protected_file_type_change"));
+  });
+
+  it("fail closed when a protected SHA-256 does not match", () => {
+    const input = evalInput();
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({
+        observedBlobSha256ByKey: {
+          ...input.observedBlobSha256ByKey,
+          "head:src/risk/risk-engine.ts": "0".repeat(64),
+        },
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("protected_file_sha256_mismatch"));
+  });
+
+  it("fail closed when trusted governance bytes mix into the runtime candidate", () => {
+    const { headTree } = trees();
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({
+        headTree: [
+          ...headTree,
+          {
+            path: "scripts/governance/phase2d-trusted-gate.mjs",
+            mode: "100644",
+            type: "blob",
+            sha: "d".repeat(40),
+          },
+        ],
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("trusted_governance_path_changed"));
   });
 
   it("does not emit ACCEPT or PASS in the machine summary", () => {

@@ -252,9 +252,20 @@ export async function runTrustedGate({
 }
 
 function finish(result, { appendOutput, stdoutWrite, processEnv }) {
-  stdoutWrite(`trustedPhase2dGateMode=${result.mode}\nreasonCode=${result.reason}\n`);
+  stdoutWrite(
+    [
+      `trustedPhase2dGateMode=${result.mode}`,
+      `reasonCode=${result.reason}`,
+      "governanceCandidateAccepted=false",
+      "phase2eRuntimeAccepted=false",
+      "",
+    ].join("\n"),
+  );
   if (processEnv.GITHUB_OUTPUT) {
-    appendOutput(processEnv.GITHUB_OUTPUT, `mode=${result.mode}\nreason=${result.reason}\n`);
+    appendOutput(
+      processEnv.GITHUB_OUTPUT,
+      `mode=${result.mode}\nreason=${result.reason}\ngovernanceCandidateAccepted=false\nphase2eRuntimeAccepted=false\n`,
+    );
   }
   const exitCode = result.mode === "FAIL_CLOSED" ? 1 : 0;
   if (processEnv.TRUSTED_GATE_TEST_NO_EXIT === "1") {

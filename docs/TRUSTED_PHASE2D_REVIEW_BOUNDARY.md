@@ -372,6 +372,8 @@ After a new independent review of a new exact candidate SHA:
 3. Merge that governance change to `main` through the active profile’s review rules.
 4. Do not ask the candidate branch to rewrite this file.
 
+A later trusted-verifier replacement (Phase 2E gate files, this document’s workflow, or the Phase 2E baseline) is a governance-only PR. Current `main` remains the executing authority until that PR is independently reviewed and merge-committed. Candidate verifier bytes are not executed, and `GOVERNANCE_REVIEW_REQUIRED` is not self-declared acceptance. After merge, runtime PRs are trusted only by governance bytes then present on `main`. See `docs/PHASE_2E_TRUSTED_GATE.md`.
+
 ## 9. What this does not do
 
 - It does not close Phase 2D overall.

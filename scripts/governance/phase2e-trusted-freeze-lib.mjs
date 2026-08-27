@@ -61,6 +61,69 @@ export const PHASE2E_FORBIDDEN_RUNTIME_COMMANDS = Object.freeze([
   "npm run evidence:phase2d-corrective4",
 ]);
 
+export const PHASE2E_NPM_TEST_HISTORICAL_MISMATCH = Object.freeze({
+  boundCandidateHeadSha: PHASE2E_CANDIDATE_HEAD_SHA,
+  testFilePath: "test/evidence/phase2d-corrective4-evidence.test.ts",
+  expectedExitCode: 1,
+  expectedTapTests: 516,
+  expectedTapPass: 473,
+  expectedTapFail: 43,
+  expectedTapCancelled: 0,
+  expectedTapSkipped: 0,
+  expectedTapTodo: 0,
+  expectedFailureType: "testCodeFailure",
+  expectedFailureCode: "ERR_ASSERTION",
+  expectedErrorSubstring: "PACKAGE_SCRIPT",
+  expectedFailureNames: Object.freeze([
+    "E4-01 handwritten intact fixture verifies without a gate verdict",
+    "E4-02 sourceHeadSha impersonated by merge checkout fails closed",
+    "E4-03 tampered tree SHA fails closed",
+    "E4-04 tampered base SHA fails closed",
+    "E4-05 tampered command exit code fails closed",
+    "E4-06 tampered raw log content fails closed",
+    "E4-07 tampered raw log hash fails closed",
+    "E4-08 tampered full test total fails closed",
+    "E4-09 tampered fail/skip/todo counts fail closed",
+    "E4-10 tampered file hash fails closed",
+    "E4-11 missing required field fails closed",
+    "E4-12 extra unauthorized field fails closed",
+    "E4-13 absolute path in artifact fails closed",
+    "E4-14 secret-like value in artifact fails closed",
+    "E4-15 missing audit JSON fails closed",
+    "E4-16 unparseable audit JSON fails closed",
+    "E4-17 audit JSON with critical vulnerability fails closed",
+    "E4-18 generator self-declared gate verdict fails closed",
+    "I-01 push sourceHeadSha does not equal GITHUB_SHA",
+    "I-02 push testedCheckoutSha does not equal GITHUB_SHA",
+    "I-03 push sourceBranch does not equal GITHUB_REF_NAME",
+    "I-04 implementation base is not a source HEAD ancestor",
+    "I-05 PR source HEAD is not a tested merge ancestor",
+    "I-06 githubRunId is tampered",
+    "I-07 githubRunAttempt is tampered",
+    "I-08 githubJob is tampered",
+    "I-09 malformed SHA or tree SHA fails closed",
+    "I-10 invalid NaN or inverted timestamps fail closed",
+    "T-01 full total 428 with evidence suite removed is rejected",
+    "T-03 evidence test file omitted from full inventory is rejected",
+    "T-04 dedicated evidence suite skip or todo is rejected",
+    "T-05 duplicate test-file path is rejected",
+    "T-06 full.total does not equal 428 plus evidenceVerifier.total",
+    "A-01 high=1 critical=0 total=1 is rejected",
+    "A-02 metadata total=0 with a high row is rejected",
+    "A-03 metadata total disagrees with severity sum",
+    "A-04 negative count is rejected",
+    "A-05 fractional count is rejected",
+    "A-06 unknown severity is rejected",
+    "A-07 vulnerabilities that are not a plain object are rejected",
+    "A-08 real zero-audit artifact has integrityOk without a gate verdict",
+    "V-01 generator last-wins TAP still fails verifier duplicate detection",
+    "V-03 artifact containing self-declared ACCEPT is rejected",
+  ]),
+  expectedSuiteFailureName: "Phase 2D Corrective 4 evidence verifier",
+  expectedSuiteFailureType: "subtestsFailed",
+  expectedSuiteFailureCode: "ERR_TEST_FAILURE",
+});
+
 const ALLOWED_BLOB_MODES = new Set(["100644", "100755"]);
 const OBJECT_TYPES = new Set(["blob", "tree", "commit"]);
 const CHANGE_TYPES = new Set(["added", "modified", "deleted"]);
@@ -86,7 +149,25 @@ const ROOT_FIELDS = new Set([
   "requiredNpmVersion",
   "requiredRuntimeCommands",
   "forbiddenRuntimeCommands",
-  "npmTestIgnoredTapFileSuffix",
+  "npmTestHistoricalMismatch",
+]);
+const MISMATCH_FIELDS = new Set([
+  "boundCandidateHeadSha",
+  "testFilePath",
+  "expectedExitCode",
+  "expectedTapTests",
+  "expectedTapPass",
+  "expectedTapFail",
+  "expectedTapCancelled",
+  "expectedTapSkipped",
+  "expectedTapTodo",
+  "expectedFailureType",
+  "expectedFailureCode",
+  "expectedErrorSubstring",
+  "expectedFailureNames",
+  "expectedSuiteFailureName",
+  "expectedSuiteFailureType",
+  "expectedSuiteFailureCode",
 ]);
 const FILE_FIELDS = new Set(["path", "mode", "objectType", "blobSha", "sha256"]);
 const CHANGE_FIELDS = new Set(["path", "change", "base", "head"]);
@@ -178,9 +259,7 @@ export function parsePhase2eBaseline(jsonText) {
   if (!sameStringList(parsed.forbiddenRuntimeCommands, PHASE2E_FORBIDDEN_RUNTIME_COMMANDS)) {
     reasons.push("phase2e_baseline_forbidden_runtime_commands");
   }
-  if (parsed.npmTestIgnoredTapFileSuffix !== "test/evidence/phase2d-corrective4-evidence.test.ts") {
-    reasons.push("phase2e_baseline_npm_test_ignored_suffix");
-  }
+  validateNpmTestHistoricalMismatch(parsed.npmTestHistoricalMismatch, reasons);
   if (
     Array.isArray(parsed.allowedChangedPaths) &&
     Array.isArray(parsed.candidateChangedFiles) &&
@@ -588,6 +667,68 @@ function validateDependencyIdentity(identity, reasons) {
   rejectUnknownFields(identity, DEP_FIELDS, "phase2e_baseline_dependency_unknown_field", reasons);
   if (!isStringMap(identity.dependencies) || !isStringMap(identity.devDependencies)) {
     reasons.push("phase2e_baseline_dependency_map");
+  }
+}
+
+function validateNpmTestHistoricalMismatch(value, reasons) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    reasons.push("phase2e_baseline_npm_test_mismatch");
+    return;
+  }
+  rejectUnknownFields(
+    value,
+    MISMATCH_FIELDS,
+    "phase2e_baseline_npm_test_mismatch_unknown_field",
+    reasons,
+  );
+  const pinned = PHASE2E_NPM_TEST_HISTORICAL_MISMATCH;
+  if (value.boundCandidateHeadSha !== pinned.boundCandidateHeadSha) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_head");
+  }
+  if (value.testFilePath !== pinned.testFilePath) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_file");
+  }
+  if (value.expectedExitCode !== pinned.expectedExitCode) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_exit");
+  }
+  if (value.expectedTapTests !== pinned.expectedTapTests) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_tests");
+  }
+  if (value.expectedTapPass !== pinned.expectedTapPass) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_pass");
+  }
+  if (value.expectedTapFail !== pinned.expectedTapFail) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_fail");
+  }
+  if (value.expectedTapCancelled !== pinned.expectedTapCancelled) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_cancelled");
+  }
+  if (value.expectedTapSkipped !== pinned.expectedTapSkipped) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_skipped");
+  }
+  if (value.expectedTapTodo !== pinned.expectedTapTodo) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_todo");
+  }
+  if (value.expectedFailureType !== pinned.expectedFailureType) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_failure_type");
+  }
+  if (value.expectedFailureCode !== pinned.expectedFailureCode) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_failure_code");
+  }
+  if (value.expectedErrorSubstring !== pinned.expectedErrorSubstring) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_error");
+  }
+  if (value.expectedSuiteFailureName !== pinned.expectedSuiteFailureName) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_suite_name");
+  }
+  if (value.expectedSuiteFailureType !== pinned.expectedSuiteFailureType) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_suite_type");
+  }
+  if (value.expectedSuiteFailureCode !== pinned.expectedSuiteFailureCode) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_suite_code");
+  }
+  if (!sameStringList(value.expectedFailureNames, pinned.expectedFailureNames)) {
+    reasons.push("phase2e_baseline_npm_test_mismatch_names");
   }
 }
 

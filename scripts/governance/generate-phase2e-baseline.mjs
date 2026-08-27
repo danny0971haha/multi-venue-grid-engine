@@ -22,6 +22,7 @@ import {
   PHASE2E_TRUSTED_GOVERNANCE_PATH_RULES,
   PHASE2E_REQUIRED_RUNTIME_COMMANDS,
   PHASE2E_FORBIDDEN_RUNTIME_COMMANDS,
+  PHASE2E_NPM_TEST_HISTORICAL_MISMATCH,
 } from "./phase2e-trusted-freeze-lib.mjs";
 
 function git(args, options = {}) {
@@ -178,15 +179,57 @@ function main() {
     requiredNpmVersion: "10.9.8",
     requiredRuntimeCommands: PHASE2E_REQUIRED_RUNTIME_COMMANDS,
     forbiddenRuntimeCommands: PHASE2E_FORBIDDEN_RUNTIME_COMMANDS,
-    npmTestIgnoredTapFileSuffix: "test/evidence/phase2d-corrective4-evidence.test.ts",
+    npmTestHistoricalMismatch: PHASE2E_NPM_TEST_HISTORICAL_MISMATCH,
   };
 
   const outPath = path.join(repoRoot(), PHASE2E_TRUSTED_BASELINE_PATH);
   mkdirSync(path.dirname(outPath), { recursive: true });
-  writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(outPath, `${formatJsonLikeBiome(manifest)}\n`);
   process.stdout.write(
     `wrote ${PHASE2E_TRUSTED_BASELINE_PATH} changed=${candidateChangedFiles.length} protected=${protectedFrozenFiles.length} tree=${candidateHeadTreeSha}\n`,
   );
+}
+
+function formatJsonLikeBiome(value) {
+  return printJsonValue(value, 0, 0);
+}
+
+function printJsonValue(value, depth, prefixLength) {
+  if (value === null || typeof value === "number" || typeof value === "boolean") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return printJsonArray(value, depth, prefixLength);
+  if (typeof value === "object") return printJsonObject(value, depth);
+  throw new Error("json_value_unsupported");
+}
+
+function printJsonArray(value, depth, prefixLength) {
+  if (value.length === 0) return "[]";
+  const primitives = value.every(
+    (item) => item === null || ["string", "number", "boolean"].includes(typeof item),
+  );
+  if (primitives) {
+    const collapsed = `[${value.map((item) => JSON.stringify(item)).join(", ")}]`;
+    if (prefixLength + collapsed.length <= 100) return collapsed;
+  }
+  const inner = "  ".repeat(depth + 1);
+  const indent = "  ".repeat(depth);
+  const items = value.map((item) => `${inner}${printJsonValue(item, depth + 1, inner.length)}`);
+  return `[\n${items.join(",\n")}\n${indent}]`;
+}
+
+function printJsonObject(value, depth) {
+  const keys = Object.keys(value);
+  if (keys.length === 0) return "{}";
+  const inner = "  ".repeat(depth + 1);
+  const indent = "  ".repeat(depth);
+  const fields = keys.map((key) => {
+    const renderedKey = `${JSON.stringify(key)}: `;
+    const prefixLength = inner.length + renderedKey.length;
+    return `${inner}${renderedKey}${printJsonValue(value[key], depth + 1, prefixLength)}`;
+  });
+  return `{\n${fields.join(",\n")}\n${indent}}`;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

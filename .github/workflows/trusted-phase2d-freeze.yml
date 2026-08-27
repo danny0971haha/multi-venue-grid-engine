@@ -133,9 +133,15 @@ jobs:
           ENFORCE_OUTCOME: ${{ steps.enforce.outcome }}
           PHASE2E_INTEGRITY_OUTCOME: ${{ steps.phase2e_integrity.outcome }}
           PHASE2E_RUNTIME_OUTCOME: ${{ steps.phase2e_runtime.outcome }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "trustedPhase2dFreezeGateExecuted=true"
           echo "trustedPhase2dFreezeGateMode=$MODE"
+          echo "trustedGovernanceCodeIdentity=$TRUSTED_WORKFLOW_SHA"
+          echo "candidateHeadSha=$PR_HEAD_SHA"
+          echo "governanceCandidateAccepted=false"
+          echo "phase2eRuntimeAccepted=false"
           if [ "$MODE" = "PHASE2D_ENFORCE" ] && [ "$ENFORCE_OUTCOME" != "success" ]; then
             exit 1
           fi

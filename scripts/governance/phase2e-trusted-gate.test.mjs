@@ -238,6 +238,80 @@ describe("Phase 2E and Phase 2D gate routing", () => {
     );
     assert.equal(result.mode, "FAIL_CLOSED");
   });
+
+  it("does not classify mixed package.json and trusted governance as governance-only", () => {
+    const committedPhase2d = parseBaseline(
+      readFileSync(path.join(root, TRUSTED_BASELINE_PATH), "utf8"),
+    );
+    assert.equal(committedPhase2d.ok, true);
+    const result = classifyGate({
+      baseline: committedPhase2d.baseline,
+      phase2eBaseline: phase2e,
+      changedPaths: ["package.json", "scripts/governance/phase2e-trusted-runtime.mjs"],
+      headRef: "governance/phase2e-trusted-gate",
+      headSha: "d".repeat(40),
+      headRepository: REPO,
+      baseRepository: REPO,
+      baseRef: "main",
+      baseSha: "e".repeat(40),
+    });
+    assert.equal(result.mode, "PHASE2D_ENFORCE");
+    assert.equal(result.reason, "phase2_and_trusted_paths_touched");
+  });
+
+  it("classifies a governance-only PR without package.json as review-required, not accepted", () => {
+    const result = classifyGate({
+      baseline: phase2dLite(),
+      phase2eBaseline: phase2e,
+      changedPaths: [
+        ".github/workflows/trusted-phase2d-freeze.yml",
+        ".github/trusted/phase2e-corrective1-baseline.json",
+        "scripts/governance/phase2e-trusted-runtime.mjs",
+      ],
+      headRef: "governance/phase2e-trusted-gate",
+      headSha: "d".repeat(40),
+      headRepository: REPO,
+      baseRepository: REPO,
+      baseRef: "main",
+      baseSha: "e".repeat(40),
+    });
+    assert.equal(result.mode, "GOVERNANCE_REVIEW_REQUIRED");
+    assert.notEqual(result.mode, "PHASE2E_ENFORCE");
+  });
+
+  it("returns only the closed classification set", () => {
+    const modes = new Set([
+      "PHASE2D_ENFORCE",
+      "PHASE2E_ENFORCE",
+      "GOVERNANCE_REVIEW_REQUIRED",
+      "NOT_APPLICABLE",
+      "FAIL_CLOSED",
+    ]);
+    const samples = [
+      classifyGate(exactPhase2e()),
+      classifyGate(
+        exactPhase2e({ changedPaths: ["scripts/governance/phase2e-trusted-runtime.mjs"] }),
+      ),
+      classifyGate({
+        baseline: phase2dLite(),
+        phase2eBaseline: phase2e,
+        changedPaths: ["README.md"],
+        headRef: "docs/readme",
+        headSha: "f".repeat(40),
+        headRepository: REPO,
+        baseRepository: REPO,
+        baseRef: "main",
+        baseSha: "a".repeat(40),
+      }),
+      classifyPullRequestEvent({}, ["README.md"], {
+        phase2dBaseline: phase2dLite(),
+        phase2eBaseline: phase2e,
+      }),
+    ];
+    for (const sample of samples) {
+      assert.equal(modes.has(sample.mode), true, sample.mode);
+    }
+  });
 });
 
 describe("adversarial fixture events", () => {
@@ -397,5 +471,28 @@ describe("trusted gate CLI fail-closed API behavior", () => {
     assert.equal(result.mode, "NOT_APPLICABLE");
     const written = readFileSync(outputPath, "utf8");
     assert.match(written, /mode=NOT_APPLICABLE/);
+    assert.match(written, /governanceCandidateAccepted=false/);
+    assert.match(written, /phase2eRuntimeAccepted=false/);
+  });
+
+  it("records a governance-only PR as review-required and not accepted", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gate-gov-"));
+    const outputPath = path.join(dir, "github-output");
+    const result = await runTrustedGate({
+      env: env({
+        GITHUB_OUTPUT: outputPath,
+        PR_HEAD_REF: "governance/phase2e-trusted-gate",
+        PR_HEAD_SHA: "a".repeat(40),
+        PR_BASE_REF: "main",
+        PR_BASE_SHA: "b".repeat(40),
+      }),
+      repoRoot: root,
+      fetchImpl: async () => jsonResponse([{ filename: "scripts/governance/x.mjs" }]),
+    });
+    assert.equal(result.mode, "GOVERNANCE_REVIEW_REQUIRED");
+    const written = readFileSync(outputPath, "utf8");
+    assert.match(written, /mode=GOVERNANCE_REVIEW_REQUIRED/);
+    assert.match(written, /governanceCandidateAccepted=false/);
+    assert.doesNotMatch(written, /governanceCandidateAccepted=true/);
   });
 });

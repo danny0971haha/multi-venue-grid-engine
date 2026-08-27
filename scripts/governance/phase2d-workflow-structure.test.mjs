@@ -65,6 +65,12 @@ describe("trusted workflow structure", () => {
     assert.equal(integrityIndex > classifyIndex, true);
     assert.equal(checkoutIndex > integrityIndex, true);
     assert.equal(runtimeIndex > checkoutIndex, true);
+    assert.match(
+      text,
+      /Check out the exact Phase 2E candidate HEAD after trusted classification\n {8}if: steps\.classify\.outputs\.mode == 'PHASE2E_ENFORCE' && steps\.phase2e_integrity\.outcome == 'success'/,
+    );
+    assert.match(text, /governanceCandidateAccepted=false/);
+    assert.match(text, /phase2eRuntimeAccepted=false/);
   });
 
   it("defines an unskipped governance self-test with an execution marker", () => {
