@@ -49,6 +49,9 @@ const ACK_KEYS = [
   "predecessorStoreGeneration",
   "priorLeaseGeneration",
   "resultingStatus",
+  "snapshotLeaseGeneration",
+  "snapshotObservedAt",
+  "snapshotSourceId",
 ] as const;
 
 export function isHaltStatus(value: unknown): value is HaltStatus {
@@ -267,6 +270,18 @@ function parseAcknowledgement(
   if (!isHaltStatus(record.resultingStatus)) {
     return { ok: false, reasonCodes: ["INVALID_HALT_STATUS"] };
   }
+  if (typeof record.snapshotSourceId !== "string" || record.snapshotSourceId.length === 0) {
+    return { ok: false, reasonCodes: ["INVALID_HALT_RECORD"] };
+  }
+  if (typeof record.snapshotObservedAt !== "string" || record.snapshotObservedAt.length === 0) {
+    return { ok: false, reasonCodes: ["INVALID_HALT_RECORD"] };
+  }
+  if (
+    typeof record.snapshotLeaseGeneration !== "string" ||
+    !isCanonicalGenerationString(record.snapshotLeaseGeneration)
+  ) {
+    return { ok: false, reasonCodes: ["INVALID_HALT_RECORD"] };
+  }
   return {
     ok: true,
     value: {
@@ -277,6 +292,9 @@ function parseAcknowledgement(
       priorLeaseGeneration: record.priorLeaseGeneration,
       currentLeaseGeneration: record.currentLeaseGeneration,
       resultingStatus: record.resultingStatus,
+      snapshotSourceId: record.snapshotSourceId,
+      snapshotObservedAt: record.snapshotObservedAt,
+      snapshotLeaseGeneration: record.snapshotLeaseGeneration,
     },
   };
 }

@@ -10,6 +10,8 @@ import type { HaltMutationTransport } from "./transport.js";
 export const HALT_KIND = "durable-halt";
 export const HALT_STATE_NAME = "durable-halt";
 export const HALT_RECORD_SCHEMA_VERSION = 1;
+export const ACK_SNAPSHOT_MAX_STALE_MS = "1000";
+export const DEFAULT_SNAPSHOT_SOURCE_ID = "engine-owned-snapshot";
 
 export type HaltStatus =
   | "RUNNING"
@@ -35,6 +37,9 @@ export type HaltAcknowledgementLineage = {
   priorLeaseGeneration: string;
   currentLeaseGeneration: string;
   resultingStatus: HaltStatus;
+  snapshotSourceId: string;
+  snapshotObservedAt: string;
+  snapshotLeaseGeneration: string;
 };
 
 export type DurableHaltRecord = {
@@ -70,6 +75,14 @@ export type HaltResumeEvidence = {
   snapshotLeaseGeneration: string;
 };
 
+export type HaltAcknowledgeRequest = {
+  suppliedHaltId: string | null;
+  operatorNote?: string;
+  resumeEvidence?: HaltResumeEvidence;
+  resumeRiskInput?: unknown;
+  ignoredCallerState?: unknown;
+};
+
 export class HaltProcessFence {
   #tripped = false;
 
@@ -86,6 +99,11 @@ export class HaltProcessFence {
   }
 }
 
+export type HaltAckTransitionHooks = {
+  beforeAckPersistLeaseRecheck?: () => void | Promise<void>;
+  afterAckPersistedBeforeFinalInspect?: () => void | Promise<void>;
+};
+
 export type HaltRuntimeContext = {
   directory: string;
   scopeKey: string;
@@ -97,6 +115,8 @@ export type HaltRuntimeContext = {
   haltIdSource: HaltIdSource;
   transport: HaltMutationTransport;
   processFence: HaltProcessFence;
+  expectedSnapshotSourceId: string;
+  ackTransitionHooks?: HaltAckTransitionHooks;
 };
 
 export type HaltOperationResult = {
@@ -134,9 +154,17 @@ export const PHASE_2E_REASON_CODE_CATALOG = [
   "HALT_ID_MISMATCH",
   "MALFORMED_HALT_ID",
   "FORGED_CALLER_STATE_IGNORED",
+  "CALLER_RESUME_EVIDENCE_IGNORED",
+  "CALLER_RISK_INPUT_IGNORED",
   "STALE_SNAPSHOT",
+  "SNAPSHOT_OBSERVED_AT_FUTURE",
+  "SNAPSHOT_OBSERVED_AT_MALFORMED",
   "SNAPSHOT_NOT_AUTHORITATIVE",
   "SNAPSHOT_LEASE_MISMATCH",
+  "SNAPSHOT_SOURCE_UNPROVEN",
+  "SNAPSHOT_RISK_MISMATCH",
+  "OWNED_RISK_INCREASING_REMAINING",
+  "LIST_OPEN_ORDERS_UNKNOWN",
   "UNRESOLVED_UNKNOWN",
   "ACTIVE_RISK_BREACH",
   "PLANNED_EXPOSURE_UNSAFE",

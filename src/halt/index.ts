@@ -1,6 +1,8 @@
 export type {
   DurableHaltRecord,
+  HaltAcknowledgeRequest,
   HaltAcknowledgementLineage,
+  HaltAckTransitionHooks,
   HaltClock,
   HaltOperationResult,
   HaltResumeEvidence,
@@ -9,6 +11,8 @@ export type {
   HaltStatus,
 } from "./types.js";
 export {
+  ACK_SNAPSHOT_MAX_STALE_MS,
+  DEFAULT_SNAPSHOT_SOURCE_ID,
   HALT_KIND,
   HALT_RECORD_SCHEMA_VERSION,
   HALT_STATE_NAME,
@@ -39,6 +43,7 @@ export type {
   HaltAuthoritativeSnapshot,
   HaltMutationTransport,
   HaltOwnedOrder,
+  HaltUnknownReservation,
   ScriptedHaltTransport,
 } from "./transport.js";
 export { createScriptedHaltTransport } from "./transport.js";

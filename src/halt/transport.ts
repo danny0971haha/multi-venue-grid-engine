@@ -1,10 +1,18 @@
 import type { WriteOutcomeKind } from "../domain/enums.js";
 import type { ExchangeOrderId } from "../domain/ids.js";
+import type { FundingConvention } from "../risk/risk-types.js";
+import { DEFAULT_SNAPSHOT_SOURCE_ID } from "./types.js";
 
 export type HaltOwnedOrder = {
   exchangeOrderId: ExchangeOrderId;
   ownership: "OWNED" | "UNOWNED" | "AMBIGUOUS";
   riskIncreasing: boolean;
+};
+
+export type HaltUnknownReservation = {
+  side: "BUY" | "SELL";
+  price: string | null;
+  quantity: string | null;
 };
 
 export type HaltAuthoritativeSnapshot = {
@@ -15,6 +23,16 @@ export type HaltAuthoritativeSnapshot = {
   actualGrossNotional: string | null;
   ownedRiskIncreasingRemaining: boolean;
   observedAt: string;
+  sourceId: string;
+  markOrMidPrice: string;
+  equity: string;
+  realizedTradingPnl: string;
+  fees: string;
+  funding: string;
+  fundingConvention: FundingConvention;
+  gridLower: string;
+  gridUpper: string;
+  unknownReservations: readonly HaltUnknownReservation[];
 };
 
 export type HaltMutationTransport = {
@@ -32,6 +50,27 @@ export type ScriptedHaltTransport = HaltMutationTransport & {
     reduce: number;
     snapshot: number;
   };
+  setOpenOrders(next: readonly HaltOwnedOrder[]): void;
+};
+
+const FALLBACK_SNAPSHOT: HaltAuthoritativeSnapshot = {
+  fresh: false,
+  authoritative: false,
+  leaseGeneration: "0",
+  signedPosition: "0",
+  actualGrossNotional: null,
+  ownedRiskIncreasingRemaining: true,
+  observedAt: "0",
+  sourceId: DEFAULT_SNAPSHOT_SOURCE_ID,
+  markOrMidPrice: "100",
+  equity: "100",
+  realizedTradingPnl: "0",
+  fees: "0",
+  funding: "0",
+  fundingConvention: "RECEIVED_POSITIVE",
+  gridLower: "97",
+  gridUpper: "103",
+  unknownReservations: [],
 };
 
 export function createScriptedHaltTransport(script: {
@@ -42,7 +81,7 @@ export function createScriptedHaltTransport(script: {
   reduce?: WriteOutcomeKind;
   snapshots?: readonly HaltAuthoritativeSnapshot[];
 }): ScriptedHaltTransport {
-  const orders = [...(script.orders ?? [])];
+  let orders = [...(script.orders ?? [])];
   const cancelById = script.cancelById ?? {};
   const defaultCancel = script.defaultCancel ?? "ACK";
   const flattenOutcome = script.flatten ?? "ACK";
@@ -58,13 +97,20 @@ export function createScriptedHaltTransport(script: {
 
   return {
     calls,
+    setOpenOrders(next) {
+      orders = [...next];
+    },
     listOpenOrders() {
       return orders.map((order) => ({ ...order }));
     },
     async cancel(exchangeOrderId) {
       calls.cancel.push(exchangeOrderId);
       const configured = cancelById[exchangeOrderId];
-      return { kind: configured ?? defaultCancel };
+      const kind = configured ?? defaultCancel;
+      if (kind === "ACK") {
+        orders = orders.filter((order) => order.exchangeOrderId !== exchangeOrderId);
+      }
+      return { kind };
     },
     async flatten() {
       calls.flatten += 1;
@@ -81,17 +127,12 @@ export function createScriptedHaltTransport(script: {
         snapshotIndex += 1;
       }
       if (next === undefined) {
-        return {
-          fresh: false,
-          authoritative: false,
-          leaseGeneration: "0",
-          signedPosition: "0",
-          actualGrossNotional: null,
-          ownedRiskIncreasingRemaining: true,
-          observedAt: "0",
-        };
+        return { ...FALLBACK_SNAPSHOT, unknownReservations: [] };
       }
-      return { ...next };
+      return {
+        ...next,
+        unknownReservations: next.unknownReservations.map((item) => ({ ...item })),
+      };
     },
   };
 }

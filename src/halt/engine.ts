@@ -1,12 +1,12 @@
 import type { WriteOutcomeKind } from "../domain/enums.js";
-import { decimalCmp } from "../math/decimal.js";
+import { decimalAbs, decimalCmp, decimalMul } from "../math/decimal.js";
 import { incrementCanonicalGeneration } from "../persistence/atomic-pair-store.js";
 import type { PairInspection } from "../persistence/exact-pair-inspection.js";
 import { sortReasonCodes } from "../persistence/exact-pair-inspection.js";
 import { assertCurrentLease, runLeaseFencedMutation } from "../persistence/runtime-lease.js";
-import type { LeaseResult } from "../persistence/runtime-lease.js";
+import type { FencedMutationResult, LeaseResult } from "../persistence/runtime-lease.js";
 import { evaluateRisk } from "../risk/risk-engine.js";
-import type { RiskDecision } from "../risk/risk-types.js";
+import type { RiskDecision, RiskInput } from "../risk/risk-types.js";
 import { FROZEN_PLANNED_GROSS_NOTIONAL_USDT } from "../risk/risk-types.js";
 import { isWellFormedHaltId } from "./halt-id.js";
 import {
@@ -16,17 +16,22 @@ import {
   parseHaltRecord,
 } from "./record.js";
 import { initializeHaltPair, loadHaltAuthority, persistHaltTransition } from "./store.js";
+import type { HaltAuthoritativeSnapshot, HaltOwnedOrder } from "./transport.js";
 import type {
   DurableHaltRecord,
+  HaltAcknowledgeRequest,
   HaltAcknowledgementLineage,
   HaltClock,
   HaltOperationResult,
-  HaltResumeEvidence,
   HaltRuntimeContext,
   HaltRuntimeDisposition,
   HaltStatus,
 } from "./types.js";
-import { HaltProcessFence, PHASE_2E_REASON_CODE_CATALOG } from "./types.js";
+import {
+  ACK_SNAPSHOT_MAX_STALE_MS,
+  HaltProcessFence,
+  PHASE_2E_REASON_CODE_CATALOG,
+} from "./types.js";
 
 export { HaltProcessFence };
 
@@ -333,7 +338,27 @@ export async function executeHardHalt(
     );
   }
 
-  const mutation = await remediateAfterHalting(context);
+  let mutation: MutationTrace;
+  try {
+    mutation = await remediateAfterHalting(context);
+  } catch {
+    return resultFromCommitted(
+      context,
+      haltingPersist.state,
+      haltingPersist.inspection,
+      {
+        committedGeneration: haltingPersist.committedGeneration,
+        committedEnvelopeSha256: haltingPersist.committedEnvelopeSha256,
+      },
+      [
+        "HALTING_COMMITTED",
+        "UNRESOLVED_UNKNOWN",
+        "RECONCILIATION_REQUIRED",
+        "RISK_INCREASE_FENCED",
+      ],
+      emptyMutation(),
+    );
+  }
   const terminalStatus = decideTerminalStatus(mutation);
   const terminalRecord = makeHaltRecord({
     ...haltingPersist.state,
@@ -442,18 +467,9 @@ export async function executeHardHalt(
 
 export async function acknowledgeHalt(
   context: HaltRuntimeContext,
-  args: {
-    suppliedHaltId: string | null;
-    resumeRiskInput: unknown;
-    resumeEvidence: HaltResumeEvidence;
-    ignoredCallerState?: unknown;
-  },
+  args: HaltAcknowledgeRequest,
 ): Promise<HaltOperationResult> {
-  const extra: string[] = [];
-  if (Object.hasOwn(args, "ignoredCallerState")) {
-    extra.push("FORGED_CALLER_STATE_IGNORED");
-  }
-  void args.ignoredCallerState;
+  const extra = ignoredCallerAuthorizationCodes(args);
 
   if (context.latch.blocked) {
     return failClosed(
@@ -476,68 +492,38 @@ export async function acknowledgeHalt(
     });
   }
 
-  const idCheck = compareSuppliedHaltId(args.suppliedHaltId, loaded.record.haltId);
-  if (!idCheck.ok) {
-    return resultFromCommitted(
+  const rejectLoaded = (reasonCodes: readonly string[]): HaltOperationResult =>
+    resultFromCommitted(
       context,
       loaded.record,
       loaded.inspection,
       { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", ...idCheck.reasonCodes, ...extra],
+      ["ACK_REJECTED", ...reasonCodes, ...extra],
       emptyMutation(),
     );
+
+  const idCheck = compareSuppliedHaltId(args.suppliedHaltId, loaded.record.haltId);
+  if (!idCheck.ok) {
+    return rejectLoaded(idCheck.reasonCodes);
   }
 
   const lease = await proveLease(context);
   if (!lease.ok) {
-    return resultFromCommitted(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", "LEASE_UNCERTAIN", ...lease.reasonCodes, ...extra],
-      emptyMutation(),
-    );
+    return rejectLoaded(["LEASE_UNCERTAIN", ...lease.reasonCodes]);
   }
 
   if (!isTerminalHaltStatus(loaded.record.status)) {
-    return resultFromCommitted(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", "RISK_INCREASE_FENCED", ...extra],
-      emptyMutation(),
-    );
+    return rejectLoaded(["RISK_INCREASE_FENCED"]);
   }
 
-  const gates = evaluateSafeResumeGates({
-    record: loaded.record,
-    resumeEvidence: args.resumeEvidence,
-    riskDecision: evaluateRisk(args.resumeRiskInput),
-    expectedLeaseGeneration: context.leaseAuthority.generation,
-  });
-  if (!gates.ok) {
-    return resultFromCommitted(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", ...gates.reasonCodes, ...extra],
-      emptyMutation(),
-    );
+  const resume = await obtainInternalResumeAuthority(context, loaded.record);
+  if (!resume.ok) {
+    return rejectLoaded(resume.reasonCodes);
   }
 
   const nextGeneration = incrementCanonicalGeneration(loaded.generation);
   if (!nextGeneration.ok) {
-    return resultFromCommitted(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", "FINAL_PAIR_UNPROVEN", ...extra],
-      emptyMutation(),
-    );
+    return rejectLoaded(["FINAL_PAIR_UNPROVEN"]);
   }
 
   const acknowledgement: HaltAcknowledgementLineage = {
@@ -548,6 +534,9 @@ export async function acknowledgeHalt(
     priorLeaseGeneration: loaded.record.leaseGeneration ?? context.leaseAuthority.generation,
     currentLeaseGeneration: context.leaseAuthority.generation,
     resultingStatus: "RUNNING",
+    snapshotSourceId: resume.snapshot.sourceId,
+    snapshotObservedAt: resume.snapshot.observedAt,
+    snapshotLeaseGeneration: resume.snapshot.leaseGeneration,
   };
   const running = makeHaltRecord({
     ...loaded.record,
@@ -561,41 +550,37 @@ export async function acknowledgeHalt(
     acknowledgement,
     unresolvedPossibleExposure: false,
     flatnessProven: false,
-    snapshotFresh: args.resumeEvidence.snapshotFresh,
-    snapshotObservedAt: args.resumeEvidence.snapshotFresh ? context.haltClock.nowIso() : null,
+    snapshotFresh: true,
+    snapshotObservedAt: resume.snapshot.observedAt,
+    lastRiskEvaluationAt: resume.riskDecision.evaluatedAt,
     updatedAt: context.haltClock.nowIso(),
   });
 
-  const relock = await proveLease(context);
-  if (!relock.ok) {
-    return resultFromCommitted(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", "LEASE_UNCERTAIN", ...relock.reasonCodes, ...extra],
-      emptyMutation(),
-    );
-  }
-  if (context.latch.blocked) {
-    return resultFromCommitted(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["ACK_REJECTED", "LATCH_BLOCKS_ACK", ...extra],
-      emptyMutation(),
-    );
+  if (context.ackTransitionHooks?.beforeAckPersistLeaseRecheck !== undefined) {
+    await context.ackTransitionHooks.beforeAckPersistLeaseRecheck();
   }
 
-  const persist = await persistHaltTransition({
-    directory: context.directory,
-    scopeKey: context.scopeKey,
-    expectedGeneration: loaded.generation,
-    expectedPredecessorEnvelopeSha256: loaded.envelopeSha256,
-    payload: running,
-    latch: context.latch,
-  });
+  const relock = await proveLease(context);
+  if (!relock.ok) {
+    return rejectLoaded(["LEASE_UNCERTAIN", ...relock.reasonCodes]);
+  }
+  if (context.latch.blocked) {
+    return rejectLoaded(["LATCH_BLOCKS_ACK"]);
+  }
+
+  let persist: Awaited<ReturnType<typeof persistHaltTransition>>;
+  try {
+    persist = await persistHaltTransition({
+      directory: context.directory,
+      scopeKey: context.scopeKey,
+      expectedGeneration: loaded.generation,
+      expectedPredecessorEnvelopeSha256: loaded.envelopeSha256,
+      payload: running,
+      latch: context.latch,
+    });
+  } catch {
+    return rejectLoaded(["FINAL_PAIR_UNPROVEN"]);
+  }
   if (persist.disposition !== "REQUESTED_STATE_COMMITTED" || persist.state === null) {
     const after = await loadHaltAuthority({
       directory: context.directory,
@@ -621,6 +606,10 @@ export async function acknowledgeHalt(
     );
   }
 
+  if (context.ackTransitionHooks?.afterAckPersistedBeforeFinalInspect !== undefined) {
+    await context.ackTransitionHooks.afterAckPersistedBeforeFinalInspect();
+  }
+
   const finalInspect = await loadHaltAuthority({
     directory: context.directory,
     scopeKey: context.scopeKey,
@@ -630,6 +619,10 @@ export async function acknowledgeHalt(
     finalInspect.record.status !== "RUNNING" ||
     finalInspect.record.acknowledgement === null ||
     finalInspect.record.acknowledgement.acknowledgedHaltId !== acknowledgement.acknowledgedHaltId ||
+    finalInspect.record.acknowledgement.snapshotSourceId !== acknowledgement.snapshotSourceId ||
+    finalInspect.record.acknowledgement.snapshotObservedAt !== acknowledgement.snapshotObservedAt ||
+    finalInspect.record.acknowledgement.snapshotLeaseGeneration !==
+      acknowledgement.snapshotLeaseGeneration ||
     finalInspect.envelopeSha256 !== persist.committedEnvelopeSha256
   ) {
     return failClosed(context, ["ACK_REJECTED", "FINAL_PAIR_UNPROVEN", ...extra], {
@@ -744,7 +737,18 @@ async function executeBoundedReduce(
 
 async function remediateAfterHalting(context: HaltRuntimeContext): Promise<MutationTrace> {
   const trace = emptyMutation();
-  const orders = await context.transport.listOpenOrders();
+  const listed = await runFencedTransport(context, () => context.transport.listOpenOrders());
+  if (listed.outcome !== "SENT" || listed.value === null) {
+    trace.unresolvedPossibleExposure = true;
+    trace.cancelUnknown = true;
+    trace.reasonCodes.push(
+      "LIST_OPEN_ORDERS_UNKNOWN",
+      "UNRESOLVED_UNKNOWN",
+      "RECONCILIATION_REQUIRED",
+    );
+    return trace;
+  }
+  const orders = listed.value;
   const ownedRiskIncreasing = orders.filter(
     (order) => order.ownership === "OWNED" && order.riskIncreasing,
   );
@@ -762,14 +766,9 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
       trace.cancelFailed = true;
       break;
     }
-    const fenced = await runLeaseFencedMutation({
-      directory: context.directory,
-      scopeKey: context.scopeKey,
-      authority: context.leaseAuthority,
-      latch: context.latch,
-      clock: context.leaseClock,
-      mutation: () => context.transport.cancel(order.exchangeOrderId),
-    });
+    const fenced = await runFencedTransport(context, () =>
+      context.transport.cancel(order.exchangeOrderId),
+    );
     if (fenced.callbackCount > 0) {
       trace.cancelInvoked = true;
     }
@@ -794,14 +793,7 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
     trace.flattenFailed = true;
     return trace;
   }
-  const flatten = await runLeaseFencedMutation({
-    directory: context.directory,
-    scopeKey: context.scopeKey,
-    authority: context.leaseAuthority,
-    latch: context.latch,
-    clock: context.leaseClock,
-    mutation: () => context.transport.flatten(),
-  });
+  const flatten = await runFencedTransport(context, () => context.transport.flatten());
   if (flatten.callbackCount > 0) {
     trace.flattenInvoked = true;
   }
@@ -824,23 +816,23 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
     trace.reasonCodes.push("LEASE_UNCERTAIN", "STALE_SNAPSHOT");
     return trace;
   }
-  const snapshotFence = await runLeaseFencedMutation({
-    directory: context.directory,
-    scopeKey: context.scopeKey,
-    authority: context.leaseAuthority,
-    latch: context.latch,
-    clock: context.leaseClock,
-    mutation: () => context.transport.freshSnapshot(),
-  });
+  const snapshotFence = await runFencedTransport(context, () => context.transport.freshSnapshot());
   if (snapshotFence.outcome !== "SENT" || snapshotFence.value === null) {
     trace.reasonCodes.push("STALE_SNAPSHOT", "SNAPSHOT_NOT_AUTHORITATIVE");
     return trace;
   }
   const snapshot = snapshotFence.value;
-  trace.snapshotFresh = snapshot.fresh;
+  const observation = classifySnapshotObservedAt(snapshot.observedAt, context.haltClock);
   trace.snapshotObservedAt = snapshot.observedAt;
-  if (!snapshot.fresh) {
+  trace.snapshotFresh = observation.kind === "ok" && snapshot.fresh === true;
+  if (!trace.snapshotFresh) {
     trace.reasonCodes.push("STALE_SNAPSHOT");
+    if (observation.kind === "future") {
+      trace.reasonCodes.push("SNAPSHOT_OBSERVED_AT_FUTURE");
+    }
+    if (observation.kind === "malformed") {
+      trace.reasonCodes.push("SNAPSHOT_OBSERVED_AT_MALFORMED");
+    }
   }
   if (!snapshot.authoritative) {
     trace.reasonCodes.push("SNAPSHOT_NOT_AUTHORITATIVE");
@@ -854,7 +846,7 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
     flattenKind === "ACK" &&
     !trace.cancelFailed &&
     !trace.cancelUnknown &&
-    snapshot.fresh &&
+    trace.snapshotFresh &&
     snapshot.authoritative &&
     snapshot.leaseGeneration === context.leaseAuthority.generation &&
     positionFlat
@@ -899,24 +891,45 @@ function committedStatusCode(status: HaltStatus): string {
   return "DURABLE_HALT_RUNNING";
 }
 
-function evaluateSafeResumeGates(args: {
+function evaluateInternalAckGates(args: {
   record: DurableHaltRecord;
-  resumeEvidence: HaltResumeEvidence;
+  snapshot: HaltAuthoritativeSnapshot;
+  orders: readonly HaltOwnedOrder[];
   riskDecision: RiskDecision;
   expectedLeaseGeneration: string;
+  expectedSnapshotSourceId: string;
+  observation: SnapshotObservation;
 }): { ok: true } | { ok: false; reasonCodes: string[] } {
   const codes: string[] = [];
   if (args.record.unresolvedPossibleExposure) {
     codes.push("UNRESOLVED_UNKNOWN");
   }
-  if (!args.resumeEvidence.snapshotFresh) {
+  if (args.observation.kind === "stale") {
     codes.push("STALE_SNAPSHOT");
   }
-  if (!args.resumeEvidence.snapshotAuthoritative) {
+  if (args.observation.kind === "future") {
+    codes.push("SNAPSHOT_OBSERVED_AT_FUTURE", "STALE_SNAPSHOT");
+  }
+  if (args.observation.kind === "malformed") {
+    codes.push("SNAPSHOT_OBSERVED_AT_MALFORMED", "STALE_SNAPSHOT");
+  }
+  if (!args.snapshot.authoritative) {
     codes.push("SNAPSHOT_NOT_AUTHORITATIVE");
   }
-  if (args.resumeEvidence.snapshotLeaseGeneration !== args.expectedLeaseGeneration) {
+  if (args.snapshot.sourceId !== args.expectedSnapshotSourceId || args.snapshot.sourceId === "") {
+    codes.push("SNAPSHOT_SOURCE_UNPROVEN", "SNAPSHOT_NOT_AUTHORITATIVE");
+  }
+  if (args.snapshot.leaseGeneration !== args.expectedLeaseGeneration) {
     codes.push("SNAPSHOT_LEASE_MISMATCH");
+  }
+  const ownedRiskIncreasingRemaining = args.orders.some(
+    (order) => order.ownership === "OWNED" && order.riskIncreasing,
+  );
+  if (ownedRiskIncreasingRemaining || args.snapshot.ownedRiskIncreasingRemaining) {
+    codes.push("OWNED_RISK_INCREASING_REMAINING");
+  }
+  if (args.snapshot.unknownReservations.length > 0) {
+    codes.push("UNRESOLVED_UNKNOWN");
   }
   if (args.riskDecision.action !== "CONTINUE" || !args.riskDecision.riskMetricsWithinLimits) {
     codes.push("ACTIVE_RISK_BREACH");
@@ -947,7 +960,226 @@ function evaluateSafeResumeGates(args: {
   if (args.riskDecision.reasonCodes.includes("STALE_OR_MISSING_INPUT")) {
     codes.push("STALE_SNAPSHOT");
   }
+  if (authoritativeSnapshotMismatchesRisk(args.snapshot, args.riskDecision)) {
+    codes.push("SNAPSHOT_RISK_MISMATCH");
+  }
   return codes.length === 0 ? { ok: true } : { ok: false, reasonCodes: codes };
+}
+
+function ignoredCallerAuthorizationCodes(args: HaltAcknowledgeRequest): string[] {
+  const codes: string[] = [];
+  if (Object.hasOwn(args, "ignoredCallerState")) {
+    codes.push("FORGED_CALLER_STATE_IGNORED");
+  }
+  if (Object.hasOwn(args, "resumeEvidence")) {
+    codes.push("CALLER_RESUME_EVIDENCE_IGNORED");
+  }
+  if (Object.hasOwn(args, "resumeRiskInput")) {
+    codes.push("CALLER_RISK_INPUT_IGNORED");
+  }
+  void args.ignoredCallerState;
+  void args.resumeEvidence;
+  void args.resumeRiskInput;
+  void args.operatorNote;
+  return codes;
+}
+
+type SnapshotObservation =
+  | { kind: "ok"; observedMs: bigint; nowMs: bigint }
+  | { kind: "stale" }
+  | { kind: "future" }
+  | { kind: "malformed" };
+
+const ISO_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const EPOCH_MS_PATTERN = /^(0|[1-9][0-9]{0,12})$/;
+
+function parseTimestampMs(value: string): bigint | null {
+  if (EPOCH_MS_PATTERN.test(value)) {
+    return BigInt(value);
+  }
+  if (ISO_UTC_PATTERN.test(value)) {
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    return BigInt(parsed);
+  }
+  return null;
+}
+
+function classifySnapshotObservedAt(observedAt: string, clock: HaltClock): SnapshotObservation {
+  const nowMs = parseTimestampMs(clock.nowIso());
+  const observedMs = parseTimestampMs(observedAt);
+  if (nowMs === null || observedMs === null) {
+    return { kind: "malformed" };
+  }
+  if (observedMs > nowMs) {
+    return { kind: "future" };
+  }
+  const maxStaleMs = BigInt(ACK_SNAPSHOT_MAX_STALE_MS);
+  if (nowMs - observedMs > maxStaleMs) {
+    return { kind: "stale" };
+  }
+  return { kind: "ok", observedMs, nowMs };
+}
+
+async function runFencedTransport<T>(
+  context: HaltRuntimeContext,
+  mutation: () => T | Promise<T>,
+): Promise<FencedMutationResult<T>> {
+  return runLeaseFencedMutation({
+    directory: context.directory,
+    scopeKey: context.scopeKey,
+    authority: context.leaseAuthority,
+    latch: context.latch,
+    clock: context.leaseClock,
+    mutation,
+  });
+}
+
+function fencedFailureCodes(result: FencedMutationResult<unknown>): string[] {
+  if (result.outcome === "UNKNOWN") {
+    return ["UNRESOLVED_UNKNOWN", "RECONCILIATION_REQUIRED"];
+  }
+  return ["LEASE_UNCERTAIN", "MUTATION_NOT_SENT"];
+}
+
+async function obtainInternalResumeAuthority(
+  context: HaltRuntimeContext,
+  record: DurableHaltRecord,
+): Promise<
+  | { ok: true; snapshot: HaltAuthoritativeSnapshot; riskDecision: RiskDecision }
+  | { ok: false; reasonCodes: string[] }
+> {
+  if (record.unresolvedPossibleExposure) {
+    return { ok: false, reasonCodes: ["UNRESOLVED_UNKNOWN"] };
+  }
+
+  const snapshotFence = await runFencedTransport(context, () => context.transport.freshSnapshot());
+  if (snapshotFence.outcome !== "SENT" || snapshotFence.value === null) {
+    return {
+      ok: false,
+      reasonCodes: [
+        "STALE_SNAPSHOT",
+        "SNAPSHOT_NOT_AUTHORITATIVE",
+        ...fencedFailureCodes(snapshotFence),
+      ],
+    };
+  }
+  const snapshot = snapshotFence.value;
+  const observation = classifySnapshotObservedAt(snapshot.observedAt, context.haltClock);
+
+  const listed = await runFencedTransport(context, () => context.transport.listOpenOrders());
+  if (listed.outcome !== "SENT" || listed.value === null) {
+    return {
+      ok: false,
+      reasonCodes: ["LIST_OPEN_ORDERS_UNKNOWN", ...fencedFailureCodes(listed)],
+    };
+  }
+
+  const nowMs = parseTimestampMs(context.haltClock.nowIso());
+  if (nowMs === null || observation.kind !== "ok") {
+    const observationCodes: string[] = [];
+    if (observation.kind === "future") {
+      observationCodes.push("SNAPSHOT_OBSERVED_AT_FUTURE", "STALE_SNAPSHOT");
+    } else if (observation.kind === "malformed" || nowMs === null) {
+      observationCodes.push("SNAPSHOT_OBSERVED_AT_MALFORMED", "STALE_SNAPSHOT");
+    } else {
+      observationCodes.push("STALE_SNAPSHOT");
+    }
+    return { ok: false, reasonCodes: observationCodes };
+  }
+
+  const riskInput = buildInternalRiskInput({
+    record,
+    snapshot,
+    evaluatedAtMs: nowMs.toString(10),
+    observedAtMs: observation.observedMs.toString(10),
+    latchBlocked: context.latch.blocked,
+    pairAuthorityProven: true,
+  });
+  const riskDecision = evaluateRisk(riskInput);
+  const gates = evaluateInternalAckGates({
+    record,
+    snapshot,
+    orders: listed.value,
+    riskDecision,
+    expectedLeaseGeneration: context.leaseAuthority.generation,
+    expectedSnapshotSourceId: context.expectedSnapshotSourceId,
+    observation,
+  });
+  if (!gates.ok) {
+    return { ok: false, reasonCodes: gates.reasonCodes };
+  }
+  return { ok: true, snapshot, riskDecision };
+}
+
+function buildInternalRiskInput(args: {
+  record: DurableHaltRecord;
+  snapshot: HaltAuthoritativeSnapshot;
+  evaluatedAtMs: string;
+  observedAtMs: string;
+  latchBlocked: boolean;
+  pairAuthorityProven: boolean;
+}): RiskInput {
+  return {
+    signedPosition: args.snapshot.signedPosition,
+    markOrMidPrice: args.snapshot.markOrMidPrice,
+    equity: args.snapshot.equity,
+    startingEquity: args.record.startingEquityUsd ?? args.snapshot.equity,
+    highWaterEquity: args.record.highWaterEquityUsd ?? args.snapshot.equity,
+    realizedTradingPnl: args.snapshot.realizedTradingPnl,
+    fees: args.snapshot.fees,
+    funding: args.snapshot.funding,
+    fundingConvention: args.snapshot.fundingConvention,
+    ownedActiveOrders: [],
+    unknownReservations: args.snapshot.unknownReservations.map((item) => ({ ...item })),
+    proposedBatch: [],
+    gridLower: args.snapshot.gridLower,
+    gridUpper: args.snapshot.gridUpper,
+    freshness: {
+      evaluatedAt: args.evaluatedAtMs,
+      maxStaleMs: ACK_SNAPSHOT_MAX_STALE_MS,
+      positionObservedAt: args.observedAtMs,
+      equityObservedAt: args.observedAtMs,
+      markObservedAt: args.observedAtMs,
+      pnlObservedAt: args.observedAtMs,
+    },
+    reconciliation: {
+      unresolved:
+        args.record.unresolvedPossibleExposure || args.snapshot.unknownReservations.length > 0,
+    },
+    lease: { proven: true, expired: false, lost: false },
+    latchBlocked: args.latchBlocked,
+    durableInspection: { pairAuthorityProven: args.pairAuthorityProven },
+    haltAuthorityClear: false,
+    boundedReduction: {
+      possible: true,
+      ambiguous: false,
+      cancelOnly: false,
+      snapshotFresh: true,
+    },
+  };
+}
+
+function authoritativeSnapshotMismatchesRisk(
+  snapshot: HaltAuthoritativeSnapshot,
+  riskDecision: RiskDecision,
+): boolean {
+  if (snapshot.actualGrossNotional === null || riskDecision.metrics.actualGrossNotional === null) {
+    return true;
+  }
+  if (riskDecision.metrics.signedPosition === null) {
+    return true;
+  }
+  if (decimalCmp(snapshot.signedPosition, riskDecision.metrics.signedPosition) !== 0) {
+    return true;
+  }
+  if (decimalCmp(snapshot.actualGrossNotional, riskDecision.metrics.actualGrossNotional) !== 0) {
+    return true;
+  }
+  const computed = decimalMul(decimalAbs(snapshot.signedPosition), snapshot.markOrMidPrice);
+  return decimalCmp(snapshot.actualGrossNotional, computed) !== 0;
 }
 
 function compareSuppliedHaltId(
