@@ -742,8 +742,8 @@
       "path": ".github/trusted/phase2e-corrective1-baseline.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "05fe40834151b926bcc26e1491090171722368b0",
-      "sha256": "9498bb51ee0691d5cbb06be446ed64fc35d8e98a1e39f0197f84112cb08bc35c"
+      "blobSha": "3a73e2c87e15563929ff377c694c5322e8796a85",
+      "sha256": "7b925d40cc4e17b2a89ac676cf469686261c9bffa4ca4fab932015e767b90cd8"
     },
     {
       "path": ".github/trusted/repository-governance-policy.json",
@@ -763,8 +763,8 @@
       "path": ".github/workflows/trusted-phase2d-freeze.yml",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "8d40948e3d8ab6a72446c4bb79f9f217eb2a0ed0",
-      "sha256": "ea0106938b96a8dcf14f7d554d495f682a503f281b47a1c9275bf5be8d46bf02"
+      "blobSha": "f2fbd9cfb2decfd289bb260d86c235cebcd861ca",
+      "sha256": "c668b9b2d1de1658a4d455a08fa0ac6c1c621305613ca15c271e83aaf622955e"
     },
     {
       "path": "scripts/governance/fixtures/events/fork-phase2e.json",
@@ -959,8 +959,8 @@
       "path": "scripts/governance/generate-phase2e-baseline.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "54f63880ca96d986a436d1f26735859cea404a73",
-      "sha256": "23b78907f53869f0ac5992077446b47516ddaf9344012a0970685ca048ccb5d2"
+      "blobSha": "7b0d7520e7d7b48843285f05662ab8af19a50dc5",
+      "sha256": "2c9c1405adec774430a921841743baa9324bbd27746417d301230c4977b6f010"
     },
     {
       "path": "scripts/governance/phase2d-trusted-control.mjs",
@@ -1015,8 +1015,8 @@
       "path": "scripts/governance/phase2d-trusted-gate.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "b5ff989f359ae9183c6896fa2a91ef2843d3585f",
-      "sha256": "cb293ae3abb611da5028ff8b32c96a4217400051145f3b28783537fbfa0e3c6d"
+      "blobSha": "f9c8594d1cb9861b09e43684dc4945227346f947",
+      "sha256": "e16d1c3b87ffe46261f490fbdb2306657517eaa2c5b4a0acd1184366c0fd1cc0"
     },
     {
       "path": "scripts/governance/phase2d-trusted-gate.test.mjs",
@@ -1029,8 +1029,8 @@
       "path": "scripts/governance/phase2d-workflow-structure.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "c60c5fabd4625738974e85eb4bec2a68d4a8538a",
-      "sha256": "92168cd5bc78f488ed9e659e39c9c5f486fa473bccd60263e732d317278e1c85"
+      "blobSha": "6ffb7537b6e2756d746527b75a776e28d627cdb2",
+      "sha256": "c54ed9a705cf5313446735ba86f772a5a7e4a86ee568a80e1d164f43a2babf78"
     },
     {
       "path": "scripts/governance/phase2e-trusted-freeze-check.mjs",
@@ -1043,36 +1043,36 @@
       "path": "scripts/governance/phase2e-trusted-freeze-lib.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "38b3c3cddf58dcf98bc16dadfc65a24d01f4eebb",
-      "sha256": "6d59387c855339a6ae539e54f5ce5d5f07b76a4c63a1c0919b7aa97240740625"
+      "blobSha": "812b490f59ab11f0afd02b1d8ca06aa60b696a90",
+      "sha256": "0f69d64208df7d555193a39bd586e070ed1b6e55d0d1c030afc8bced8b228756"
     },
     {
       "path": "scripts/governance/phase2e-trusted-freeze-lib.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "a355c71eba8b40de7895ff290cd7aa9a4e16278f",
-      "sha256": "742f3b6d42034c498c3591c0141a67e8947a44e9851192e9ec5785af0a11d923"
+      "blobSha": "effcffdbdce25715ee41deb0b24121da979162b2",
+      "sha256": "b475d306186a61ee25f24da5f06071942034b14395e6ef94da9bf840222cbdbf"
     },
     {
       "path": "scripts/governance/phase2e-trusted-gate.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "c597577c218d069396b908abf01c31e0d8827382",
-      "sha256": "1a24cd2298f430f247d08371ee185e30475c84ba64f2f0a4413e260b8e9a3c71"
+      "blobSha": "c5312c11ccee7c5e5d1389ae2b5042291529626b",
+      "sha256": "cd201d2101ac2625fa2a2789b45b9b1a95149d8ec61c089bcff9526ca84a1d39"
     },
     {
       "path": "scripts/governance/phase2e-trusted-runtime.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "dec90ce25358e6b2725df638141707d56bb7d2b7",
-      "sha256": "c91c91bc2c35d52ec36872864d16811df8d114cbaaa73e0986b2218200b4bde9"
+      "blobSha": "f665ad45b7e1d133c44654dd575be5c361311b2d",
+      "sha256": "e13c881c70551b0c1b41b31382e0805570a9967832a942bc30e1cef4a5687773"
     },
     {
       "path": "scripts/governance/phase2e-trusted-runtime.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "d707ec67b9be85b46fcf9b698d1fb22581e23c15",
-      "sha256": "87dcbf062c7c48d35aa76bc87307712259f51dfd5fc68a763ff923f3e95fe462"
+      "blobSha": "8470667fc688cbace113f61c0d2ff3ea5f44fdb2",
+      "sha256": "9baf5c342349a775c1a04e995ca796e3e5e21ac7c8840f73047c4b6b756b55bc"
     },
     {
       "path": "scripts/governance/repository-governance-policy.mjs",
