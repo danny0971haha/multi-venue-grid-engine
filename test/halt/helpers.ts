@@ -8,6 +8,7 @@ import type {
   HaltRuntimeContext,
 } from "../../src/halt/index.js";
 import {
+  DEFAULT_SNAPSHOT_SOURCE_ID,
   HaltProcessFence,
   createSequentialHaltIdSource,
   createScriptedHaltTransport,
@@ -107,6 +108,16 @@ export function snapshot(
     actualGrossNotional: args.actualGrossNotional ?? "0",
     ownedRiskIncreasingRemaining: args.ownedRiskIncreasingRemaining ?? false,
     observedAt: args.observedAt ?? RISK_NOW,
+    sourceId: args.sourceId ?? DEFAULT_SNAPSHOT_SOURCE_ID,
+    markOrMidPrice: args.markOrMidPrice ?? "100",
+    equity: args.equity ?? "100",
+    realizedTradingPnl: args.realizedTradingPnl ?? "0",
+    fees: args.fees ?? "0",
+    funding: args.funding ?? "0",
+    fundingConvention: args.fundingConvention ?? "RECEIVED_POSITIVE",
+    gridLower: args.gridLower ?? "97",
+    gridUpper: args.gridUpper ?? "103",
+    unknownReservations: args.unknownReservations ?? [],
   };
 }
 
@@ -174,6 +185,7 @@ export async function seedHaltContext(
     haltIdSource: createSequentialHaltIdSource("h"),
     transport,
     processFence: new HaltProcessFence(),
+    expectedSnapshotSourceId: DEFAULT_SNAPSHOT_SOURCE_ID,
   };
   const initialized = await initializeDurableHalt(context, { startingEquityUsd: "100" });
   if (initialized.durableStatus !== "RUNNING" || initialized.durableGeneration !== "1") {

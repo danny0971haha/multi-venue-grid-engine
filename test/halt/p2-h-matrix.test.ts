@@ -310,24 +310,46 @@ describe("Phase 2E P2-H halt/ACK matrix", { concurrency: 1 }, () => {
       });
       assertMatrixShape(result);
       assert.ok(result.reasonCodes.includes("FORGED_CALLER_STATE_IGNORED"));
-      assert.equal(result.acknowledgementCommitted, false);
-      assert.equal(result.durableStatus, halted.durableStatus);
-      assert.equal(result.durableGeneration, halted.durableGeneration);
-      assert.equal(result.durableEnvelopeSha256, halted.durableEnvelopeSha256);
-      assertNonRunning(result);
+      assert.ok(result.reasonCodes.includes("CALLER_RESUME_EVIDENCE_IGNORED"));
+      assert.ok(result.reasonCodes.includes("CALLER_RISK_INPUT_IGNORED"));
+      assert.notEqual(result.durableGeneration, forged.storeGeneration);
+      assert.equal(result.acknowledgementCommitted, true);
+      assert.equal(result.durableStatus, "RUNNING");
+      assert.equal(result.record?.acknowledgement?.acknowledgedHaltId, halted.haltId);
+      assert.equal(
+        result.record?.acknowledgement?.predecessorEnvelopeSha256,
+        halted.durableEnvelopeSha256,
+      );
+      assert.equal(result.record?.acknowledgement?.snapshotSourceId, "engine-owned-snapshot");
     });
   });
 
   test("P2-H11 correct ID plus unsafe fresh state does not authorize RUNNING", async () => {
     await withTempDir(async (directory) => {
-      const { context } = await seedHaltContext(directory, {});
+      const { context } = await seedHaltContext(directory, {
+        snapshots: [
+          snapshot({
+            leaseGeneration: "pending",
+            signedPosition: "0",
+            actualGrossNotional: "0",
+            ownedRiskIncreasingRemaining: false,
+          }),
+          snapshot({
+            leaseGeneration: "pending",
+            signedPosition: "2",
+            actualGrossNotional: "200",
+            ownedRiskIncreasingRemaining: true,
+            realizedTradingPnl: "-5",
+          }),
+        ],
+      });
       const halted = await executeHardHalt(context, {
         haltReasons: ["DAILY_LOSS"],
         lastRiskEvaluationAt: "1000000",
       });
       const unsafe = await acknowledgeHalt(context, {
         suppliedHaltId: halted.haltId,
-        resumeRiskInput: dailyLossHaltInput(),
+        resumeRiskInput: baselineRiskInput(),
         resumeEvidence: resumeEvidence(context.leaseAuthority.generation),
       });
       assertMatrixShape(unsafe);
@@ -355,8 +377,9 @@ describe("Phase 2E P2-H halt/ACK matrix", { concurrency: 1 }, () => {
       });
       assertNonRunning(overCap);
       assert.ok(
-        overCap.reasonCodes.includes("PLANNED_EXPOSURE_UNSAFE") ||
-          overCap.reasonCodes.includes("ACTIVE_RISK_BREACH"),
+        overCap.reasonCodes.includes("ACTUAL_EXPOSURE_UNSAFE") ||
+          overCap.reasonCodes.includes("ACTIVE_RISK_BREACH") ||
+          overCap.reasonCodes.includes("PLANNED_EXPOSURE_UNSAFE"),
       );
     });
   });
@@ -398,7 +421,23 @@ describe("Phase 2E P2-H halt/ACK matrix", { concurrency: 1 }, () => {
 
   test("P2-H13 crash during ACK persistence never infers caller-memory clearance", async () => {
     await withTempDir(async (directory) => {
-      const { context } = await seedHaltContext(directory, {});
+      const { context } = await seedHaltContext(directory, {
+        snapshots: [
+          snapshot({
+            leaseGeneration: "pending",
+            signedPosition: "0",
+            actualGrossNotional: "0",
+            ownedRiskIncreasingRemaining: false,
+          }),
+          snapshot({
+            leaseGeneration: "pending",
+            signedPosition: "0",
+            actualGrossNotional: "0",
+            ownedRiskIncreasingRemaining: false,
+            observedAt: "0",
+          }),
+        ],
+      });
       const halted = await executeHardHalt(context, {
         haltReasons: ["DAILY_LOSS"],
         lastRiskEvaluationAt: "1000000",

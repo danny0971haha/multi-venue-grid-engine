@@ -100,6 +100,9 @@ function runningAfterAckRecord(
       priorLeaseGeneration: "1",
       currentLeaseGeneration: "1",
       resultingStatus: "RUNNING",
+      snapshotSourceId: "engine-owned-snapshot",
+      snapshotObservedAt: "1000000",
+      snapshotLeaseGeneration: "1",
     },
     unresolvedPossibleExposure: false,
     flatnessProven: false,
@@ -237,6 +240,9 @@ function assertAllowedOutcome(
     assert.equal(inspection.haltStatus, "RUNNING");
     assert.equal(inspection.acknowledgedHaltId, "h1");
     assert.equal(inspection.resultingStatus, "RUNNING");
+    assert.equal(inspection.snapshotSourceId, "engine-owned-snapshot");
+    assert.equal(inspection.snapshotObservedAt, "1000000");
+    assert.equal(inspection.snapshotLeaseGeneration, "1");
   }
 }
 
@@ -399,6 +405,32 @@ describe("Phase 2E halt/ACK real process-crash matrix", { concurrency: 1 }, () =
     for (const hook of ATOMIC_WRITE_HOOKS) {
       const result = await runCrash({ kind: "HALTED_TO_RUNNING", target: "PRIMARY", hook });
       assert.equal(result.inspection.allowRiskIncrease, false);
+    }
+  });
+
+  test("P2E-C1-17 real parent-delivered SIGKILL during corrected ACK windows", async () => {
+    for (const target of ["BACKUP", "PRIMARY"] as const) {
+      for (const hook of ATOMIC_WRITE_HOOKS) {
+        const result = await runCrash({ kind: "HALTED_TO_RUNNING", target, hook });
+        assert.ok(
+          result.classification === "OLD_EXACT_PAIR" ||
+            result.classification === "NEW_EXACT_PAIR" ||
+            result.classification === "PAIR_UNPROVEN",
+        );
+        if (result.classification === "NEW_EXACT_PAIR") {
+          assert.equal(result.inspection.haltStatus, "RUNNING");
+          assert.equal(result.inspection.acknowledgedHaltId, "h1");
+          assert.equal(result.inspection.snapshotSourceId, "engine-owned-snapshot");
+          assert.equal(result.inspection.snapshotLeaseGeneration, "1");
+        }
+        if (result.classification === "OLD_EXACT_PAIR") {
+          assert.equal(result.inspection.haltStatus, "HALTED_FLAT");
+        }
+        if (result.classification === "PAIR_UNPROVEN") {
+          assert.equal(result.inspection.pairAuthorityProven, false);
+        }
+        assert.equal(result.inspection.allowRiskIncrease, false);
+      }
     }
   });
 });

@@ -25,6 +25,9 @@ export type Phase2ECrashInspectResult = {
   haltId: string | null;
   acknowledgedHaltId: string | null;
   resultingStatus: string | null;
+  snapshotSourceId: string | null;
+  snapshotObservedAt: string | null;
+  snapshotLeaseGeneration: string | null;
 };
 
 export type Phase2ECrashTransitionCommand = {
@@ -59,6 +62,9 @@ async function handleCommand(command: Phase2ECrashCommand): Promise<void> {
     let haltId: string | null = null;
     let acknowledgedHaltId: string | null = null;
     let resultingStatus: string | null = null;
+    let snapshotSourceId: string | null = null;
+    let snapshotObservedAt: string | null = null;
+    let snapshotLeaseGeneration: string | null = null;
     if (inspection.primary.status === "VALID") {
       const parsed = parseHaltRecord(inspection.primary.envelope.payload);
       if (parsed.ok) {
@@ -66,6 +72,9 @@ async function handleCommand(command: Phase2ECrashCommand): Promise<void> {
         haltId = parsed.record.haltId;
         acknowledgedHaltId = parsed.record.acknowledgement?.acknowledgedHaltId ?? null;
         resultingStatus = parsed.record.acknowledgement?.resultingStatus ?? null;
+        snapshotSourceId = parsed.record.acknowledgement?.snapshotSourceId ?? null;
+        snapshotObservedAt = parsed.record.acknowledgement?.snapshotObservedAt ?? null;
+        snapshotLeaseGeneration = parsed.record.acknowledgement?.snapshotLeaseGeneration ?? null;
       }
     }
     const result: Phase2ECrashInspectResult = {
@@ -82,6 +91,9 @@ async function handleCommand(command: Phase2ECrashCommand): Promise<void> {
       haltId,
       acknowledgedHaltId,
       resultingStatus,
+      snapshotSourceId,
+      snapshotObservedAt,
+      snapshotLeaseGeneration,
     };
     process.stdout.write(`${JSON.stringify(result)}\n`);
     return;
