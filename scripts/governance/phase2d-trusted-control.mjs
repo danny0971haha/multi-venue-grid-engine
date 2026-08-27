@@ -15,7 +15,7 @@ import {
   sha256Bytes,
 } from "./phase2d-trusted-freeze-lib.mjs";
 
-export function inspectTrustedCheckout({ repoRoot, baseline }) {
+export function inspectTrustedCheckout({ repoRoot, baseline, expectedHeadSha }) {
   const reasons = [];
   if (typeof repoRoot !== "string" || !baseline) {
     return { ok: false, reasons: ["trusted_checkout_input_invalid"], headSha: null };
@@ -28,6 +28,11 @@ export function inspectTrustedCheckout({ repoRoot, baseline }) {
   const head = git(repoRoot, ["rev-parse", "HEAD"]);
   const headSha = head.ok ? head.stdout : null;
   if (!GIT_SHA1_RE.test(headSha ?? "")) reasons.push("trusted_checkout_head_invalid");
+  if (expectedHeadSha !== undefined && expectedHeadSha !== null && expectedHeadSha !== "") {
+    if (!GIT_SHA1_RE.test(expectedHeadSha) || expectedHeadSha !== headSha) {
+      reasons.push("trusted_checkout_workflow_sha_mismatch");
+    }
+  }
 
   const ancestor = gitExit(repoRoot, [
     "merge-base",

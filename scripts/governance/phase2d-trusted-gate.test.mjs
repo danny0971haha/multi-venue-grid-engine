@@ -35,20 +35,23 @@ describe("stable required gate classification", () => {
   });
 
   it("enforces the exact Phase 2 branch even without a path hint", () => {
-    assert.equal(classifyGate(input({ headRef: "experiment/v0.1-phase2" })).mode, "ENFORCE");
+    assert.equal(
+      classifyGate(input({ headRef: "experiment/v0.1-phase2" })).mode,
+      "PHASE2D_ENFORCE",
+    );
   });
 
   it("renamed candidate branches cannot bypass protected Phase 2 paths", () => {
     assert.equal(
       classifyGate(input({ headRef: "renamed", changedPaths: ["src/risk/risk-engine.ts"] })).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
   });
 
   it("fork candidates touching Phase 2 paths are still enforced", () => {
     assert.equal(
       classifyGate(input({ headRepository: "fork/engine", changedPaths: ["test/risk/x.ts"] })).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
   });
 
@@ -60,7 +63,7 @@ describe("stable required gate classification", () => {
           changedPaths: [".github/workflows/trusted-phase2d-freeze.yml"],
         }),
       ).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
   });
 
@@ -91,7 +94,7 @@ describe("stable required gate classification", () => {
           changedPaths: ["src/index.ts"],
         }),
       ).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
     assert.equal(
       classifyGate(
@@ -100,7 +103,7 @@ describe("stable required gate classification", () => {
           changedPaths: ["src/domain/types.ts"],
         }),
       ).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
   });
 });

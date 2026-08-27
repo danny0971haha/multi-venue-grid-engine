@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Trusted freeze CLI. Intended to run from a protected-main checkout only.
- * Reads GitHub metadata from environment variables. Does not checkout PR code.
+ * Trusted Phase 2E integrity CLI. Runs from the trusted workflow checkout only.
+ * Uses GitHub Git APIs. Does not checkout or execute candidate code.
  */
 
 import { appendFileSync, readFileSync } from "node:fs";
@@ -10,9 +10,6 @@ import path from "node:path";
 
 import {
   parseBaseline,
-  evaluateTrustedFreeze,
-  formatMachineSummary,
-  summaryContainsForbiddenDecisionWording,
   sha256Bytes,
   TRUSTED_BASELINE_PATH,
 } from "./phase2d-trusted-freeze-lib.mjs";
@@ -24,44 +21,41 @@ import {
   fetchCompareAncestor,
   fetchRecursiveTree,
 } from "./phase2d-trusted-freeze-github.mjs";
+import {
+  PHASE2E_TRUSTED_BASELINE_PATH,
+  evaluatePhase2eIntegrity,
+  formatPhase2eMachineSummary,
+  parsePhase2eBaseline,
+} from "./phase2e-trusted-freeze-lib.mjs";
+import { summaryContainsForbiddenDecisionWording } from "./phase2d-trusted-freeze-lib.mjs";
 
 const DEFAULT_API = "https://api.github.com";
 
 async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "..", "..");
-  const baselinePath = path.join(repoRoot, TRUSTED_BASELINE_PATH);
-  let jsonText;
+
+  let phase2dJson;
+  let phase2eJson;
   try {
-    jsonText = readFileSync(baselinePath, "utf8");
+    phase2dJson = readFileSync(path.join(repoRoot, TRUSTED_BASELINE_PATH), "utf8");
+    phase2eJson = readFileSync(path.join(repoRoot, PHASE2E_TRUSTED_BASELINE_PATH), "utf8");
   } catch {
-    return failClosed({
-      trustedBaselineIntegrityOk: false,
-      sourceHeadMatchesReviewedCandidate: false,
-      reasons: ["baseline_unreadable"],
-    });
+    return failClosed({ reasons: ["baseline_unreadable"] });
   }
 
-  const parsed = parseBaseline(jsonText);
-  if (!parsed.ok) {
-    return failClosed({
-      trustedBaselineIntegrityOk: false,
-      sourceHeadMatchesReviewedCandidate: false,
-      reasons: parsed.reasons,
-    });
-  }
+  const phase2d = parseBaseline(phase2dJson);
+  const phase2e = parsePhase2eBaseline(phase2eJson);
+  if (!phase2d.ok) return failClosed({ reasons: phase2d.reasons });
+  if (!phase2e.ok) return failClosed({ reasons: phase2e.reasons });
 
   const trustedCheckout = inspectTrustedCheckout({
     repoRoot,
-    baseline: parsed.baseline,
+    baseline: phase2d.baseline,
     expectedHeadSha: process.env.TRUSTED_WORKFLOW_SHA,
   });
   if (!trustedCheckout.ok) {
-    return failClosed({
-      trustedBaselineIntegrityOk: false,
-      sourceHeadMatchesReviewedCandidate: false,
-      reasons: trustedCheckout.reasons,
-    });
+    return failClosed({ reasons: trustedCheckout.reasons });
   }
 
   const token = process.env.GITHUB_TOKEN;
@@ -71,18 +65,23 @@ async function main() {
   const repositoryFullName = process.env.PR_BASE_REPO;
   const prHeadRepositoryFullName = process.env.PR_HEAD_REPO;
   const prHeadRef = process.env.PR_HEAD_REF;
+  const prBaseRef = process.env.PR_BASE_REF;
+  const prBaseSha = process.env.PR_BASE_SHA;
+  const baseline = phase2e.baseline;
 
   if (!token) {
     return failClosed(
-      evaluateTrustedFreeze({
-        baseline: parsed.baseline,
+      evaluatePhase2eIntegrity({
+        baseline,
         repositoryFullName,
         prHeadRepositoryFullName,
         prHeadRef,
+        prBaseRef,
+        prBaseSha,
         sourceHeadSha,
         eventSourceHeadSha,
         ancestorCheckComplete: false,
-        implementationBaseIsAncestor: false,
+        frozenBaseIsAncestor: false,
         baseTreeComplete: false,
         headTreeComplete: false,
         baseTree: [],
@@ -93,20 +92,20 @@ async function main() {
 
   const baseCommit = await fetchCommitTreeSha({
     apiUrl,
-    repository: parsed.baseline.repository,
-    commitSha: parsed.baseline.acceptedImplementationBaseSha,
+    repository: baseline.repository,
+    commitSha: baseline.frozenBaseSha,
     token,
   });
   const headCommit = await fetchCommitTreeSha({
     apiUrl,
-    repository: parsed.baseline.repository,
+    repository: baseline.repository,
     commitSha: sourceHeadSha,
     token,
   });
   const baseTree = baseCommit.complete
     ? await fetchRecursiveTree({
         apiUrl,
-        repository: parsed.baseline.repository,
+        repository: baseline.repository,
         treeSha: baseCommit.treeSha,
         token,
       })
@@ -114,62 +113,58 @@ async function main() {
   const headTree = headCommit.complete
     ? await fetchRecursiveTree({
         apiUrl,
-        repository: parsed.baseline.repository,
+        repository: baseline.repository,
         treeSha: headCommit.treeSha,
         token,
       })
     : { complete: false, reason: headCommit.reason, entries: [] };
   const compare = await fetchCompareAncestor({
     apiUrl,
-    repository: parsed.baseline.repository,
-    baseSha: parsed.baseline.acceptedImplementationBaseSha,
+    repository: baseline.repository,
+    baseSha: baseline.frozenBaseSha,
     headSha: sourceHeadSha,
     token,
   });
 
   const headTextByPath = {};
-  let anchorContentComplete = true;
+  let packageJsonComplete = true;
   if (headTree.complete) {
-    for (const anchor of parsed.baseline.protectedContentAnchors) {
-      const entry = headTree.entries.find((item) => item.path === anchor.path);
-      if (!entry) {
-        anchorContentComplete = false;
-        continue;
-      }
+    const pkg = headTree.entries.find((item) => item.path === "package.json");
+    if (!pkg) {
+      packageJsonComplete = false;
+    } else {
       const blob = await fetchBlobUtf8({
         apiUrl,
-        repository: parsed.baseline.repository,
-        blobSha: entry.sha,
+        repository: baseline.repository,
+        blobSha: pkg.sha,
         token,
       });
-      if (!blob.complete) {
-        anchorContentComplete = false;
-        continue;
-      }
-      headTextByPath[anchor.path] = blob.text;
+      if (!blob.complete) packageJsonComplete = false;
+      else headTextByPath["package.json"] = blob.text;
     }
   } else {
-    anchorContentComplete = false;
+    packageJsonComplete = false;
   }
 
   const observedBlobSha256ByKey = {};
   let blobHashesComplete = true;
   if (baseTree.complete && headTree.complete) {
     const requests = new Map();
-    for (const file of parsed.baseline.protectedFiles) {
+    for (const file of baseline.protectedFrozenFiles) {
       requests.set(`head:${file.path}`, file.blobSha);
     }
-    for (const item of parsed.baseline.candidateChangedFiles) {
+    for (const item of baseline.candidateChangedFiles) {
       if (item.base) requests.set(`base:${item.path}`, item.base.blobSha);
       if (item.head) requests.set(`head:${item.path}`, item.head.blobSha);
     }
+    requests.set("head:package-lock.json", baseline.packageLock.blobSha);
     const cache = new Map();
     for (const [key, blobSha] of requests) {
       let promise = cache.get(blobSha);
       if (!promise) {
         promise = fetchBlobBytes({
           apiUrl,
-          repository: parsed.baseline.repository,
+          repository: baseline.repository,
           blobSha,
           token,
         });
@@ -192,21 +187,24 @@ async function main() {
   if (!baseTree.complete) extraReasons.push(baseTree.reason ?? "base_tree_incomplete");
   if (!headTree.complete) extraReasons.push(headTree.reason ?? "head_tree_incomplete");
   if (!compare.complete) extraReasons.push(compare.reason ?? "ancestor_check_incomplete");
-  if (!anchorContentComplete) extraReasons.push("anchor_content_unavailable");
+  if (!packageJsonComplete) extraReasons.push("package_json_unavailable");
   if (!blobHashesComplete) extraReasons.push("blob_sha256_unavailable");
 
-  const evaluation = evaluateTrustedFreeze({
-    baseline: parsed.baseline,
+  const evaluation = evaluatePhase2eIntegrity({
+    baseline,
     repositoryFullName,
     prHeadRepositoryFullName,
     prHeadRef,
+    prBaseRef,
+    prBaseSha,
     sourceHeadSha,
     eventSourceHeadSha,
     ancestorCheckComplete: compare.complete === true,
-    implementationBaseIsAncestor: compare.isAncestor === true,
+    frozenBaseIsAncestor: compare.isAncestor === true,
     baseTreeComplete: baseTree.complete === true,
     headTreeComplete: headTree.complete === true,
     observedBaseTreeSha: baseCommit.treeSha,
+    observedHeadTreeSha: headCommit.treeSha,
     baseTree: baseTree.entries ?? [],
     headTree: headTree.entries ?? [],
     compareFiles: compare.files,
@@ -230,18 +228,17 @@ function failClosed(evaluation) {
 }
 
 function finish(evaluation) {
-  const text = formatMachineSummary(evaluation);
-  if (summaryContainsForbiddenDecisionWording(text)) {
+  if (summaryContainsForbiddenDecisionWording(formatPhase2eMachineSummary(evaluation))) {
     evaluation.trustedBaselineIntegrityOk = false;
     evaluation.reasons = [...evaluation.reasons, "forbidden_decision_wording"];
   }
-  const output = formatMachineSummary(evaluation);
+  const output = formatPhase2eMachineSummary(evaluation);
   process.stdout.write(`${output}\n`);
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
     appendFileSync(
       githubOutput,
-      `trustedBaselineIntegrityOk=${evaluation.trustedBaselineIntegrityOk ? "true" : "false"}\n`,
+      `phase2eTrustedBaselineIntegrityOk=${evaluation.trustedBaselineIntegrityOk ? "true" : "false"}\n`,
     );
     appendFileSync(
       githubOutput,
@@ -252,14 +249,10 @@ function finish(evaluation) {
   process.exit(ok ? 0 : 1);
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : "unknown_error";
+main().catch(() => {
   finish({
     trustedBaselineIntegrityOk: false,
     sourceHeadMatchesReviewedCandidate: false,
     reasons: ["checker_unhandled_error"],
-    // Keep the original error off the machine summary so PR-controlled
-    // text cannot land in shell-interpolated logs.
-    _ignored: message,
   });
 });

@@ -31,6 +31,42 @@ describe("trusted workflow structure", () => {
     assert.match(text, /PR_HEAD_REF: \$\{\{ github\.event\.pull_request\.head\.ref \}\}/);
   });
 
+  it("executes governance from github.workflow_sha rather than the PR base", () => {
+    const text = readFileSync(gatePath, "utf8");
+    assert.equal(text.includes("ref: ${{ github.workflow_sha }}"), true);
+    assert.equal(text.includes("ref: ${{ github.event.pull_request.base.sha }}"), false);
+    assert.equal([...text.matchAll(/persist-credentials: false/g)].length >= 2, true);
+    assert.doesNotMatch(text, /continue-on-error/);
+    assert.doesNotMatch(text, /allow-unsafe-pr-checkout/);
+    assert.doesNotMatch(text, /contents:\s*write/);
+    assert.doesNotMatch(text, /secrets:/);
+    assert.doesNotMatch(text, /evidence:phase2d-corrective4:verify/);
+  });
+
+  it("routes Phase 2D and Phase 2E through the same required context", () => {
+    const text = readFileSync(gatePath, "utf8");
+    assert.match(text, /steps\.classify\.outputs\.mode == 'PHASE2D_ENFORCE'/);
+    assert.match(text, /steps\.classify\.outputs\.mode == 'PHASE2E_ENFORCE'/);
+    assert.match(
+      text,
+      /PHASE2D_ENFORCE\|PHASE2E_ENFORCE\|NOT_APPLICABLE\|GOVERNANCE_REVIEW_REQUIRED/,
+    );
+    assert.match(text, /node-version: "22\.23\.2"/);
+    assert.match(text, /phase2e-trusted-freeze-check\.mjs/);
+    assert.match(text, /TRUSTED_PHASE2E_RUNNER/);
+    assert.match(text, /Check out the exact Phase 2E candidate HEAD after trusted classification/);
+    const classifyIndex = text.indexOf("Classify the pull request from trusted workflow code");
+    const integrityIndex = text.indexOf("Enforce exact Phase 2E candidate integrity");
+    const checkoutIndex = text.indexOf(
+      "Check out the exact Phase 2E candidate HEAD after trusted classification",
+    );
+    const runtimeIndex = text.indexOf("Run trusted Phase 2E runtime commands");
+    assert.equal(classifyIndex > 0, true);
+    assert.equal(integrityIndex > classifyIndex, true);
+    assert.equal(checkoutIndex > integrityIndex, true);
+    assert.equal(runtimeIndex > checkoutIndex, true);
+  });
+
   it("defines an unskipped governance self-test with an execution marker", () => {
     const text = readFileSync(selfTestPath, "utf8");
     assert.match(

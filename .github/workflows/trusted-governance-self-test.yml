@@ -9,6 +9,7 @@ on:
       - ".github/CODEOWNERS"
       - "scripts/governance/**"
       - "docs/TRUSTED_PHASE2D_REVIEW_BOUNDARY.md"
+      - "docs/PHASE_2E_TRUSTED_GATE.md"
   push:
     branches:
       - main
@@ -20,6 +21,7 @@ on:
       - ".github/CODEOWNERS"
       - "scripts/governance/**"
       - "docs/TRUSTED_PHASE2D_REVIEW_BOUNDARY.md"
+      - "docs/PHASE_2E_TRUSTED_GATE.md"
 
 permissions:
   contents: read
@@ -37,6 +39,12 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Fetch frozen Phase 2E identities
+        run: |
+          git fetch --no-tags origin \
+            7f196d367e39640eee9517f742b0d61424f9d4cc \
+            f24421d9c80d96d7279d9626fc6bb95941031cf5
 
       - name: Parse workflow YAML
         run: |
@@ -60,6 +68,8 @@ jobs:
         run: |
           node scripts/governance/generate-phase2d-corrective4-baseline.mjs
           git diff --exit-code -- .github/trusted/phase2d-corrective4-baseline.json
+          node scripts/governance/generate-phase2e-baseline.mjs
+          git diff --exit-code -- .github/trusted/phase2e-corrective1-baseline.json
 
       - name: Prove the self-test job executed
         run: echo "trustedGovernanceSelfTestExecuted=true"
