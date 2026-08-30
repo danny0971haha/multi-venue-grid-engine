@@ -161,15 +161,57 @@ export async function inspectHaltContinuation(
       runtimeDisposition: "FAIL_CLOSED",
     });
   }
+  if (isNonRunningHaltStatus(loaded.record.status)) {
+    return successFromRecord(
+      context,
+      loaded.record,
+      loaded.inspection,
+      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
+      ["RISK_INCREASE_FENCED"],
+      { runtimeDisposition: dispositionFromStatus(loaded.record.status) },
+    );
+  }
+  return authorizeCurrentRunningContinuation(context, loaded);
+}
+
+async function authorizeCurrentRunningContinuation(
+  context: HaltRuntimeContext,
+  loaded: {
+    record: DurableHaltRecord;
+    inspection: PairInspection;
+    generation: string;
+    envelopeSha256: string;
+  },
+): Promise<HaltOperationResult> {
+  const persist = {
+    committedGeneration: loaded.generation,
+    committedEnvelopeSha256: loaded.envelopeSha256,
+  };
+  const blocked = (reasonCodes: readonly string[]): HaltOperationResult =>
+    successFromRecord(context, loaded.record, loaded.inspection, persist, reasonCodes, {
+      runtimeDisposition: "FAIL_CLOSED",
+      forceRiskBlocked: true,
+    });
+  const lease = await proveLease(context);
+  if (!lease.ok) {
+    return blocked(["LEASE_UNCERTAIN", "RISK_INCREASE_FENCED", ...lease.reasonCodes]);
+  }
+  if (context.latch.blocked) {
+    return blocked(["LATCH_ALREADY_BLOCKED", "RISK_INCREASE_FENCED"]);
+  }
+  if (context.processFence.tripped) {
+    return blocked(["RISK_INCREASE_FENCED"]);
+  }
+  if (loaded.record.unresolvedPossibleExposure) {
+    return blocked(["UNRESOLVED_UNKNOWN", "RISK_INCREASE_FENCED"]);
+  }
   return successFromRecord(
     context,
     loaded.record,
     loaded.inspection,
-    { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-    loaded.record.status === "RUNNING" ? ["DURABLE_HALT_RUNNING"] : ["RISK_INCREASE_FENCED"],
-    {
-      runtimeDisposition: dispositionFromStatus(loaded.record.status),
-    },
+    persist,
+    ["DURABLE_HALT_RUNNING"],
+    { runtimeDisposition: "RUNNING" },
   );
 }
 
@@ -516,9 +558,26 @@ export async function acknowledgeHalt(
     return rejectLoaded(["RISK_INCREASE_FENCED"]);
   }
 
-  const resume = await obtainInternalResumeAuthority(context, loaded.record);
-  if (!resume.ok) {
-    return rejectLoaded(resume.reasonCodes);
+  const initialResume = await obtainInternalResumeAuthority(context, loaded.record);
+  if (!initialResume.ok) {
+    return rejectLoaded(initialResume.reasonCodes);
+  }
+
+  if (context.ackTransitionHooks?.beforeAckPersistLeaseRecheck !== undefined) {
+    await context.ackTransitionHooks.beforeAckPersistLeaseRecheck();
+  }
+
+  const relock = await proveLease(context);
+  if (!relock.ok) {
+    return rejectLoaded(["LEASE_UNCERTAIN", ...relock.reasonCodes]);
+  }
+  if (context.latch.blocked) {
+    return rejectLoaded(["LATCH_BLOCKS_ACK"]);
+  }
+
+  const finalResume = await obtainInternalResumeAuthority(context, loaded.record);
+  if (!finalResume.ok) {
+    return rejectLoaded(finalResume.reasonCodes);
   }
 
   const nextGeneration = incrementCanonicalGeneration(loaded.generation);
@@ -534,9 +593,9 @@ export async function acknowledgeHalt(
     priorLeaseGeneration: loaded.record.leaseGeneration ?? context.leaseAuthority.generation,
     currentLeaseGeneration: context.leaseAuthority.generation,
     resultingStatus: "RUNNING",
-    snapshotSourceId: resume.snapshot.sourceId,
-    snapshotObservedAt: resume.snapshot.observedAt,
-    snapshotLeaseGeneration: resume.snapshot.leaseGeneration,
+    snapshotSourceId: finalResume.snapshot.sourceId,
+    snapshotObservedAt: finalResume.snapshot.observedAt,
+    snapshotLeaseGeneration: finalResume.snapshot.leaseGeneration,
   };
   const running = makeHaltRecord({
     ...loaded.record,
@@ -550,23 +609,11 @@ export async function acknowledgeHalt(
     acknowledgement,
     unresolvedPossibleExposure: false,
     flatnessProven: false,
-    snapshotFresh: true,
-    snapshotObservedAt: resume.snapshot.observedAt,
-    lastRiskEvaluationAt: resume.riskDecision.evaluatedAt,
+    snapshotFresh: finalResume.snapshot.fresh,
+    snapshotObservedAt: finalResume.snapshot.observedAt,
+    lastRiskEvaluationAt: finalResume.riskDecision.evaluatedAt,
     updatedAt: context.haltClock.nowIso(),
   });
-
-  if (context.ackTransitionHooks?.beforeAckPersistLeaseRecheck !== undefined) {
-    await context.ackTransitionHooks.beforeAckPersistLeaseRecheck();
-  }
-
-  const relock = await proveLease(context);
-  if (!relock.ok) {
-    return rejectLoaded(["LEASE_UNCERTAIN", ...relock.reasonCodes]);
-  }
-  if (context.latch.blocked) {
-    return rejectLoaded(["LATCH_BLOCKS_ACK"]);
-  }
 
   let persist: Awaited<ReturnType<typeof persistHaltTransition>>;
   try {
@@ -752,11 +799,18 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
   const ownedRiskIncreasing = orders.filter(
     (order) => order.ownership === "OWNED" && order.riskIncreasing,
   );
+  const ambiguousRiskIncreasing = orders.some(
+    (order) => order.ownership === "AMBIGUOUS" && order.riskIncreasing,
+  );
   if (orders.some((order) => order.ownership === "UNOWNED")) {
     trace.reasonCodes.push("UNOWNED_CANCEL_REFUSED");
   }
   if (orders.some((order) => order.ownership === "AMBIGUOUS")) {
     trace.reasonCodes.push("AMBIGUOUS_ORDERS_PRESENT");
+  }
+  if (ambiguousRiskIncreasing) {
+    trace.unresolvedPossibleExposure = true;
+    trace.reasonCodes.push("RECONCILIATION_REQUIRED");
   }
 
   for (const order of ownedRiskIncreasing) {
@@ -846,6 +900,7 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
     flattenKind === "ACK" &&
     !trace.cancelFailed &&
     !trace.cancelUnknown &&
+    !trace.unresolvedPossibleExposure &&
     trace.snapshotFresh &&
     snapshot.authoritative &&
     snapshot.leaseGeneration === context.leaseAuthority.generation &&
@@ -857,7 +912,7 @@ async function remediateAfterHalting(context: HaltRuntimeContext): Promise<Mutat
 }
 
 function decideTerminalStatus(trace: MutationTrace): HaltStatus {
-  if (trace.cancelUnknown || trace.flattenUnknown) {
+  if (trace.cancelUnknown || trace.flattenUnknown || trace.unresolvedPossibleExposure) {
     return "RECONCILIATION_REQUIRED";
   }
   if (trace.flatnessProven) {
@@ -913,6 +968,9 @@ function evaluateInternalAckGates(args: {
   if (args.observation.kind === "malformed") {
     codes.push("SNAPSHOT_OBSERVED_AT_MALFORMED", "STALE_SNAPSHOT");
   }
+  if (args.snapshot.fresh !== true) {
+    codes.push("STALE_SNAPSHOT");
+  }
   if (!args.snapshot.authoritative) {
     codes.push("SNAPSHOT_NOT_AUTHORITATIVE");
   }
@@ -925,8 +983,14 @@ function evaluateInternalAckGates(args: {
   const ownedRiskIncreasingRemaining = args.orders.some(
     (order) => order.ownership === "OWNED" && order.riskIncreasing,
   );
+  const ambiguousRiskIncreasingRemaining = args.orders.some(
+    (order) => order.ownership === "AMBIGUOUS" && order.riskIncreasing,
+  );
   if (ownedRiskIncreasingRemaining || args.snapshot.ownedRiskIncreasingRemaining) {
     codes.push("OWNED_RISK_INCREASING_REMAINING");
+  }
+  if (ambiguousRiskIncreasingRemaining) {
+    codes.push("AMBIGUOUS_ORDERS_PRESENT");
   }
   if (args.snapshot.unknownReservations.length > 0) {
     codes.push("UNRESOLVED_UNKNOWN");
@@ -1054,6 +1118,9 @@ async function obtainInternalResumeAuthority(
   if (record.unresolvedPossibleExposure) {
     return { ok: false, reasonCodes: ["UNRESOLVED_UNKNOWN"] };
   }
+  if (record.startingEquityUsd === null || record.highWaterEquityUsd === null) {
+    return { ok: false, reasonCodes: ["DURABLE_RISK_BASELINE_MISSING"] };
+  }
 
   const snapshotFence = await runFencedTransport(context, () => context.transport.freshSnapshot());
   if (snapshotFence.outcome !== "SENT" || snapshotFence.value === null) {
@@ -1126,8 +1193,8 @@ function buildInternalRiskInput(args: {
     signedPosition: args.snapshot.signedPosition,
     markOrMidPrice: args.snapshot.markOrMidPrice,
     equity: args.snapshot.equity,
-    startingEquity: args.record.startingEquityUsd ?? args.snapshot.equity,
-    highWaterEquity: args.record.highWaterEquityUsd ?? args.snapshot.equity,
+    startingEquity: args.record.startingEquityUsd,
+    highWaterEquity: args.record.highWaterEquityUsd,
     realizedTradingPnl: args.snapshot.realizedTradingPnl,
     fees: args.snapshot.fees,
     funding: args.snapshot.funding,
@@ -1157,7 +1224,7 @@ function buildInternalRiskInput(args: {
       possible: true,
       ambiguous: false,
       cancelOnly: false,
-      snapshotFresh: true,
+      snapshotFresh: args.snapshot.fresh,
     },
   };
 }
