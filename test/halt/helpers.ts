@@ -147,6 +147,10 @@ export async function withTempDir(run: (directory: string) => Promise<void>): Pr
 export async function seedHaltContext(
   directory: string,
   script: Parameters<typeof createScriptedHaltTransport>[0],
+  extras?: {
+    startingEquityUsd?: string | null;
+    highWaterEquityUsd?: string | null;
+  },
 ): Promise<{
   context: HaltRuntimeContext;
   transport: ReturnType<typeof createScriptedHaltTransport>;
@@ -187,7 +191,11 @@ export async function seedHaltContext(
     processFence: new HaltProcessFence(),
     expectedSnapshotSourceId: DEFAULT_SNAPSHOT_SOURCE_ID,
   };
-  const initialized = await initializeDurableHalt(context, { startingEquityUsd: "100" });
+  const initialized = await initializeDurableHalt(context, {
+    startingEquityUsd: extras?.startingEquityUsd !== undefined ? extras.startingEquityUsd : "100",
+    highWaterEquityUsd:
+      extras?.highWaterEquityUsd !== undefined ? extras.highWaterEquityUsd : "100",
+  });
   if (initialized.durableStatus !== "RUNNING" || initialized.durableGeneration !== "1") {
     throw new Error(`halt initialize failed: ${initialized.reasonCodes.join(",")}`);
   }
