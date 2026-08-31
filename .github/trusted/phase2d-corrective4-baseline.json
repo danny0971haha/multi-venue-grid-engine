@@ -746,6 +746,13 @@
       "sha256": "7b925d40cc4e17b2a89ac676cf469686261c9bffa4ca4fab932015e767b90cd8"
     },
     {
+      "path": ".github/trusted/phase2e-corrective3-baseline.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "1cab801c55564b9c6e7643ee667d1bee46e2847e",
+      "sha256": "789cad3c7bce93a8dd35297d29724c5e4ec491c8a83fb28de917f8068042021d"
+    },
+    {
       "path": ".github/trusted/repository-governance-policy.json",
       "mode": "100644",
       "objectType": "blob",
@@ -756,22 +763,29 @@
       "path": ".github/workflows/trusted-governance-self-test.yml",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "26d582a92b6f45b439a5a23aa8cb6a370ed27b83",
-      "sha256": "a66ea018d64f41942d06c2c5d67406216f9ab262b99fb93ed316b9e68e04b67a"
+      "blobSha": "056a819cc7848847874e69c0d05a729daedbc675",
+      "sha256": "0636a6a8b74dba1515ad77e77648ebfcf10f8b38e7d77c9bd1f74f2701473290"
     },
     {
       "path": ".github/workflows/trusted-phase2d-freeze.yml",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "f2fbd9cfb2decfd289bb260d86c235cebcd861ca",
-      "sha256": "c668b9b2d1de1658a4d455a08fa0ac6c1c621305613ca15c271e83aaf622955e"
+      "blobSha": "d96894447a6726f341bcf464025f064ae52ae4f1",
+      "sha256": "f57a8616a00951b8eeb5b14ea224a91eb734b06209521c515da1f8ef5b613f4c"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/extra-changed-path.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4b834ec8702bb011cd4b15cfa76fd7c55800c21",
+      "sha256": "27d54f1094ce6c8f11afc319a208662eef65ad4dc7626fb3b12299263b6521ae"
     },
     {
       "path": "scripts/governance/fixtures/events/fork-phase2e.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "536d95e6dfc8192266b5dfc24aa1bd826398278c",
-      "sha256": "f8bcf20c495a51e3191133ffe634918f9d130de2982539fbbf4619fc848b051a"
+      "blobSha": "d83e7dd52251babff0e8f84107343df0db324323",
+      "sha256": "9638579763cf79737d76e7c9a3d9e2de05c6cce6ec3be0bb47d777610bbb2949"
     },
     {
       "path": "scripts/governance/fixtures/events/governance-only.json",
@@ -779,6 +793,27 @@
       "objectType": "blob",
       "blobSha": "e9868ed31d0cb7b7caea219a7a530c2f362cd6a8",
       "sha256": "2baba5fc8ab29a90d32d8703123f85c78f88590fc70e7d203332aa3a6645d61f"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/malformed-pr-metadata.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "4d8207f02cbda1af14eed581402a88144169bdca",
+      "sha256": "438d8191c798bcb539c1fd3d0acb03316c228a5eee34ac312bc8e57aede95272"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/old-corrective1-head.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4ebda9f6063776669715870d7c4746ad5413f7c",
+      "sha256": "4bdee82967ecfa56f4b462fcd257e980503597f69ce76496a9459b47d84aa3ef"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/omitted-test-file.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4b834ec8702bb011cd4b15cfa76fd7c55800c21",
+      "sha256": "27d54f1094ce6c8f11afc319a208662eef65ad4dc7626fb3b12299263b6521ae"
     },
     {
       "path": "scripts/governance/fixtures/events/unrelated.json",
@@ -798,8 +833,15 @@
       "path": "scripts/governance/fixtures/events/valid-phase2e.json",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "e4ebda9f6063776669715870d7c4746ad5413f7c",
-      "sha256": "4bdee82967ecfa56f4b462fcd257e980503597f69ce76496a9459b47d84aa3ef"
+      "blobSha": "e4b834ec8702bb011cd4b15cfa76fd7c55800c21",
+      "sha256": "27d54f1094ce6c8f11afc319a208662eef65ad4dc7626fb3b12299263b6521ae"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/wrong-head.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "2393ca7ea9cbf8777f25052a1d6037d67fb0e8e8",
+      "sha256": "a06a45c5dcd365061ffc6e2f84d97ac13427f542c264c6054f1999560a49838e"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/deployment-authorized.json",
@@ -942,6 +984,13 @@
       "sha256": "3e511807546e618d24baae231eb2a52bb0caaef1450b06c8eb47d4e031694fb4"
     },
     {
+      "path": "scripts/governance/fixtures/wrong-tree.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "52a1c9edc4c06219d6799f480ab5455f1e681b89",
+      "sha256": "9870d93153297d13df028f308c34aed4cbeebfca7c6b373b3d294bae44d3f8ac"
+    },
+    {
       "path": "scripts/governance/generate-phase2d-corrective4-baseline.mjs",
       "mode": "100644",
       "objectType": "blob",
@@ -959,8 +1008,8 @@
       "path": "scripts/governance/generate-phase2e-baseline.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "7b0d7520e7d7b48843285f05662ab8af19a50dc5",
-      "sha256": "2c9c1405adec774430a921841743baa9324bbd27746417d301230c4977b6f010"
+      "blobSha": "4e5dbe3bd8f9f24d075d4f884b027900a35dcbab",
+      "sha256": "d91face5e32c498e564799f28030036cc5826e80078a71c43e0c0a28af7dc1c1"
     },
     {
       "path": "scripts/governance/phase2d-trusted-control.mjs",
@@ -1029,8 +1078,8 @@
       "path": "scripts/governance/phase2d-workflow-structure.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "6ffb7537b6e2756d746527b75a776e28d627cdb2",
-      "sha256": "c54ed9a705cf5313446735ba86f772a5a7e4a86ee568a80e1d164f43a2babf78"
+      "blobSha": "1330bbff08350cfe9d50a495c7da9f51b5885ece",
+      "sha256": "d411763b0082f967e8c5834c39cc777d6c15b0aa3defb740867fe6085d9e6aa5"
     },
     {
       "path": "scripts/governance/phase2e-trusted-freeze-check.mjs",
@@ -1043,36 +1092,36 @@
       "path": "scripts/governance/phase2e-trusted-freeze-lib.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "812b490f59ab11f0afd02b1d8ca06aa60b696a90",
-      "sha256": "0f69d64208df7d555193a39bd586e070ed1b6e55d0d1c030afc8bced8b228756"
+      "blobSha": "e2f2065a9c2fe9a48bd8d710985653365c5c0f1f",
+      "sha256": "87a4ac2df84b8da311de43ba9b9a1fff22e558e11c396f068a4926f99facd0f6"
     },
     {
       "path": "scripts/governance/phase2e-trusted-freeze-lib.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "effcffdbdce25715ee41deb0b24121da979162b2",
-      "sha256": "b475d306186a61ee25f24da5f06071942034b14395e6ef94da9bf840222cbdbf"
+      "blobSha": "a0cc51a64be351ea98286e34d8b4dfe78abb1ed7",
+      "sha256": "86eb05aaa0879f3bcaf3daea73673f786e351818f021248ee412e2b427fbdcd1"
     },
     {
       "path": "scripts/governance/phase2e-trusted-gate.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "c5312c11ccee7c5e5d1389ae2b5042291529626b",
-      "sha256": "cd201d2101ac2625fa2a2789b45b9b1a95149d8ec61c089bcff9526ca84a1d39"
+      "blobSha": "2ad0decda431e84f09aac31e06d2d3446f18fdcf",
+      "sha256": "28e66585cba210ce7e01b677adc9266a47be10f22823da34257ece5ae6b62933"
     },
     {
       "path": "scripts/governance/phase2e-trusted-runtime.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "f665ad45b7e1d133c44654dd575be5c361311b2d",
-      "sha256": "e13c881c70551b0c1b41b31382e0805570a9967832a942bc30e1cef4a5687773"
+      "blobSha": "a7c2b09cfacbe5a890b725a005594a3f64ae5742",
+      "sha256": "b36ec24b8459687580c11ac96362a8bddbd2ccf7a5bab0c6ce29cb6adf1ba47c"
     },
     {
       "path": "scripts/governance/phase2e-trusted-runtime.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "8470667fc688cbace113f61c0d2ff3ea5f44fdb2",
-      "sha256": "9baf5c342349a775c1a04e995ca796e3e5e21ac7c8840f73047c4b6b756b55bc"
+      "blobSha": "0a1add4f3b758c87dd1220d7db984cd3efcf91dc",
+      "sha256": "8b80a731c8f01d1edfedbf0abfdec4b2ed0ad28310fb01fefd652552d0f8c2a8"
     },
     {
       "path": "scripts/governance/repository-governance-policy.mjs",
