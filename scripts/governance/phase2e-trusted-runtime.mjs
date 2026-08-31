@@ -227,6 +227,22 @@ export function evaluateNpmTestOutput({ exitCode, signal, stdout, mismatch, cand
   ) {
     return { ok: false, ignoredEvidenceFailures: 0, reason: "npm_test_tap_counts_mismatch" };
   }
+  if (pinned.expectedTapFail === 0) {
+    if (parsed.failedTests.length !== 0) {
+      return { ok: false, ignoredEvidenceFailures: 0, reason: "npm_test_unexpected_failure" };
+    }
+    if (parsed.failedSuites.length !== 0) {
+      return { ok: false, ignoredEvidenceFailures: 0, reason: "npm_test_unexpected_suite_failure" };
+    }
+    if (pinned.expectedFailureNames.length !== 0) {
+      return { ok: false, ignoredEvidenceFailures: 0, reason: "npm_test_failure_count_mismatch" };
+    }
+    return {
+      ok: true,
+      ignoredEvidenceFailures: 0,
+      reason: "npm_test_all_passed",
+    };
+  }
   if (parsed.failedTests.length !== pinned.expectedFailureNames.length) {
     return { ok: false, ignoredEvidenceFailures: 0, reason: "npm_test_failure_count_mismatch" };
   }
@@ -269,6 +285,33 @@ export function evaluateNpmTestOutput({ exitCode, signal, stdout, mismatch, cand
     ignoredEvidenceFailures: parsed.failedTests.length,
     reason: "phase2d_evidence_identity_failures_not_used_as_phase2e_result",
   };
+}
+
+export function evaluatePhase2eSuiteOutput({ exitCode, signal, stdout }) {
+  if (signal) {
+    return { ok: false, reason: "phase2e_test_signal_exit" };
+  }
+  if (!Number.isInteger(exitCode)) {
+    return { ok: false, reason: "phase2e_test_abnormal_exit" };
+  }
+  if (exitCode !== 0) {
+    return { ok: false, reason: "phase2e_test_exit_mismatch" };
+  }
+  const parsed = parseNodeTapStdout(stdout);
+  if (!parsed.ok) {
+    return { ok: false, reason: parsed.reason };
+  }
+  if (parsed.summary.cancelled !== 0 || parsed.summary.skipped !== 0 || parsed.summary.todo !== 0) {
+    return { ok: false, reason: "phase2e_test_skipped_or_todo" };
+  }
+  if (
+    parsed.summary.fail !== 0 ||
+    parsed.failedTests.length !== 0 ||
+    parsed.failedSuites.length !== 0
+  ) {
+    return { ok: false, reason: "phase2e_test_unexpected_failure" };
+  }
+  return { ok: true, reason: "phase2e_test_all_passed" };
 }
 
 export function parseDryRunLiveExchangeWrites(stdout) {
@@ -417,6 +460,15 @@ export function runPhase2eTrustedRuntime({
         entry.ok = disposition.ok;
         entry.npmTestReason = disposition.reason;
         npmTestIgnoredEvidenceFailures = disposition.ignoredEvidenceFailures;
+        if (!disposition.ok) reasons.push(disposition.reason);
+      } else if (command === "npm run test:phase2e") {
+        const disposition = evaluatePhase2eSuiteOutput({
+          exitCode: result.exitCode,
+          signal: result.signal,
+          stdout: result.stdout,
+        });
+        entry.ok = disposition.ok;
+        entry.phase2eTestReason = disposition.reason;
         if (!disposition.ok) reasons.push(disposition.reason);
       } else if (command === "npm run dry-run") {
         const dry = parseDryRunLiveExchangeWrites(result.stdout);

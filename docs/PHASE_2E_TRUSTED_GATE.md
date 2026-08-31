@@ -23,13 +23,16 @@ RUNTIME_PR=7
 RUNTIME_BRANCH=experiment/v0.1-phase2e-halt-ack
 RUNTIME_BASE_BRANCH=experiment/v0.1-phase2
 RUNTIME_BASE_SHA=7f196d367e39640eee9517f742b0d61424f9d4cc
-RUNTIME_CANDIDATE_HEAD_BOUND=f24421d9c80d96d7279d9626fc6bb95941031cf5
-RUNTIME_CANDIDATE_TREE=be500d1ec4268269672cf1e1bb8f6cca29e5d397
-BASELINE_PATH=.github/trusted/phase2e-corrective1-baseline.json
+RUNTIME_CANDIDATE_HEAD_BOUND=704afa2dd858c52dad06aa22941d463aa5ce4d69
+RUNTIME_CANDIDATE_TREE=bda9793acd2fb8de033f65739b8c092cbdec7d9b
+BASELINE_PATH=.github/trusted/phase2e-corrective3-baseline.json
 SCHEMA=multi-venue-phase2e-trusted-baseline/1
+INVALIDATED_CORRECTIVE1_HEAD=f24421d9c80d96d7279d9626fc6bb95941031cf5
+INVALIDATED_CORRECTIVE1_TREE=be500d1ec4268269672cf1e1bb8f6cca29e5d397
+INVALIDATED_CORRECTIVE1_BASELINE=.github/trusted/phase2e-corrective1-baseline.json
 ```
 
-The bound HEAD is Runtime Corrective 1. It is not `7b98c888543b980dee48b27f4497db1bf93a7970`.
+The live bound HEAD is Runtime Corrective 3. It is not Runtime Corrective 1 `f24421d9c80d96d7279d9626fc6bb95941031cf5` / tree `be500d1ec4268269672cf1e1bb8f6cca29e5d397`. It is not `7b98c888543b980dee48b27f4497db1bf93a7970`. The Corrective 1 baseline file remains only as an invalidated historical artifact and is not the live pin.
 
 ## Modes
 
@@ -49,14 +52,23 @@ The existing required check name is unchanged. Modes returned into that context:
 4. Credentials are not persisted.
 5. Candidate bytes do not control classification, allowed paths, expected SHAs, protected hashes, required commands, or final disposition.
 6. The Phase 2D evidence verifier is not executed as a Phase 2E result.
-7. `npm test` TAP from Runtime Corrective 1 may contain historical Phase 2D evidence identity failures. Those failures are not Phase 2E success evidence. The trusted runner may continue only when stdout TAP matches the exact pin in `.github/trusted/phase2e-corrective1-baseline.json` / `PHASE2E_NPM_TEST_HISTORICAL_MISMATCH`:
-   - bound Runtime HEAD `f24421d9c80d96d7279d9626fc6bb95941031cf5`
-   - exact file `test/evidence/phase2d-corrective4-evidence.test.ts`
-   - exact 43 failure names
-   - expected counts `# tests 516`, `# pass 473`, `# fail 43`, cancelled/skipped/todo `0`
-   - expected assertion identity `ERR_ASSERTION` / `PACKAGE_SCRIPT`
-   - process exit `1` with no signal
-   Any new evidence-file failure, other-file failure, skip/todo/cancelled, missing/malformed TAP, stderr-only spoof, exit `0`, timeout, OOM, or signal fails closed.
+7. Trusted runtime on the exact candidate HEAD is, in this order:
+   - `npm ci`
+   - `npm run typecheck`
+   - `npm run lint`
+   - `npm run format:check`
+   - `npm test`
+   - `npm run test:phase2e`
+   - `npm run build`
+   - `npm run scan:secrets`
+   - `npm run dry-run`
+8. `npm test` TAP from Runtime Corrective 3 must be green. Historical Corrective 1 evidence-identity failures are not ignored. The trusted runner may continue only when stdout TAP matches the exact pin in `.github/trusted/phase2e-corrective3-baseline.json` / `PHASE2E_NPM_TEST_HISTORICAL_MISMATCH`:
+   - bound Runtime HEAD `704afa2dd858c52dad06aa22941d463aa5ce4d69`
+   - expected counts `# tests 474`, `# pass 474`, `# fail 0`, cancelled/skipped/todo `0`
+   - process exit `0` with no signal
+   - no failed tests or failed suites
+   `npm run test:phase2e` must also be TAP-green: exit `0`, fail/skip/todo/cancelled `0`.
+   Any failure, skip/todo/cancelled, missing/malformed TAP, stderr-only spoof, non-zero exit, timeout, OOM, or signal fails closed.
 
 This document does not emit `ACCEPT`, `PASS`, `PHASE2E_GOVERNANCE_PASS`, or `PHASE2E_RUNTIME_ACCEPTED`.
 
@@ -82,7 +94,7 @@ PHASE2E_RUNTIME_ACCEPTED=NO
    - unrelated paths → `NOT_APPLICABLE`
    - mixed governance + runtime / extra path / lockfile / fork / stale SHA / malformed event → `FAIL_CLOSED` or `PHASE2D_ENFORCE` then exact-identity fail
 5. After independent review merge-commits this governance change onto `main`, later runtime PRs are classified and integrity-checked only by the governance bytes then present on `main`. A moving branch name is not authorization. Runtime HEAD and tree must match the pinned SHAs.
-6. A later commit on `experiment/v0.1-phase2e-halt-ack` that is not `f24421d9c80d96d7279d9626fc6bb95941031cf5` / tree `be500d1ec4268269672cf1e1bb8f6cca29e5d397` fails closed until this baseline is versioned again on `main`.
+6. A later commit on `experiment/v0.1-phase2e-halt-ack` that is not `704afa2dd858c52dad06aa22941d463aa5ce4d69` / tree `bda9793acd2fb8de033f65739b8c092cbdec7d9b` fails closed until this baseline is versioned again on `main`. The invalidated Corrective 1 identity `f24421d9c80d96d7279d9626fc6bb95941031cf5` / tree `be500d1ec4268269672cf1e1bb8f6cca29e5d397` is not authorized.
 
 Do not execute untrusted candidate scripts with secrets to land this PR. Do not treat `GOVERNANCE_REVIEW_REQUIRED` as self-declared acceptance.
 
@@ -106,7 +118,7 @@ PR8_MERGE_AUTHORIZED=NO
 No `src/**` exemption. Allowed paths are the exact stacked diff versus `7f196d367e39640eee9517f742b0d61424f9d4cc`:
 
 - `docs/PHASE_2E_EVIDENCE.md`
-- `package.json` (scripts-only: `test` glob and added `test:phase2e`)
+- `package.json` (scripts-only: added `test:phase2e`; `test` matches frozen Phase 2D)
 - `src/halt/engine.ts`
 - `src/halt/halt-id.ts`
 - `src/halt/index.ts`
@@ -119,3 +131,5 @@ No `src/**` exemption. Allowed paths are the exact stacked diff versus `7f196d36
 - `test/halt/helpers.ts`
 - `test/halt/p2-h-matrix.test.ts`
 - `test/halt/p2e-corrective-1.test.ts`
+- `test/halt/p2e-corrective-2.test.ts`
+- `test/halt/p2e-corrective-3.test.ts`

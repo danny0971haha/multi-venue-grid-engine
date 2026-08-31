@@ -10,6 +10,8 @@ import { parseBaseline, TRUSTED_BASELINE_PATH } from "./phase2d-trusted-freeze-l
 import {
   PHASE2E_CANDIDATE_HEAD_SHA,
   PHASE2E_FROZEN_BASE_SHA,
+  PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA,
+  PHASE2E_STALE_CORRECTIVE2_HEAD_SHA,
   PHASE2E_TRUSTED_BASELINE_PATH,
   parsePhase2eBaseline,
 } from "./phase2e-trusted-freeze-lib.mjs";
@@ -105,6 +107,33 @@ describe("Phase 2E and Phase 2D gate routing", () => {
   it("fail closed on a stale Phase 2E head SHA", () => {
     assert.equal(
       classifyGate(exactPhase2e({ headSha: "7b98c888543b980dee48b27f4497db1bf93a7970" })).mode,
+      "FAIL_CLOSED",
+    );
+  });
+
+  it("fail closed on the invalidated Runtime Corrective 1 HEAD", () => {
+    assert.equal(
+      classifyGate(exactPhase2e({ headSha: PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA })).mode,
+      "FAIL_CLOSED",
+    );
+  });
+
+  it("fail closed on the stale Runtime Corrective 2 HEAD", () => {
+    assert.equal(
+      classifyGate(exactPhase2e({ headSha: PHASE2E_STALE_CORRECTIVE2_HEAD_SHA })).mode,
+      "FAIL_CLOSED",
+    );
+  });
+
+  it("fail closed when a required halt test file is omitted from the PR files list", () => {
+    assert.equal(
+      classifyGate(
+        exactPhase2e({
+          changedPaths: phase2e.allowedChangedPaths.filter(
+            (filePath) => filePath !== "test/halt/p2e-corrective-3.test.ts",
+          ),
+        }),
+      ).mode,
       "FAIL_CLOSED",
     );
   });
@@ -265,7 +294,7 @@ describe("Phase 2E and Phase 2D gate routing", () => {
       phase2eBaseline: phase2e,
       changedPaths: [
         ".github/workflows/trusted-phase2d-freeze.yml",
-        ".github/trusted/phase2e-corrective1-baseline.json",
+        ".github/trusted/phase2e-corrective3-baseline.json",
         "scripts/governance/phase2e-trusted-runtime.mjs",
       ],
       headRef: "governance/phase2e-trusted-gate",
@@ -356,6 +385,59 @@ describe("adversarial fixture events", () => {
         phase2dBaseline: phase2dLite(),
         phase2eBaseline: phase2e,
       }).mode,
+      "FAIL_CLOSED",
+    );
+    assert.equal(
+      classifyPullRequestEvent(
+        eventFixture("old-corrective1-head.json"),
+        phase2e.allowedChangedPaths,
+        {
+          phase2dBaseline: phase2dLite(),
+          phase2eBaseline: phase2e,
+        },
+      ).mode,
+      "FAIL_CLOSED",
+    );
+    assert.equal(
+      classifyPullRequestEvent(eventFixture("wrong-head.json"), phase2e.allowedChangedPaths, {
+        phase2dBaseline: phase2dLite(),
+        phase2eBaseline: phase2e,
+      }).mode,
+      "FAIL_CLOSED",
+    );
+    assert.equal(
+      classifyPullRequestEvent(
+        eventFixture("extra-changed-path.json"),
+        [...phase2e.allowedChangedPaths, "src/index.ts"],
+        {
+          phase2dBaseline: phase2dLite(),
+          phase2eBaseline: phase2e,
+        },
+      ).mode,
+      "FAIL_CLOSED",
+    );
+    assert.equal(
+      classifyPullRequestEvent(
+        eventFixture("omitted-test-file.json"),
+        phase2e.allowedChangedPaths.filter(
+          (filePath) => filePath !== "test/halt/p2e-corrective-3.test.ts",
+        ),
+        {
+          phase2dBaseline: phase2dLite(),
+          phase2eBaseline: phase2e,
+        },
+      ).mode,
+      "FAIL_CLOSED",
+    );
+    assert.equal(
+      classifyPullRequestEvent(
+        eventFixture("malformed-pr-metadata.json"),
+        phase2e.allowedChangedPaths,
+        {
+          phase2dBaseline: phase2dLite(),
+          phase2eBaseline: phase2e,
+        },
+      ).mode,
       "FAIL_CLOSED",
     );
   });

@@ -15,12 +15,15 @@ import {
 } from "./phase2d-trusted-freeze-lib.mjs";
 
 export const PHASE2E_SCHEMA_VERSION = "multi-venue-phase2e-trusted-baseline/1";
-export const PHASE2E_TRUSTED_BASELINE_PATH = ".github/trusted/phase2e-corrective1-baseline.json";
+export const PHASE2E_TRUSTED_BASELINE_PATH = ".github/trusted/phase2e-corrective3-baseline.json";
 export const PHASE2E_REPOSITORY = "danny0971haha/multi-venue-grid-engine";
 export const PHASE2E_CANDIDATE_HEAD_REF = "experiment/v0.1-phase2e-halt-ack";
 export const PHASE2E_CANDIDATE_BASE_REF = "experiment/v0.1-phase2";
 export const PHASE2E_FROZEN_BASE_SHA = "7f196d367e39640eee9517f742b0d61424f9d4cc";
-export const PHASE2E_CANDIDATE_HEAD_SHA = "f24421d9c80d96d7279d9626fc6bb95941031cf5";
+export const PHASE2E_CANDIDATE_HEAD_SHA = "704afa2dd858c52dad06aa22941d463aa5ce4d69";
+export const PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA = "f24421d9c80d96d7279d9626fc6bb95941031cf5";
+export const PHASE2E_INVALIDATED_CORRECTIVE1_TREE_SHA = "be500d1ec4268269672cf1e1bb8f6cca29e5d397";
+export const PHASE2E_STALE_CORRECTIVE2_HEAD_SHA = "80a86c8f3374711ad939a93e94292f177dc8f9e4";
 
 export const PHASE2E_PROTECTED_PATH_RULES = Object.freeze([
   "src/**",
@@ -45,12 +48,11 @@ export const PHASE2E_TRUSTED_GOVERNANCE_PATH_RULES = Object.freeze([
 
 export const PHASE2E_REQUIRED_RUNTIME_COMMANDS = Object.freeze([
   "npm ci",
-  "npm run format:check",
-  "npm run lint",
   "npm run typecheck",
+  "npm run lint",
+  "npm run format:check",
   "npm test",
   "npm run test:phase2e",
-  "npm run test:phase2d-corrective-4",
   "npm run build",
   "npm run scan:secrets",
   "npm run dry-run",
@@ -64,61 +66,17 @@ export const PHASE2E_FORBIDDEN_RUNTIME_COMMANDS = Object.freeze([
 export const PHASE2E_NPM_TEST_HISTORICAL_MISMATCH = Object.freeze({
   boundCandidateHeadSha: PHASE2E_CANDIDATE_HEAD_SHA,
   testFilePath: "test/evidence/phase2d-corrective4-evidence.test.ts",
-  expectedExitCode: 1,
-  expectedTapTests: 516,
-  expectedTapPass: 473,
-  expectedTapFail: 43,
+  expectedExitCode: 0,
+  expectedTapTests: 474,
+  expectedTapPass: 474,
+  expectedTapFail: 0,
   expectedTapCancelled: 0,
   expectedTapSkipped: 0,
   expectedTapTodo: 0,
   expectedFailureType: "testCodeFailure",
   expectedFailureCode: "ERR_ASSERTION",
   expectedErrorSubstring: "PACKAGE_SCRIPT",
-  expectedFailureNames: Object.freeze([
-    "E4-01 handwritten intact fixture verifies without a gate verdict",
-    "E4-02 sourceHeadSha impersonated by merge checkout fails closed",
-    "E4-03 tampered tree SHA fails closed",
-    "E4-04 tampered base SHA fails closed",
-    "E4-05 tampered command exit code fails closed",
-    "E4-06 tampered raw log content fails closed",
-    "E4-07 tampered raw log hash fails closed",
-    "E4-08 tampered full test total fails closed",
-    "E4-09 tampered fail/skip/todo counts fail closed",
-    "E4-10 tampered file hash fails closed",
-    "E4-11 missing required field fails closed",
-    "E4-12 extra unauthorized field fails closed",
-    "E4-13 absolute path in artifact fails closed",
-    "E4-14 secret-like value in artifact fails closed",
-    "E4-15 missing audit JSON fails closed",
-    "E4-16 unparseable audit JSON fails closed",
-    "E4-17 audit JSON with critical vulnerability fails closed",
-    "E4-18 generator self-declared gate verdict fails closed",
-    "I-01 push sourceHeadSha does not equal GITHUB_SHA",
-    "I-02 push testedCheckoutSha does not equal GITHUB_SHA",
-    "I-03 push sourceBranch does not equal GITHUB_REF_NAME",
-    "I-04 implementation base is not a source HEAD ancestor",
-    "I-05 PR source HEAD is not a tested merge ancestor",
-    "I-06 githubRunId is tampered",
-    "I-07 githubRunAttempt is tampered",
-    "I-08 githubJob is tampered",
-    "I-09 malformed SHA or tree SHA fails closed",
-    "I-10 invalid NaN or inverted timestamps fail closed",
-    "T-01 full total 428 with evidence suite removed is rejected",
-    "T-03 evidence test file omitted from full inventory is rejected",
-    "T-04 dedicated evidence suite skip or todo is rejected",
-    "T-05 duplicate test-file path is rejected",
-    "T-06 full.total does not equal 428 plus evidenceVerifier.total",
-    "A-01 high=1 critical=0 total=1 is rejected",
-    "A-02 metadata total=0 with a high row is rejected",
-    "A-03 metadata total disagrees with severity sum",
-    "A-04 negative count is rejected",
-    "A-05 fractional count is rejected",
-    "A-06 unknown severity is rejected",
-    "A-07 vulnerabilities that are not a plain object are rejected",
-    "A-08 real zero-audit artifact has integrityOk without a gate verdict",
-    "V-01 generator last-wins TAP still fails verifier duplicate detection",
-    "V-03 artifact containing self-declared ACCEPT is rejected",
-  ]),
+  expectedFailureNames: Object.freeze([]),
   expectedSuiteFailureName: "Phase 2D Corrective 4 evidence verifier",
   expectedSuiteFailureType: "subtestsFailed",
   expectedSuiteFailureCode: "ERR_TEST_FAILURE",

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generate the trusted Phase 2E baseline from Git objects at the bound
- * Runtime Corrective 1 HEAD stacked on the frozen Phase 2D candidate.
+ * Runtime Corrective 3 HEAD stacked on the frozen Phase 2D candidate.
  */
 
 import { execFileSync } from "node:child_process";

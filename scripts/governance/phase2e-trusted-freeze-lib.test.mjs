@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 import {
   PHASE2E_CANDIDATE_HEAD_SHA,
   PHASE2E_FROZEN_BASE_SHA,
+  PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA,
+  PHASE2E_INVALIDATED_CORRECTIVE1_TREE_SHA,
   PHASE2E_SCHEMA_VERSION,
+  PHASE2E_STALE_CORRECTIVE2_HEAD_SHA,
   PHASE2E_TRUSTED_BASELINE_PATH,
   evaluatePhase2eIntegrity,
   formatPhase2eMachineSummary,
@@ -61,8 +64,7 @@ function headPackageJson(overrides = {}) {
     dependencies: overrides.dependencies ?? baseline.dependencyIdentity.dependencies,
     devDependencies: overrides.devDependencies ?? baseline.dependencyIdentity.devDependencies,
     scripts: {
-      test: baseline.packageJsonScriptsPolicy.expectedHeadScripts.test,
-      "test:phase2e": baseline.packageJsonScriptsPolicy.expectedHeadScripts["test:phase2e"],
+      ...baseline.packageJsonScriptsPolicy.expectedHeadScripts,
     },
   });
 }
@@ -93,23 +95,37 @@ function evalInput(overrides = {}) {
 }
 
 describe("Phase 2E trusted baseline parse", () => {
-  it("parses the committed Runtime Corrective 1 baseline", () => {
+  it("parses the committed Runtime Corrective 3 baseline", () => {
     assert.equal(parsed.ok, true);
     assert.equal(baseline.schemaVersion, PHASE2E_SCHEMA_VERSION);
     assert.equal(baseline.candidateHeadSha, PHASE2E_CANDIDATE_HEAD_SHA);
     assert.equal(baseline.frozenBaseSha, PHASE2E_FROZEN_BASE_SHA);
     assert.equal(baseline.allowedChangedPaths.includes("src/**"), false);
-    assert.equal(baseline.allowedChangedPaths.length, 14);
+    assert.equal(baseline.allowedChangedPaths.length, 16);
     assert.equal(baseline.protectedFrozenFiles.length, 61);
     assert.equal(baseline.candidateHeadSha.startsWith("7b98c888"), false);
+    assert.equal(baseline.candidateHeadSha, "704afa2dd858c52dad06aa22941d463aa5ce4d69");
+    assert.notEqual(baseline.candidateHeadSha, PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA);
+    assert.ok(baseline.allowedChangedPaths.includes("test/halt/p2e-corrective-2.test.ts"));
+    assert.ok(baseline.allowedChangedPaths.includes("test/halt/p2e-corrective-3.test.ts"));
     assert.equal(
       baseline.npmTestHistoricalMismatch.boundCandidateHeadSha,
       PHASE2E_CANDIDATE_HEAD_SHA,
     );
-    assert.equal(baseline.npmTestHistoricalMismatch.expectedTapFail, 43);
-    assert.equal(baseline.npmTestHistoricalMismatch.expectedFailureNames.length, 43);
+    assert.equal(baseline.npmTestHistoricalMismatch.expectedTapFail, 0);
+    assert.equal(baseline.npmTestHistoricalMismatch.expectedExitCode, 0);
+    assert.equal(baseline.npmTestHistoricalMismatch.expectedTapTests, 474);
+    assert.equal(baseline.npmTestHistoricalMismatch.expectedFailureNames.length, 0);
     const committed = readFileSync(path.join(root, PHASE2E_TRUSTED_BASELINE_PATH), "utf8");
-    assert.match(committed, /"allowedScriptKeysChanged": \["test", "test:phase2e"\]/);
+    assert.match(committed, /"allowedScriptKeysChanged": \["test:phase2e"\]/);
+  });
+
+  it("rejects the invalidated Runtime Corrective 1 baseline as the live pin", () => {
+    const old = parsePhase2eBaseline(
+      readFileSync(path.join(root, ".github/trusted/phase2e-corrective1-baseline.json"), "utf8"),
+    );
+    assert.equal(old.ok, false);
+    assert.ok(old.reasons.includes("phase2e_baseline_candidate_head_sha"));
   });
 
   it("rejects malformed JSON", () => {
@@ -251,6 +267,45 @@ describe("Phase 2E integrity evaluation", () => {
     );
     assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
     assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
+  });
+
+  it("fail closed on the invalidated Runtime Corrective 1 HEAD", () => {
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({ sourceHeadSha: PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA }),
+    );
+    assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
+    assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
+  });
+
+  it("fail closed on the stale Runtime Corrective 2 HEAD", () => {
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({ sourceHeadSha: PHASE2E_STALE_CORRECTIVE2_HEAD_SHA }),
+    );
+    assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
+    assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
+  });
+
+  it("fail closed on the invalidated Runtime Corrective 1 tree", () => {
+    const wrongTree = JSON.parse(
+      readFileSync(path.join(root, "scripts/governance/fixtures/wrong-tree.json"), "utf8"),
+    );
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({ observedHeadTreeSha: wrongTree.observedHeadTreeSha }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("candidate_head_tree_sha_mismatch"));
+    assert.equal(wrongTree.observedHeadTreeSha, PHASE2E_INVALIDATED_CORRECTIVE1_TREE_SHA);
+  });
+
+  it("fail closed when the Runtime Corrective 3 test file is omitted", () => {
+    const { headTree } = trees();
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({
+        headTree: headTree.filter((entry) => entry.path !== "test/halt/p2e-corrective-3.test.ts"),
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("candidate_manifest_missing_path"));
   });
 
   it("fail closed when an additional protected-path file appears", () => {

@@ -112,7 +112,7 @@ jobs:
         id: phase2e_runtime
         if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_integrity.outcome == 'success'
         env:
-          TRUSTED_PHASE2E_BASELINE: ${{ runner.temp }}/trusted-governance/trusted/phase2e-corrective1-baseline.json
+          TRUSTED_PHASE2E_BASELINE: ${{ runner.temp }}/trusted-governance/trusted/phase2e-corrective3-baseline.json
           PHASE2E_CANDIDATE_ROOT: ${{ github.workspace }}
           PHASE2E_EVIDENCE_PATH: ${{ runner.temp }}/phase2e-gate-evidence.json
           TRUSTED_PHASE2E_RUNNER: ${{ runner.temp }}/trusted-governance/scripts/phase2e-trusted-runtime.mjs

@@ -53,6 +53,8 @@ describe("trusted workflow structure", () => {
     );
     assert.match(text, /node-version: "22\.23\.2"/);
     assert.match(text, /phase2e-trusted-freeze-check\.mjs/);
+    assert.match(text, /phase2e-corrective3-baseline\.json/);
+    assert.doesNotMatch(text, /phase2e-corrective1-baseline\.json/);
     assert.match(text, /TRUSTED_PHASE2E_RUNNER/);
     assert.match(text, /Check out the exact Phase 2E candidate HEAD after trusted classification/);
     const classifyIndex = text.indexOf("Classify the pull request from trusted workflow code");

@@ -134,7 +134,7 @@ trustedPhase2dFreezeGateExecuted=true
 
 `PHASE2D_ENFORCE` runs the complete Phase 2D freeze checker. A renamed branch or fork touching Phase 2 paths is still enforced and then fails the exact repo/ref/SHA checks. A candidate change to trusted governance paths is enforced and fails the exact manifest. Unrelated work receives an actual successful `NOT_APPLICABLE` run rather than a skipped job. A new candidate SHA fails closed until this baseline is updated on `main` by a separate governance change.
 
-`PHASE2E_ENFORCE` is allowed only for the exact stacked Runtime Corrective 1 candidate bound in `.github/trusted/phase2e-corrective1-baseline.json`. Near-miss identity, extra paths, forks, and governance/lockfile/dependency changes fail closed. See `docs/PHASE_2E_TRUSTED_GATE.md`.
+`PHASE2E_ENFORCE` is allowed only for the exact stacked Runtime Corrective 3 candidate bound in `.github/trusted/phase2e-corrective3-baseline.json`. The Runtime Corrective 1 identity `f24421d9c80d96d7279d9626fc6bb95941031cf5` is invalidated and is not the live pin. Near-miss identity, extra paths, forks, and governance/lockfile/dependency changes fail closed. See `docs/PHASE_2E_TRUSTED_GATE.md`.
 
 The classifier has no Phase 0 or Phase 1 path whitelist. Predecessor PRs that touch `src/**` while this workflow is already the PR base would be classified `PHASE2D_ENFORCE`. That is why governance reaches `main` only after PR #1 and PR #2 are integrated. The predecessor solution is the bootstrap sequence below, not a freeze-checker bypass.
 
