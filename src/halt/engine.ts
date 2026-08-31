@@ -262,25 +262,7 @@ export async function applyRiskDecision(
       loaded.envelopeSha256,
     );
   }
-  const continueLease = await proveLease(context);
-  if (!continueLease.ok) {
-    return successFromRecord(
-      context,
-      loaded.record,
-      loaded.inspection,
-      { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["LEASE_UNCERTAIN", "RISK_INCREASE_FENCED", ...continueLease.reasonCodes],
-      { runtimeDisposition: "FAIL_CLOSED", forceRiskBlocked: true },
-    );
-  }
-  return successFromRecord(
-    context,
-    loaded.record,
-    loaded.inspection,
-    { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-    ["DURABLE_HALT_RUNNING"],
-    { runtimeDisposition: "RUNNING" },
-  );
+  return authorizeCurrentRunningContinuation(context, loaded);
 }
 
 export async function executeHardHalt(
