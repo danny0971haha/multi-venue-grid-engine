@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   commandArgv,
+  evaluateCandidateGitIdentity,
+  evaluateEvidenceRecord,
   evaluateNpmTestOutput,
   evaluatePhase2eSuiteOutput,
   evaluateToolchain,
@@ -10,11 +12,13 @@ import {
   parseDryRunLiveExchangeWrites,
   parseNodeTapStdout,
   runPhase2eTrustedRuntime,
+  sanitizeRuntimeChildEnv,
 } from "./phase2e-trusted-runtime.mjs";
 import {
   PHASE2E_FORBIDDEN_RUNTIME_COMMANDS,
   PHASE2E_NPM_TEST_HISTORICAL_MISMATCH as TAP,
   PHASE2E_REQUIRED_RUNTIME_COMMANDS,
+  PHASE2E_SUITE_TAP,
   PHASE2E_TRUSTED_BASELINE_PATH,
 } from "./phase2e-trusted-freeze-lib.mjs";
 
@@ -284,9 +288,27 @@ describe("Phase 2E trusted runtime policy", () => {
     const green = evaluatePhase2eSuiteOutput({
       exitCode: 0,
       signal: null,
-      stdout: greenTap({ tests: 79, pass: 79, fail: 0 }),
+      stdout: greenTap({
+        tests: PHASE2E_SUITE_TAP.expectedTapTests,
+        pass: PHASE2E_SUITE_TAP.expectedTapPass,
+        fail: 0,
+      }),
     });
     assert.equal(green.ok, true);
+    const emptySuite = evaluatePhase2eSuiteOutput({
+      exitCode: 0,
+      signal: null,
+      stdout: greenTap({ tests: 0, pass: 0, fail: 0 }),
+    });
+    assert.equal(emptySuite.ok, false);
+    assert.equal(emptySuite.reason, "phase2e_test_tap_counts_mismatch");
+    const staleTwentyFour = evaluatePhase2eSuiteOutput({
+      exitCode: 0,
+      signal: null,
+      stdout: greenTap({ tests: 24, pass: 24, fail: 0 }),
+    });
+    assert.equal(staleTwentyFour.ok, false);
+    assert.equal(staleTwentyFour.reason, "phase2e_test_tap_counts_mismatch");
   });
 
   it("fail closed on a different assertion identity or file path", () => {
@@ -314,10 +336,85 @@ describe("Phase 2E trusted runtime policy", () => {
     const result = runPhase2eTrustedRuntime({
       candidateRoot: "/tmp/candidate",
       baselinePath: `/tmp/candidate/${PHASE2E_TRUSTED_BASELINE_PATH}`,
+      evidencePath: "/tmp/phase2e-gate-evidence.json",
+      writeFile() {},
+      readFile() {
+        return "{}";
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.ok(result.reasons.includes("candidate_controlled_baseline_rejected"));
+  });
+
+  it("fail closed when the evidence path is omitted", () => {
+    const result = runPhase2eTrustedRuntime({
+      candidateRoot: "/tmp/candidate",
+      baselinePath: "/tmp/trusted/phase2e-corrective3-baseline.json",
       evidencePath: null,
       writeFile() {},
     });
     assert.equal(result.ok, false);
-    assert.ok(result.reasons.includes("candidate_controlled_baseline_rejected"));
+    assert.ok(result.reasons.includes("evidence_path_missing"));
+  });
+
+  it("fail closed on truncated or success-spoofed evidence", () => {
+    assert.equal(evaluateEvidenceRecord({ phase2eTrustedRuntimeOk: true }).ok, false);
+    assert.equal(
+      evaluateEvidenceRecord(
+        {
+          phase2eTrustedRuntimeOk: true,
+          phase2dEvidenceVerifierExecuted: false,
+          reasons: [],
+          commandResults: [],
+          dryRunLiveExchangeWrites: false,
+          candidateHeadSha: "a".repeat(40),
+        },
+        { requireSuccess: true },
+      ).ok,
+      false,
+    );
+  });
+
+  it("does not forward GitHub tokens into candidate npm children", () => {
+    const env = sanitizeRuntimeChildEnv({
+      PATH: "/usr/bin",
+      HOME: "/home/runner",
+      GITHUB_TOKEN: "secret-github-token",
+      NODE_AUTH_TOKEN: "secret-npm-token",
+      ACTIONS_RUNTIME_TOKEN: "secret-runtime-token",
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: "secret-oidc",
+      NODE_OPTIONS: "--require ./malicious.cjs",
+    });
+    assert.equal(env.GITHUB_TOKEN, "");
+    assert.equal(env.NODE_AUTH_TOKEN, "");
+    assert.equal(env.ACTIONS_RUNTIME_TOKEN, undefined);
+    assert.equal(env.ACTIONS_ID_TOKEN_REQUEST_TOKEN, undefined);
+    assert.equal(env.NODE_OPTIONS, undefined);
+    assert.equal(env.PATH, "/usr/bin");
+  });
+
+  it("fail closed when git HEAD or TREE drifts after runtime commands", () => {
+    assert.equal(
+      evaluateCandidateGitIdentity({
+        headSha: "0".repeat(40),
+        treeSha: "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+        baseline: {
+          candidateHeadSha: "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+          candidateHeadTreeSha: "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+        },
+      }).ok,
+      false,
+    );
+    assert.equal(
+      evaluateCandidateGitIdentity({
+        headSha: "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+        treeSha: "be500d1ec4268269672cf1e1bb8f6cca29e5d397",
+        baseline: {
+          candidateHeadSha: "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+          candidateHeadTreeSha: "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+        },
+      }).reason,
+      "candidate_head_tree_sha_mismatch_after_runtime",
+    );
   });
 });

@@ -1,6 +1,7 @@
 {
   "schemaVersion": "multi-venue-phase2e-trusted-baseline/1",
   "repository": "danny0971haha/multi-venue-grid-engine",
+  "pullRequestNumber": 7,
   "candidateHeadRef": "experiment/v0.1-phase2e-halt-ack",
   "candidateBaseRef": "experiment/v0.1-phase2",
   "frozenBaseSha": "7f196d367e39640eee9517f742b0d61424f9d4cc",
@@ -715,5 +716,14 @@
     "expectedSuiteFailureName": "Phase 2D Corrective 4 evidence verifier",
     "expectedSuiteFailureType": "subtestsFailed",
     "expectedSuiteFailureCode": "ERR_TEST_FAILURE"
+  },
+  "phase2eSuiteTap": {
+    "expectedExitCode": 0,
+    "expectedTapTests": 79,
+    "expectedTapPass": 79,
+    "expectedTapFail": 0,
+    "expectedTapCancelled": 0,
+    "expectedTapSkipped": 0,
+    "expectedTapTodo": 0
   }
 }

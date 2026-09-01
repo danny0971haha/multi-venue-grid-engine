@@ -112,7 +112,8 @@ Job `trusted-phase2d-freeze-gate`:
 - trigger: `pull_request_target` for every pull request targeting protected `main`
 - permissions: `contents: read`, `pull-requests: read`
 - no write permissions
-- no production secrets (only the default `GITHUB_TOKEN`)
+- no production secrets (only the default `GITHUB_TOKEN` for classification/integrity)
+- the Phase 2E runtime step unsets `GITHUB_TOKEN` / `NODE_AUTH_TOKEN` / OIDC and runtime-token env vars; the trusted runner allowlists child env and does not forward GitHub secrets into `npm`
 - checkout is hardcoded to `danny0971haha/multi-venue-grid-engine` at `${{ github.workflow_sha }}` (the trusted default-branch workflow commit). It does not execute governance scripts from the pull-request base SHA.
 - classifies first using trusted workflow bytes and GitHub metadata only
 - Phase 2D: does not checkout the PR head; compares GitHub Git objects against the pinned implementation base

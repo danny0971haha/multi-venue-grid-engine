@@ -67,7 +67,10 @@ The existing required check name is unchanged. Modes returned into that context:
    - expected counts `# tests 474`, `# pass 474`, `# fail 0`, cancelled/skipped/todo `0`
    - process exit `0` with no signal
    - no failed tests or failed suites
-   `npm run test:phase2e` must also be TAP-green: exit `0`, fail/skip/todo/cancelled `0`.
+   `npm run test:phase2e` TAP from Runtime Corrective 3 must also be exact:
+   - expected counts `# tests 79`, `# pass 79`, `# fail 0`, cancelled/skipped/todo `0`
+   - process exit `0` with no signal
+   Historical `24/24` counts are not the live pin. An empty TAP `0/0` or any other count fails closed.
    Any failure, skip/todo/cancelled, missing/malformed TAP, stderr-only spoof, non-zero exit, timeout, OOM, or signal fails closed.
 
 This document does not emit `ACCEPT`, `PASS`, `PHASE2E_GOVERNANCE_PASS`, or `PHASE2E_RUNTIME_ACCEPTED`.

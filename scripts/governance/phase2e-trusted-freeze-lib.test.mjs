@@ -64,7 +64,9 @@ function headPackageJson(overrides = {}) {
     dependencies: overrides.dependencies ?? baseline.dependencyIdentity.dependencies,
     devDependencies: overrides.devDependencies ?? baseline.dependencyIdentity.devDependencies,
     scripts: {
+      test: baseline.packageJsonScriptsPolicy.expectedBaseTestScript,
       ...baseline.packageJsonScriptsPolicy.expectedHeadScripts,
+      ...(overrides.scripts ?? {}),
     },
   });
 }
@@ -86,6 +88,7 @@ function evalInput(overrides = {}) {
     headTreeComplete: true,
     observedBaseTreeSha: baseline.frozenBaseTreeSha,
     observedHeadTreeSha: baseline.candidateHeadTreeSha,
+    prNumber: 7,
     baseTree,
     headTree,
     headTextByPath: { "package.json": headPackageJson() },
@@ -102,6 +105,9 @@ describe("Phase 2E trusted baseline parse", () => {
     assert.equal(baseline.frozenBaseSha, PHASE2E_FROZEN_BASE_SHA);
     assert.equal(baseline.allowedChangedPaths.includes("src/**"), false);
     assert.equal(baseline.allowedChangedPaths.length, 16);
+    assert.equal(baseline.pullRequestNumber, 7);
+    assert.equal(baseline.phase2eSuiteTap.expectedTapTests, 79);
+    assert.equal(baseline.phase2eSuiteTap.expectedTapPass, 79);
     assert.equal(baseline.protectedFrozenFiles.length, 61);
     assert.equal(baseline.candidateHeadSha.startsWith("7b98c888"), false);
     assert.equal(baseline.candidateHeadSha, "704afa2dd858c52dad06aa22941d463aa5ce4d69");
@@ -247,6 +253,20 @@ describe("Phase 2E integrity evaluation", () => {
     assert.ok(evaluation.reasons.includes("package_json_dependency_identity_mismatch"));
   });
 
+  it("fail closed when package.json test script is replaced", () => {
+    const evaluation = evaluatePhase2eIntegrity(
+      evalInput({
+        headTextByPath: {
+          "package.json": headPackageJson({
+            scripts: { test: "true" },
+          }),
+        },
+      }),
+    );
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("package_json_base_test_script_mismatch"));
+  });
+
   it("fail closed when GitHub tree metadata is incomplete", () => {
     const evaluation = evaluatePhase2eIntegrity(
       evalInput({ headTreeComplete: false, headTree: [] }),
@@ -283,6 +303,12 @@ describe("Phase 2E integrity evaluation", () => {
     );
     assert.equal(evaluation.sourceHeadMatchesReviewedCandidate, false);
     assert.ok(evaluation.reasons.includes("source_head_not_reviewed_candidate"));
+  });
+
+  it("fail closed on a different pull request number with the same trees", () => {
+    const evaluation = evaluatePhase2eIntegrity(evalInput({ prNumber: 8 }));
+    assert.equal(evaluation.trustedBaselineIntegrityOk, false);
+    assert.ok(evaluation.reasons.includes("pr_number_mismatch"));
   });
 
   it("fail closed on the invalidated Runtime Corrective 1 tree", () => {

@@ -21,6 +21,7 @@ export const PHASE2E_CANDIDATE_HEAD_REF = "experiment/v0.1-phase2e-halt-ack";
 export const PHASE2E_CANDIDATE_BASE_REF = "experiment/v0.1-phase2";
 export const PHASE2E_FROZEN_BASE_SHA = "7f196d367e39640eee9517f742b0d61424f9d4cc";
 export const PHASE2E_CANDIDATE_HEAD_SHA = "704afa2dd858c52dad06aa22941d463aa5ce4d69";
+export const PHASE2E_PULL_REQUEST_NUMBER = 7;
 export const PHASE2E_INVALIDATED_CORRECTIVE1_HEAD_SHA = "f24421d9c80d96d7279d9626fc6bb95941031cf5";
 export const PHASE2E_INVALIDATED_CORRECTIVE1_TREE_SHA = "be500d1ec4268269672cf1e1bb8f6cca29e5d397";
 export const PHASE2E_STALE_CORRECTIVE2_HEAD_SHA = "80a86c8f3374711ad939a93e94292f177dc8f9e4";
@@ -82,6 +83,16 @@ export const PHASE2E_NPM_TEST_HISTORICAL_MISMATCH = Object.freeze({
   expectedSuiteFailureCode: "ERR_TEST_FAILURE",
 });
 
+export const PHASE2E_SUITE_TAP = Object.freeze({
+  expectedExitCode: 0,
+  expectedTapTests: 79,
+  expectedTapPass: 79,
+  expectedTapFail: 0,
+  expectedTapCancelled: 0,
+  expectedTapSkipped: 0,
+  expectedTapTodo: 0,
+});
+
 const ALLOWED_BLOB_MODES = new Set(["100644", "100755"]);
 const OBJECT_TYPES = new Set(["blob", "tree", "commit"]);
 const CHANGE_TYPES = new Set(["added", "modified", "deleted"]);
@@ -89,6 +100,7 @@ const CHANGE_TYPES = new Set(["added", "modified", "deleted"]);
 const ROOT_FIELDS = new Set([
   "schemaVersion",
   "repository",
+  "pullRequestNumber",
   "candidateHeadRef",
   "candidateBaseRef",
   "frozenBaseSha",
@@ -108,6 +120,16 @@ const ROOT_FIELDS = new Set([
   "requiredRuntimeCommands",
   "forbiddenRuntimeCommands",
   "npmTestHistoricalMismatch",
+  "phase2eSuiteTap",
+]);
+const SUITE_TAP_FIELDS = new Set([
+  "expectedExitCode",
+  "expectedTapTests",
+  "expectedTapPass",
+  "expectedTapFail",
+  "expectedTapCancelled",
+  "expectedTapSkipped",
+  "expectedTapTodo",
 ]);
 const MISMATCH_FIELDS = new Set([
   "boundCandidateHeadSha",
@@ -171,6 +193,9 @@ export function parsePhase2eBaseline(jsonText) {
   if (parsed.schemaVersion !== PHASE2E_SCHEMA_VERSION)
     reasons.push("phase2e_baseline_schema_version");
   if (parsed.repository !== PHASE2E_REPOSITORY) reasons.push("phase2e_baseline_repository");
+  if (parsed.pullRequestNumber !== PHASE2E_PULL_REQUEST_NUMBER) {
+    reasons.push("phase2e_baseline_pull_request_number");
+  }
   if (parsed.candidateHeadRef !== PHASE2E_CANDIDATE_HEAD_REF) {
     reasons.push("phase2e_baseline_candidate_head_ref");
   }
@@ -218,6 +243,7 @@ export function parsePhase2eBaseline(jsonText) {
     reasons.push("phase2e_baseline_forbidden_runtime_commands");
   }
   validateNpmTestHistoricalMismatch(parsed.npmTestHistoricalMismatch, reasons);
+  validatePhase2eSuiteTap(parsed.phase2eSuiteTap, reasons);
   if (
     Array.isArray(parsed.allowedChangedPaths) &&
     Array.isArray(parsed.candidateChangedFiles) &&
@@ -257,6 +283,9 @@ export function evaluatePhase2eIntegrity(input) {
     reasons.push("source_head_event_mismatch");
   }
   if (!sourceHeadMatchesReviewedCandidate) reasons.push("source_head_not_reviewed_candidate");
+  if (Number(input.prNumber) !== Number(baseline.pullRequestNumber)) {
+    reasons.push("pr_number_mismatch");
+  }
   if (input.prHeadRef !== baseline.candidateHeadRef) reasons.push("pr_head_ref_mismatch");
   if (input.prBaseRef !== baseline.candidateBaseRef) reasons.push("pr_base_ref_mismatch");
   if (input.prBaseSha !== baseline.frozenBaseSha) reasons.push("pr_base_sha_mismatch");
@@ -368,6 +397,9 @@ function checkPackageJsonPolicy(baseline, headIndex, headTextByPath, reasons) {
   if (!scripts || typeof scripts !== "object") {
     reasons.push("package_json_scripts_missing");
     return;
+  }
+  if (scripts.test !== policy.expectedBaseTestScript) {
+    reasons.push("package_json_base_test_script_mismatch");
   }
   for (const key of policy.allowedScriptKeysChanged) {
     if ((scripts[key] ?? null) !== (policy.expectedHeadScripts[key] ?? null)) {
@@ -687,6 +719,36 @@ function validateNpmTestHistoricalMismatch(value, reasons) {
   }
   if (!sameStringList(value.expectedFailureNames, pinned.expectedFailureNames)) {
     reasons.push("phase2e_baseline_npm_test_mismatch_names");
+  }
+}
+
+function validatePhase2eSuiteTap(value, reasons) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    reasons.push("phase2e_baseline_suite_tap");
+    return;
+  }
+  rejectUnknownFields(value, SUITE_TAP_FIELDS, "phase2e_baseline_suite_tap_unknown_field", reasons);
+  const pinned = PHASE2E_SUITE_TAP;
+  if (value.expectedExitCode !== pinned.expectedExitCode) {
+    reasons.push("phase2e_baseline_suite_tap_exit");
+  }
+  if (value.expectedTapTests !== pinned.expectedTapTests) {
+    reasons.push("phase2e_baseline_suite_tap_tests");
+  }
+  if (value.expectedTapPass !== pinned.expectedTapPass) {
+    reasons.push("phase2e_baseline_suite_tap_pass");
+  }
+  if (value.expectedTapFail !== pinned.expectedTapFail) {
+    reasons.push("phase2e_baseline_suite_tap_fail");
+  }
+  if (value.expectedTapCancelled !== pinned.expectedTapCancelled) {
+    reasons.push("phase2e_baseline_suite_tap_cancelled");
+  }
+  if (value.expectedTapSkipped !== pinned.expectedTapSkipped) {
+    reasons.push("phase2e_baseline_suite_tap_skipped");
+  }
+  if (value.expectedTapTodo !== pinned.expectedTapTodo) {
+    reasons.push("phase2e_baseline_suite_tap_todo");
   }
 }
 

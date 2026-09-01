@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   PHASE2E_NPM_TEST_HISTORICAL_MISMATCH,
+  PHASE2E_SUITE_TAP,
   dependencyIdentityMatches,
   parsePhase2eBaseline,
   parsePackageJsonObject,
@@ -23,6 +24,33 @@ const RUNTIME_COMMAND_TIMEOUT_MS = 20 * 60 * 1000;
 const TEST_POINT_RE = /^( *)(not )?ok(?:\s+(\d+))?\s+-\s+(.+)$/;
 const TAP_SUMMARY_RE = /^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$/;
 const YAML_KEY_RE = /^(\s*)([A-Za-z_][\w]*)\s*:\s*(.*)$/;
+const RUNTIME_CHILD_ENV_ALLOWLIST = new Set([
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "CI",
+  "TERM",
+  "TZ",
+]);
+
+export function sanitizeRuntimeChildEnv(sourceEnv = process.env) {
+  const env = {
+    GITHUB_TOKEN: "",
+    NODE_AUTH_TOKEN: "",
+  };
+  for (const key of RUNTIME_CHILD_ENV_ALLOWLIST) {
+    const value = sourceEnv?.[key];
+    if (typeof value === "string" && value.length > 0) env[key] = value;
+  }
+  return env;
+}
 
 export function commandArgv(command) {
   if (command === "npm ci") return { file: "npm", args: ["ci"] };
@@ -287,22 +315,34 @@ export function evaluateNpmTestOutput({ exitCode, signal, stdout, mismatch, cand
   };
 }
 
-export function evaluatePhase2eSuiteOutput({ exitCode, signal, stdout }) {
+export function evaluatePhase2eSuiteOutput({ exitCode, signal, stdout, suiteTap }) {
+  const pinned = suiteTap ?? PHASE2E_SUITE_TAP;
   if (signal) {
     return { ok: false, reason: "phase2e_test_signal_exit" };
   }
   if (!Number.isInteger(exitCode)) {
     return { ok: false, reason: "phase2e_test_abnormal_exit" };
   }
-  if (exitCode !== 0) {
+  if (exitCode !== pinned.expectedExitCode) {
     return { ok: false, reason: "phase2e_test_exit_mismatch" };
   }
   const parsed = parseNodeTapStdout(stdout);
   if (!parsed.ok) {
     return { ok: false, reason: parsed.reason };
   }
-  if (parsed.summary.cancelled !== 0 || parsed.summary.skipped !== 0 || parsed.summary.todo !== 0) {
+  if (
+    parsed.summary.cancelled !== pinned.expectedTapCancelled ||
+    parsed.summary.skipped !== pinned.expectedTapSkipped ||
+    parsed.summary.todo !== pinned.expectedTapTodo
+  ) {
     return { ok: false, reason: "phase2e_test_skipped_or_todo" };
+  }
+  if (
+    parsed.summary.tests !== pinned.expectedTapTests ||
+    parsed.summary.pass !== pinned.expectedTapPass ||
+    parsed.summary.fail !== pinned.expectedTapFail
+  ) {
+    return { ok: false, reason: "phase2e_test_tap_counts_mismatch" };
   }
   if (
     parsed.summary.fail !== 0 ||
@@ -338,6 +378,46 @@ export function parseDryRunLiveExchangeWrites(stdout) {
   }
 }
 
+export function evaluateCandidateGitIdentity({ headSha, treeSha, baseline }) {
+  if (typeof headSha !== "string" || headSha !== baseline.candidateHeadSha) {
+    return { ok: false, reason: "candidate_head_sha_mismatch_after_runtime" };
+  }
+  if (typeof treeSha !== "string" || treeSha !== baseline.candidateHeadTreeSha) {
+    return { ok: false, reason: "candidate_head_tree_sha_mismatch_after_runtime" };
+  }
+  return { ok: true, reason: null };
+}
+
+export function evaluateEvidenceRecord(evidence, { requireSuccess = false } = {}) {
+  if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) {
+    return { ok: false, reason: "evidence_not_object" };
+  }
+  if (typeof evidence.phase2eTrustedRuntimeOk !== "boolean") {
+    return { ok: false, reason: "evidence_incomplete" };
+  }
+  if (!Array.isArray(evidence.reasons)) {
+    return { ok: false, reason: "evidence_incomplete" };
+  }
+  if (evidence.phase2dEvidenceVerifierExecuted !== false) {
+    return { ok: false, reason: "evidence_incomplete" };
+  }
+  if (requireSuccess) {
+    if (evidence.phase2eTrustedRuntimeOk !== true) {
+      return { ok: false, reason: "evidence_runtime_not_ok" };
+    }
+    if (!Array.isArray(evidence.commandResults) || evidence.commandResults.length === 0) {
+      return { ok: false, reason: "evidence_incomplete" };
+    }
+    if (evidence.dryRunLiveExchangeWrites !== false) {
+      return { ok: false, reason: "evidence_incomplete" };
+    }
+    if (typeof evidence.candidateHeadSha !== "string" || evidence.candidateHeadSha.length === 0) {
+      return { ok: false, reason: "evidence_incomplete" };
+    }
+  }
+  return { ok: true, reason: null };
+}
+
 export function evaluateToolchain({ nodeVersion, npmVersion, baseline }) {
   if (nodeVersion !== baseline.requiredNodeVersion) {
     return { ok: false, reason: "node_version_mismatch" };
@@ -356,7 +436,7 @@ function runCaptured(file, args, cwd) {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: RUNTIME_COMMAND_TIMEOUT_MS,
       killSignal: "SIGTERM",
-      env: { ...process.env, GITHUB_TOKEN: "", NODE_AUTH_TOKEN: "" },
+      env: sanitizeRuntimeChildEnv(process.env),
     });
     return { exitCode: 0, signal: null, stdout, stderr: "" };
   } catch (error) {
@@ -369,7 +449,20 @@ function runCaptured(file, args, cwd) {
   }
 }
 
-function verifyCandidateIdentity(candidateRoot, baseline) {
+function gitRevParse(execCommand, candidateRoot, spec) {
+  const result = execCommand("git", ["rev-parse", spec], candidateRoot);
+  if (result.exitCode !== 0 || result.signal) return null;
+  const value = result.stdout.trim();
+  return value.length > 0 ? value : null;
+}
+
+function verifyCandidateIdentity(candidateRoot, baseline, execCommand) {
+  const gitIdentity = evaluateCandidateGitIdentity({
+    headSha: gitRevParse(execCommand, candidateRoot, "HEAD"),
+    treeSha: gitRevParse(execCommand, candidateRoot, "HEAD^{tree}"),
+    baseline,
+  });
+  if (!gitIdentity.ok) return gitIdentity;
   const lockBytes = readFileSync(path.join(candidateRoot, "package-lock.json"));
   const lockSha256 = sha256Bytes(lockBytes);
   if (lockSha256 !== baseline.packageLock.sha256) {
@@ -395,7 +488,10 @@ export function runPhase2eTrustedRuntime({
 } = {}) {
   const reasons = [];
   if (typeof candidateRoot !== "string" || typeof baselinePath !== "string") {
-    return fail("runtime_input_invalid", evidencePath, writeFile, reasons);
+    return fail("runtime_input_invalid", evidencePath, writeFile, reasons, readFile);
+  }
+  if (typeof evidencePath !== "string" || evidencePath.length === 0) {
+    return fail("evidence_path_missing", evidencePath, writeFile, reasons, readFile);
   }
   const resolvedCandidate = path.resolve(candidateRoot);
   const resolvedBaseline = path.resolve(baselinePath);
@@ -403,17 +499,23 @@ export function runPhase2eTrustedRuntime({
     resolvedBaseline === resolvedCandidate ||
     resolvedBaseline.startsWith(`${resolvedCandidate}${path.sep}`)
   ) {
-    return fail("candidate_controlled_baseline_rejected", evidencePath, writeFile, reasons);
+    return fail(
+      "candidate_controlled_baseline_rejected",
+      evidencePath,
+      writeFile,
+      reasons,
+      readFile,
+    );
   }
 
   let parsed;
   try {
     parsed = parsePhase2eBaseline(readFile(resolvedBaseline, "utf8"));
   } catch {
-    return fail("phase2e_baseline_unreadable", evidencePath, writeFile, reasons);
+    return fail("phase2e_baseline_unreadable", evidencePath, writeFile, reasons, readFile);
   }
   if (!parsed.ok) {
-    return fail(parsed.reasons.join(","), evidencePath, writeFile, reasons);
+    return fail(parsed.reasons.join(","), evidencePath, writeFile, reasons, readFile);
   }
   const baseline = parsed.baseline;
 
@@ -466,6 +568,7 @@ export function runPhase2eTrustedRuntime({
           exitCode: result.exitCode,
           signal: result.signal,
           stdout: result.stdout,
+          suiteTap: baseline.phase2eSuiteTap,
         });
         entry.ok = disposition.ok;
         entry.phase2eTestReason = disposition.reason;
@@ -487,7 +590,7 @@ export function runPhase2eTrustedRuntime({
     }
   }
 
-  const identity = verifyCandidateIdentity(resolvedCandidate, baseline);
+  const identity = verifyCandidateIdentity(resolvedCandidate, baseline, execCommand);
   if (!identity.ok) reasons.push(identity.reason);
 
   const ok = reasons.length === 0;
@@ -500,28 +603,53 @@ export function runPhase2eTrustedRuntime({
     commandResults,
     reasons,
   };
-  if (evidencePath) {
+  try {
     writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+    const written = JSON.parse(readFile(evidencePath, "utf8"));
+    const evidenceCheck = evaluateEvidenceRecord(written, { requireSuccess: ok });
+    if (!evidenceCheck.ok) {
+      reasons.push(evidenceCheck.reason);
+      evidence.phase2eTrustedRuntimeOk = false;
+      evidence.reasons = reasons;
+      writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+    }
+  } catch {
+    reasons.push("evidence_unreadable");
+    evidence.phase2eTrustedRuntimeOk = false;
+    evidence.reasons = reasons;
   }
+  const finalOk = reasons.length === 0;
+  evidence.phase2eTrustedRuntimeOk = finalOk;
   process.stdout.write(
     `${[
-      `phase2eTrustedRuntimeOk=${ok ? "true" : "false"}`,
+      `phase2eTrustedRuntimeOk=${finalOk ? "true" : "false"}`,
       `dryRunLiveExchangeWrites=${dryRunLiveExchangeWrites === false ? "false" : "unknown"}`,
       `phase2dEvidenceVerifierExecuted=false`,
       `reasonCodes=${reasons.join(",")}`,
     ].join("\n")}\n`,
   );
-  return { ok, reasons, evidence };
+  return { ok: finalOk, reasons, evidence };
 }
 
-function fail(reason, evidencePath, writeFile, reasons) {
+function fail(reason, evidencePath, writeFile, reasons, readFile) {
   reasons.push(reason);
   const evidence = {
     phase2eTrustedRuntimeOk: false,
     phase2dEvidenceVerifierExecuted: false,
     reasons,
   };
-  if (evidencePath) writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+  if (typeof evidencePath === "string" && evidencePath.length > 0) {
+    try {
+      writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+      if (typeof readFile === "function") {
+        const written = JSON.parse(readFile(evidencePath, "utf8"));
+        const evidenceCheck = evaluateEvidenceRecord(written);
+        if (!evidenceCheck.ok) reasons.push(evidenceCheck.reason);
+      }
+    } catch {
+      reasons.push("evidence_unreadable");
+    }
+  }
   process.stdout.write(`phase2eTrustedRuntimeOk=false\nreasonCodes=${reasons.join(",")}\n`);
   return { ok: false, reasons, evidence };
 }

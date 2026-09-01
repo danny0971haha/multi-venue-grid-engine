@@ -67,6 +67,7 @@ async function main() {
   const prHeadRef = process.env.PR_HEAD_REF;
   const prBaseRef = process.env.PR_BASE_REF;
   const prBaseSha = process.env.PR_BASE_SHA;
+  const prNumber = process.env.PR_NUMBER;
   const baseline = phase2e.baseline;
 
   if (!token) {
@@ -78,6 +79,7 @@ async function main() {
         prHeadRef,
         prBaseRef,
         prBaseSha,
+        prNumber,
         sourceHeadSha,
         eventSourceHeadSha,
         ancestorCheckComplete: false,
@@ -197,6 +199,7 @@ async function main() {
     prHeadRef,
     prBaseRef,
     prBaseSha,
+    prNumber,
     sourceHeadSha,
     eventSourceHeadSha,
     ancestorCheckComplete: compare.complete === true,

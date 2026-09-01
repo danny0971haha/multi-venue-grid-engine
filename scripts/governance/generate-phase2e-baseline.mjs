@@ -23,6 +23,8 @@ import {
   PHASE2E_REQUIRED_RUNTIME_COMMANDS,
   PHASE2E_FORBIDDEN_RUNTIME_COMMANDS,
   PHASE2E_NPM_TEST_HISTORICAL_MISMATCH,
+  PHASE2E_PULL_REQUEST_NUMBER,
+  PHASE2E_SUITE_TAP,
 } from "./phase2e-trusted-freeze-lib.mjs";
 
 function git(args, options = {}) {
@@ -149,6 +151,7 @@ function main() {
   const manifest = {
     schemaVersion: PHASE2E_SCHEMA_VERSION,
     repository: PHASE2E_REPOSITORY,
+    pullRequestNumber: PHASE2E_PULL_REQUEST_NUMBER,
     candidateHeadRef: PHASE2E_CANDIDATE_HEAD_REF,
     candidateBaseRef: PHASE2E_CANDIDATE_BASE_REF,
     frozenBaseSha: PHASE2E_FROZEN_BASE_SHA,
@@ -180,6 +183,7 @@ function main() {
     requiredRuntimeCommands: PHASE2E_REQUIRED_RUNTIME_COMMANDS,
     forbiddenRuntimeCommands: PHASE2E_FORBIDDEN_RUNTIME_COMMANDS,
     npmTestHistoricalMismatch: PHASE2E_NPM_TEST_HISTORICAL_MISMATCH,
+    phase2eSuiteTap: PHASE2E_SUITE_TAP,
   };
 
   const outPath = path.join(repoRoot(), PHASE2E_TRUSTED_BASELINE_PATH);

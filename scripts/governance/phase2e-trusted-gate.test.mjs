@@ -44,6 +44,7 @@ function exactPhase2e(overrides = {}) {
     baseRepository: REPO,
     baseRef: phase2e.candidateBaseRef,
     baseSha: phase2e.frozenBaseSha,
+    prNumber: 7,
     ...overrides,
   };
 }
@@ -123,6 +124,12 @@ describe("Phase 2E and Phase 2D gate routing", () => {
       classifyGate(exactPhase2e({ headSha: PHASE2E_STALE_CORRECTIVE2_HEAD_SHA })).mode,
       "FAIL_CLOSED",
     );
+  });
+
+  it("fail closed on a different pull request number with the same SHA", () => {
+    assert.equal(classifyGate(exactPhase2e({ prNumber: 8 })).mode, "FAIL_CLOSED");
+    assert.equal(classifyGate(exactPhase2e({ prNumber: 8 })).reason, "phase2e_pr_number_mismatch");
+    assert.equal(classifyGate(exactPhase2e({ prNumber: 7 })).mode, "PHASE2E_ENFORCE");
   });
 
   it("fail closed when a required halt test file is omitted from the PR files list", () => {
@@ -440,6 +447,13 @@ describe("adversarial fixture events", () => {
       ).mode,
       "FAIL_CLOSED",
     );
+    assert.equal(
+      classifyPullRequestEvent(eventFixture("wrong-pr-number.json"), phase2e.allowedChangedPaths, {
+        phase2dBaseline: phase2dLite(),
+        phase2eBaseline: phase2e,
+      }).mode,
+      "FAIL_CLOSED",
+    );
   });
 });
 
@@ -464,6 +478,17 @@ describe("trusted gate CLI fail-closed API behavior", () => {
       ...overrides,
     };
   }
+
+  it("fail closed when PR_NUMBER is not the bound runtime PR", async () => {
+    const result = await runTrustedGate({
+      env: env({ PR_NUMBER: "8" }),
+      repoRoot: root,
+      fetchImpl: async () =>
+        jsonResponse(phase2e.allowedChangedPaths.map((filename) => ({ filename }))),
+    });
+    assert.equal(result.mode, "FAIL_CLOSED");
+    assert.equal(result.reason, "phase2e_pr_number_mismatch");
+  });
 
   it("fail closed when the token is missing", async () => {
     const result = await runTrustedGate({ env: env({ GITHUB_TOKEN: "" }), repoRoot: root });

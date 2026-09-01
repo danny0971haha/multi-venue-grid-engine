@@ -56,6 +56,27 @@ describe("trusted workflow structure", () => {
     assert.match(text, /phase2e-corrective3-baseline\.json/);
     assert.doesNotMatch(text, /phase2e-corrective1-baseline\.json/);
     assert.match(text, /TRUSTED_PHASE2E_RUNNER/);
+    assert.match(text, /PHASE2E_EVIDENCE_PATH/);
+    assert.match(text, /if-no-files-found: error/);
+    assert.doesNotMatch(text, /if-no-files-found: warn/);
+    assert.match(
+      text,
+      /Run trusted Phase 2E runtime commands[\s\S]*?GITHUB_TOKEN: ""[\s\S]*?NODE_AUTH_TOKEN: ""/,
+    );
+    assert.equal(
+      text.includes(["ref: $", "{{ github.event.pull_request.head.sha }}"].join("")),
+      true,
+    );
+    assert.equal(
+      text.includes(["ref: $", "{{ github.event.pull_request.head.ref }}"].join("")),
+      false,
+    );
+    assert.equal(text.includes("Verify Phase 2E evidence file is complete"), true);
+    assert.equal(text.includes("PHASE2E_EVIDENCE_OUTCOME"), true);
+    assert.equal(
+      text.includes(["PR_NUMBER: $", "{{ github.event.pull_request.number }}"].join("")),
+      true,
+    );
     assert.match(text, /Check out the exact Phase 2E candidate HEAD after trusted classification/);
     const classifyIndex = text.indexOf("Classify the pull request from trusted workflow code");
     const integrityIndex = text.indexOf("Enforce exact Phase 2E candidate integrity");

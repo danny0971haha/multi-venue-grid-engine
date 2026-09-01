@@ -43,6 +43,7 @@ export function classifyPullRequestEvent(
     baseRepository: pullRequest.base.repo?.full_name ?? event.repository?.full_name,
     baseRef: pullRequest.base.ref,
     baseSha: pullRequest.base.sha,
+    prNumber: pullRequest.number,
   });
 }
 
@@ -56,6 +57,7 @@ export function classifyGate({
   baseRepository,
   baseRef = null,
   baseSha = null,
+  prNumber = null,
 }) {
   if (!baseline || !Array.isArray(changedPaths) || baseRepository !== baseline?.repository) {
     return { mode: "FAIL_CLOSED", reason: "gate_input_invalid" };
@@ -74,6 +76,7 @@ export function classifyGate({
       baseRepository,
       baseRef,
       baseSha,
+      prNumber,
     });
   }
 
@@ -110,9 +113,13 @@ function classifyPhase2e({
   baseRepository,
   baseRef,
   baseSha,
+  prNumber,
 }) {
   if (!phase2eBaseline) {
     return { mode: "FAIL_CLOSED", reason: "phase2e_baseline_missing" };
+  }
+  if (Number(prNumber) !== Number(phase2eBaseline.pullRequestNumber)) {
+    return { mode: "FAIL_CLOSED", reason: "phase2e_pr_number_mismatch" };
   }
   if (
     headRepository !== phase2eBaseline.repository ||
@@ -246,6 +253,7 @@ export async function runTrustedGate({
       baseRepository: processEnv.PR_BASE_REPO,
       baseRef: processEnv.PR_BASE_REF,
       baseSha: processEnv.PR_BASE_SHA,
+      prNumber: processEnv.PR_NUMBER,
     }),
     { appendOutput, stdoutWrite, processEnv },
   );
