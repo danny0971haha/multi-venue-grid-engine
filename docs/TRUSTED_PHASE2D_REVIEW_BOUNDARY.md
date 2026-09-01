@@ -112,28 +112,32 @@ Job `trusted-phase2d-freeze-gate`:
 - trigger: `pull_request_target` for every pull request targeting protected `main`
 - permissions: `contents: read`, `pull-requests: read`
 - no write permissions
-- no production secrets (only the default `GITHUB_TOKEN`)
-- checkout is hardcoded to `danny0971haha/multi-venue-grid-engine` at the exact pull-request base SHA
-- does not checkout the PR head
+- no production secrets (only the default `GITHUB_TOKEN` for classification/integrity)
+- the Phase 2E runtime step unsets `GITHUB_TOKEN` / `NODE_AUTH_TOKEN` / OIDC and runtime-token env vars; the trusted runner allowlists child env and does not forward GitHub secrets into `npm`
+- checkout is hardcoded to `danny0971haha/multi-venue-grid-engine` at `${{ github.workflow_sha }}` (the trusted default-branch workflow commit). It does not execute governance scripts from the pull-request base SHA.
+- classifies first using trusted workflow bytes and GitHub metadata only
+- Phase 2D: does not checkout the PR head; compares GitHub Git objects against the pinned implementation base
+- Phase 2E: checks out the exact bound candidate HEAD only after trusted classification and API integrity succeed, with `persist-credentials: false`, then runs pinned Node commands from a runner copied out of the trusted tree
 - does not checkout the PR merge commit
-- does not run `npm install` / `npm ci`
-- does not import JavaScript/TypeScript from the PR
-- does not run tests from the PR
-- third-party action pin: `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1)
+- does not import candidate JavaScript as policy
+- does not run `npm run evidence:phase2d-corrective4:verify`
+- third-party action pins: `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1), `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020` (v7.0.0), `actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2)
 - PR title, branch, and filenames are not interpolated into the shell
 - source repo, ref, and exact HEAD are taken from the event via environment
-- comparison uses GitHub Git object APIs against the pinned implementation base and that source HEAD
+- comparison uses GitHub Git object APIs against the pinned identities
 
 The stable job always executes. It prints an explicit mode:
 
 ```text
-trustedPhase2dGateMode=ENFORCE|NOT_APPLICABLE|GOVERNANCE_REVIEW_REQUIRED
+trustedPhase2dGateMode=PHASE2D_ENFORCE|PHASE2E_ENFORCE|NOT_APPLICABLE|GOVERNANCE_REVIEW_REQUIRED
 trustedPhase2dFreezeGateExecuted=true
 ```
 
-`ENFORCE` runs the complete freeze checker. A renamed branch or fork touching Phase 2 paths is still enforced and then fails the exact repo/ref/SHA checks. A candidate change to trusted governance paths is enforced and fails the exact manifest. Unrelated work receives an actual successful `NOT_APPLICABLE` run rather than a skipped job. A new candidate SHA fails closed until this baseline is updated on `main` by a separate governance change.
+`PHASE2D_ENFORCE` runs the complete Phase 2D freeze checker. A renamed branch or fork touching Phase 2 paths is still enforced and then fails the exact repo/ref/SHA checks. A candidate change to trusted governance paths is enforced and fails the exact manifest. Unrelated work receives an actual successful `NOT_APPLICABLE` run rather than a skipped job. A new candidate SHA fails closed until this baseline is updated on `main` by a separate governance change.
 
-The classifier has no Phase 0 or Phase 1 path whitelist. Predecessor PRs that touch `src/**` while this workflow is already the PR base would be classified `ENFORCE`. That is why governance reaches `main` only after PR #1 and PR #2 are integrated. The predecessor solution is the bootstrap sequence below, not a freeze-checker bypass.
+`PHASE2E_ENFORCE` is allowed only for the exact stacked Runtime Corrective 3 candidate bound in `.github/trusted/phase2e-corrective3-baseline.json`. The Runtime Corrective 1 identity `f24421d9c80d96d7279d9626fc6bb95941031cf5` is invalidated and is not the live pin. Near-miss identity, extra paths, forks, and governance/lockfile/dependency changes fail closed. See `docs/PHASE_2E_TRUSTED_GATE.md`.
+
+The classifier has no Phase 0 or Phase 1 path whitelist. Predecessor PRs that touch `src/**` while this workflow is already the PR base would be classified `PHASE2D_ENFORCE`. That is why governance reaches `main` only after PR #1 and PR #2 are integrated. The predecessor solution is the bootstrap sequence below, not a freeze-checker bypass.
 
 Workflow `.github/workflows/trusted-governance-self-test.yml` provides job `trusted-governance-self-test` on governance-path changes. It parses both workflow YAML files, checks every governance script with `node --check`, validates the machine-readable policy, runs temporary Git repository fixtures including the post-merge ancestor case and negative controls, and emits `trustedGovernanceSelfTestExecuted=true`. It does not checkout or execute the Phase 2 candidate.
 
@@ -368,6 +372,8 @@ After a new independent review of a new exact candidate SHA:
    `node scripts/governance/generate-phase2d-corrective4-baseline.mjs`
 3. Merge that governance change to `main` through the active profile’s review rules.
 4. Do not ask the candidate branch to rewrite this file.
+
+A later trusted-verifier replacement (Phase 2E gate files, this document’s workflow, or the Phase 2E baseline) is a governance-only PR. Current `main` remains the executing authority until that PR is independently reviewed and merge-committed. Candidate verifier bytes are not executed, and `GOVERNANCE_REVIEW_REQUIRED` is not self-declared acceptance. After merge, runtime PRs are trusted only by governance bytes then present on `main`. See `docs/PHASE_2E_TRUSTED_GATE.md`.
 
 ## 9. What this does not do
 

@@ -58,6 +58,17 @@ describe("trusted protected-main checkout", () => {
     assert.ok(result.reasons.includes("trusted_governance_file_sha256_mismatch"));
   });
 
+  it("fails closed when HEAD does not match the running workflow SHA", () => {
+    const fixture = repositoryFixture();
+    const result = inspectTrustedCheckout({
+      repoRoot: fixture.root,
+      baseline: fixture.baseline,
+      expectedHeadSha: "0".repeat(40),
+    });
+    assert.equal(result.ok, false);
+    assert.ok(result.reasons.includes("trusted_checkout_workflow_sha_mismatch"));
+  });
+
   it("fails closed when the trusted manifest identity is tampered", () => {
     const fixture = repositoryFixture();
     const baseline = {

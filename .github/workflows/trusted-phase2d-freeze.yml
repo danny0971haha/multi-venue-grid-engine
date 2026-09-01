@@ -16,56 +16,176 @@ jobs:
   trusted-phase2d-freeze-gate:
     name: trusted-phase2d-freeze-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     permissions:
       contents: read
       pull-requests: read
     steps:
-      - name: Check out the exact protected base commit only
+      - name: Check out the trusted workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: danny0971haha/multi-venue-grid-engine
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.workflow_sha }}
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Classify the pull request from trusted base code
+      - name: Prove the checkout is the running workflow commit
+        env:
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          test -n "$TRUSTED_WORKFLOW_SHA"
+          test "$(git rev-parse HEAD)" = "$TRUSTED_WORKFLOW_SHA"
+
+      - name: Classify the pull request from trusted workflow code
         id: classify
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_API_URL: ${{ github.api_url }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           PR_BASE_REPO: ${{ github.repository }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/governance/phase2d-trusted-gate.mjs
 
-      - name: Enforce exact Phase 2 candidate integrity
+      - name: Enforce exact Phase 2D candidate integrity
         id: enforce
-        if: steps.classify.outputs.mode == 'ENFORCE'
+        if: steps.classify.outputs.mode == 'PHASE2D_ENFORCE'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_API_URL: ${{ github.api_url }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           PR_BASE_REPO: ${{ github.repository }}
         run: node scripts/governance/phase2d-trusted-freeze-check.mjs
 
+      - name: Enforce exact Phase 2E candidate integrity
+        id: phase2e_integrity
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REPO: ${{ github.repository }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/governance/phase2e-trusted-freeze-check.mjs
+
+      - name: Preserve trusted Phase 2E runner outside the workspace
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_integrity.outcome == 'success'
+        env:
+          TRUSTED_STASH: ${{ runner.temp }}/trusted-governance
+        run: |
+          mkdir -p "$TRUSTED_STASH/scripts" "$TRUSTED_STASH/trusted"
+          cp -R scripts/governance/. "$TRUSTED_STASH/scripts/"
+          cp -R .github/trusted/. "$TRUSTED_STASH/trusted/"
+
+      - name: Check out the exact Phase 2E candidate HEAD after trusted classification
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_integrity.outcome == 'success'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: danny0971haha/multi-venue-grid-engine
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up pinned Node.js for Phase 2E runtime commands
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_integrity.outcome == 'success'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.23.2"
+        env:
+          GITHUB_TOKEN: ""
+          NODE_AUTH_TOKEN: ""
+
+      - name: Verify pinned toolchain
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_integrity.outcome == 'success'
+        run: |
+          test "$(node --version)" = "v22.23.2"
+          test "$(npm --version)" = "10.9.8"
+
+      - name: Run trusted Phase 2E runtime commands
+        id: phase2e_runtime
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_integrity.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ""
+          NODE_AUTH_TOKEN: ""
+          ACTIONS_RUNTIME_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ""
+          ACTIONS_ID_TOKEN_REQUEST_URL: ""
+          TRUSTED_PHASE2E_BASELINE: ${{ runner.temp }}/trusted-governance/trusted/phase2e-corrective3-baseline.json
+          PHASE2E_CANDIDATE_ROOT: ${{ github.workspace }}
+          PHASE2E_EVIDENCE_PATH: ${{ runner.temp }}/phase2e-gate-evidence.json
+          TRUSTED_PHASE2E_RUNNER: ${{ runner.temp }}/trusted-governance/scripts/phase2e-trusted-runtime.mjs
+        run: node "$TRUSTED_PHASE2E_RUNNER"
+
+      - name: Verify Phase 2E evidence file is complete
+        id: phase2e_evidence
+        if: steps.classify.outputs.mode == 'PHASE2E_ENFORCE' && steps.phase2e_runtime.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ""
+          NODE_AUTH_TOKEN: ""
+          PHASE2E_EVIDENCE_PATH: ${{ runner.temp }}/phase2e-gate-evidence.json
+        run: |
+          test -s "$PHASE2E_EVIDENCE_PATH"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const evidence = JSON.parse(readFileSync(process.env.PHASE2E_EVIDENCE_PATH, "utf8"));
+            if (evidence.phase2eTrustedRuntimeOk !== true) process.exit(1);
+            if (!Array.isArray(evidence.commandResults) || evidence.commandResults.length === 0) process.exit(1);
+            if (evidence.dryRunLiveExchangeWrites !== false) process.exit(1);
+            if (evidence.phase2dEvidenceVerifierExecuted !== false) process.exit(1);
+            if (typeof evidence.candidateHeadSha !== "string" || evidence.candidateHeadSha.length === 0) process.exit(1);
+          '
+
+      - name: Upload Phase 2E gate evidence
+        if: always() && steps.classify.outputs.mode == 'PHASE2E_ENFORCE'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phase2e-trusted-gate-evidence
+          path: ${{ runner.temp }}/phase2e-gate-evidence.json
+          if-no-files-found: error
+
       - name: Record the stable required context result
         if: always()
         env:
           MODE: ${{ steps.classify.outputs.mode }}
           ENFORCE_OUTCOME: ${{ steps.enforce.outcome }}
+          PHASE2E_INTEGRITY_OUTCOME: ${{ steps.phase2e_integrity.outcome }}
+          PHASE2E_RUNTIME_OUTCOME: ${{ steps.phase2e_runtime.outcome }}
+          PHASE2E_EVIDENCE_OUTCOME: ${{ steps.phase2e_evidence.outcome }}
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "$MODE" = "ENFORCE" ] && [ "$ENFORCE_OUTCOME" != "success" ]; then
-            echo "trustedPhase2dFreezeGateExecuted=true"
-            echo "trustedPhase2dFreezeGateMode=$MODE"
-            exit 1
-          fi
-          case "$MODE" in
-            ENFORCE|NOT_APPLICABLE|GOVERNANCE_REVIEW_REQUIRED) ;;
-            *) exit 1 ;;
-          esac
           echo "trustedPhase2dFreezeGateExecuted=true"
           echo "trustedPhase2dFreezeGateMode=$MODE"
+          echo "trustedGovernanceCodeIdentity=$TRUSTED_WORKFLOW_SHA"
+          echo "candidateHeadSha=$PR_HEAD_SHA"
+          echo "governanceCandidateAccepted=false"
+          echo "phase2eRuntimeAccepted=false"
+          if [ "$MODE" = "PHASE2D_ENFORCE" ] && [ "$ENFORCE_OUTCOME" != "success" ]; then
+            exit 1
+          fi
+          if [ "$MODE" = "PHASE2E_ENFORCE" ]; then
+            if [ "$PHASE2E_INTEGRITY_OUTCOME" != "success" ]; then
+              exit 1
+            fi
+            if [ "$PHASE2E_RUNTIME_OUTCOME" != "success" ]; then
+              exit 1
+            fi
+            if [ "$PHASE2E_EVIDENCE_OUTCOME" != "success" ]; then
+              exit 1
+            fi
+          fi
+          case "$MODE" in
+            PHASE2D_ENFORCE|PHASE2E_ENFORCE|NOT_APPLICABLE|GOVERNANCE_REVIEW_REQUIRED) ;;
+            *) exit 1 ;;
+          esac

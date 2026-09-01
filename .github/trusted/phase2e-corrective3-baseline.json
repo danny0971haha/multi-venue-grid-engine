@@ -1,0 +1,729 @@
+{
+  "schemaVersion": "multi-venue-phase2e-trusted-baseline/1",
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "pullRequestNumber": 7,
+  "candidateHeadRef": "experiment/v0.1-phase2e-halt-ack",
+  "candidateBaseRef": "experiment/v0.1-phase2",
+  "frozenBaseSha": "7f196d367e39640eee9517f742b0d61424f9d4cc",
+  "frozenBaseTreeSha": "1b0afe805269972cf7af40f7fbf0e4e6b3e35894",
+  "candidateHeadSha": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+  "candidateHeadTreeSha": "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+  "allowedChangedPaths": [
+    "docs/PHASE_2E_EVIDENCE.md",
+    "package.json",
+    "src/halt/engine.ts",
+    "src/halt/halt-id.ts",
+    "src/halt/index.ts",
+    "src/halt/record.ts",
+    "src/halt/store.ts",
+    "src/halt/transport.ts",
+    "src/halt/types.ts",
+    "test/fixtures/phase2e-crash-worker.ts",
+    "test/halt/halt-crash-matrix.test.ts",
+    "test/halt/helpers.ts",
+    "test/halt/p2-h-matrix.test.ts",
+    "test/halt/p2e-corrective-1.test.ts",
+    "test/halt/p2e-corrective-2.test.ts",
+    "test/halt/p2e-corrective-3.test.ts"
+  ],
+  "candidateChangedFiles": [
+    {
+      "path": "docs/PHASE_2E_EVIDENCE.md",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "e96b449d392cf342dce2faf265f8ce8da157279f",
+        "sha256": "b8479d603a8b098e17bad6d3e5606205c07900b63e67e5ad00fb02be12e3a7d5"
+      }
+    },
+    {
+      "path": "package.json",
+      "change": "modified",
+      "base": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "116838b8ebe73d7a29ec2c6ae7504e809d45aaf9",
+        "sha256": "9e8ae1015eab925470a9622d48c981cdf1a151acb41d12131bcee871c8385cca"
+      },
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "bbceec77e34558173ccbcec99807ba75d3f2d37f",
+        "sha256": "f440fc2f027de8232c2ed3d215c7042f5b2d7f3e43cb7dbef1b9d28f8c24cd61"
+      }
+    },
+    {
+      "path": "src/halt/engine.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "33f5fb5256341d9171c6ad7b39641c068a5c2bba",
+        "sha256": "018a18aca1a7221f0d091957e8bbe3d491cfa82cc26b7e0e95ffbbe9cacd3330"
+      }
+    },
+    {
+      "path": "src/halt/halt-id.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "17ca24d9831e9e5bdba5314816591303802e4ea8",
+        "sha256": "db07884566c11694a734df62ca9f36ad3f23fd6807af2e9eeaadecb48c031903"
+      }
+    },
+    {
+      "path": "src/halt/index.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "833e61f319577d63aab5a5e6951817cfe1130cda",
+        "sha256": "cfe7869e44803d2953ed85d799e502606a1459d6ffd68ecaaf472af4dbe1938a"
+      }
+    },
+    {
+      "path": "src/halt/record.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "921d7c8526674a10a1cbe5ddfb3f559602a1bab3",
+        "sha256": "cf16b3eba9d0e5f1deee98eb747328378dda5e455ba9a73c37e428538044cde0"
+      }
+    },
+    {
+      "path": "src/halt/store.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "e1972cc476b01642d99079d450e8f7e88bca6327",
+        "sha256": "9db715236362600b0a6be4bd347d3e78513884737d5c7bbee569555544ac2b98"
+      }
+    },
+    {
+      "path": "src/halt/transport.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "d6fad783627af71ac3c8ff3562044689508e4837",
+        "sha256": "1a54a18b07bfa291a554218b9f84c6dd2abe9debe8daa5731f14fd5622f4063c"
+      }
+    },
+    {
+      "path": "src/halt/types.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "dc0a6122e060da1d00dcecf48f09566af3851518",
+        "sha256": "d04f6ce3fe777c3c7313769220ab491b48b046cd4a967454e732357062b3473c"
+      }
+    },
+    {
+      "path": "test/fixtures/phase2e-crash-worker.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "aeb03e730e96049d6d74b267e1fe20b9a23de867",
+        "sha256": "bda12c0d0a96418664a6705787d3f64a5dc449b352a4684a932ea115744b7e0e"
+      }
+    },
+    {
+      "path": "test/halt/halt-crash-matrix.test.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "fa6cfcc5eb4a972f73f3cd20b9f0d8faf7852ed5",
+        "sha256": "4df0a0d86d3634d6f378e28747aea834d69f55aa635b7820b8ac6d90ef69aea1"
+      }
+    },
+    {
+      "path": "test/halt/helpers.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "5da9aa56511358f5fb480ffe836b0eb26d07aa0c",
+        "sha256": "c1d36017ef43df45f82c6217fc90cffac411054dfdbb2c1fcc274cb1c44c48f9"
+      }
+    },
+    {
+      "path": "test/halt/p2-h-matrix.test.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "344d7ce0148adf73a12b09523c47cfd5afa9dd3b",
+        "sha256": "8058ea1fe7d65651ae4cc47b7597615ef64ccbc9197fcba951592ec080eda7a5"
+      }
+    },
+    {
+      "path": "test/halt/p2e-corrective-1.test.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "a0eab83379cf8503e8176db7fa7ba66decb7f993",
+        "sha256": "4cf4846c890a44e4704876889574394327b4498e5749a6614a1ccb012281c03e"
+      }
+    },
+    {
+      "path": "test/halt/p2e-corrective-2.test.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "73a1720baa2763fac21b22f2018460dcbec4626f",
+        "sha256": "79738aa0f11464f88a7e79031ee3d2c57e08bf140a1eec4ff1d6a0aa16cd4cbc"
+      }
+    },
+    {
+      "path": "test/halt/p2e-corrective-3.test.ts",
+      "change": "added",
+      "base": null,
+      "head": {
+        "mode": "100644",
+        "objectType": "blob",
+        "blobSha": "c7285684e96bf43ea676f4e92d5f28ae0577ad97",
+        "sha256": "be9d4ce877c5d76fbe28cb8bb4ada004e2ce6c41b36a3268f95b4e67cb378933"
+      }
+    }
+  ],
+  "protectedPathRules": [
+    "src/**",
+    "test/risk/**",
+    "test/persistence/**",
+    "test/simulator/**",
+    "package-lock.json",
+    "docs/RISK_PERSISTENCE_CONTRACT.md",
+    "docs/EXPERIMENT_SPEC.md",
+    "docs/PHASE_1_CONTRACT.md",
+    "docs/DOMAIN_CONTRACTS.md",
+    "docs/ACCEPTANCE_GATES.md"
+  ],
+  "protectedFrozenFiles": [
+    {
+      "path": "docs/ACCEPTANCE_GATES.md",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "31c6a07c5c88451fd94386c7977bc2716c7a105b",
+      "sha256": "de563e8c67cc4a8ea37e0826af660956c17de20704f52b6e0f1cd878879be8dd"
+    },
+    {
+      "path": "docs/DOMAIN_CONTRACTS.md",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "98746c25872bb127b894375491e5e1abd62fb4cd",
+      "sha256": "ed08351162c8d561d11a5305b92c3e65ee5993d8d9cbf15f4027b4b14f418424"
+    },
+    {
+      "path": "docs/EXPERIMENT_SPEC.md",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "630550b258253f1883ce95e0046570f67dc2cd6f",
+      "sha256": "844ac78add667ce353c4e7f72d6528bca8589249ee1f9e3bfebba96f83557d9a"
+    },
+    {
+      "path": "docs/PHASE_1_CONTRACT.md",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "989410f306230100ffd0a9ab55dccbd95aaba241",
+      "sha256": "4753792a12f1fa1f9fedbd8b3a7e05ddfb2933bb79013da4448f91cc2bbc4e96"
+    },
+    {
+      "path": "docs/RISK_PERSISTENCE_CONTRACT.md",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "19c31434bb9d01d1a6f4c5a1d48d04b0d82a2e99",
+      "sha256": "a06c4b9ee323d836694c784780ba270fc034d78406634ffd11b6474d0b99dca0"
+    },
+    {
+      "path": "package-lock.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "0f6240431a05a8cd358041b88c7b5f5fb8a31593",
+      "sha256": "a20cb9ac4dffb6cd9f19b594c6e9755dff5067a29bc0391a6ba99a80b5741b51"
+    },
+    {
+      "path": "src/bootstrap/runtimeMode.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "006887b6c6389be2be73492e9a2ad174f3b98746",
+      "sha256": "0dd1e604312537597e67faee23ad14fe80a0cac9e870a60bf73d0202c018e0aa"
+    },
+    {
+      "path": "src/domain/config.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "ccfd3c23df60a5090ffcd0c8cc9938a9c221fc8b",
+      "sha256": "c7fc983aed37015fe797330b6ef4b0ca5bf72c852ddbdbe0e57281e2a798e18c"
+    },
+    {
+      "path": "src/domain/enums.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "6ce6db4bb50f1b74b38862b8c387fca25ea67544",
+      "sha256": "ca62d7b25698ad9ef669a95ae1dec8859ef68a4780d712280d8ed75bdbee7342"
+    },
+    {
+      "path": "src/domain/ids.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "90ac1e7383b04c7688f37dabda99425a464d0d0f",
+      "sha256": "991dff1e8c755131e85e950f000f488dfdda9f2250360c6f33951e2d8d5f8618"
+    },
+    {
+      "path": "src/domain/ownership.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "43aa1ae249a82aae5538c163610055492375f7d0",
+      "sha256": "31a1cfcb92a145e96bea62c24d7271fa87386c800685567f2c26d192d12d0a1a"
+    },
+    {
+      "path": "src/domain/types.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e6edf6528d9a8622bd77a105b2e0046b6c53d8b9",
+      "sha256": "f7848366f09ddd220c7bbef4a73c20af6d0cf453798771956f1165d904fc01a8"
+    },
+    {
+      "path": "src/index.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "d5028d449490b6845a3704d9a824cdc9bba7a18f",
+      "sha256": "4830a60c2b6bbd504c5d503c7e6bb195f5f59202242ed784475058e3ab2d6b8f"
+    },
+    {
+      "path": "src/math/decimal.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "053608736ef81f0aa35509097d2e6d05252c7c7e",
+      "sha256": "3d577aa2eeb2eb6cf2fc2ba117256d4884a0cd11913a35fb3abf46819eb6cda4"
+    },
+    {
+      "path": "src/persistence/atomic-pair-store.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "c97532433d8d366ce4e5552a470bc00e79054bfd",
+      "sha256": "a31b01e4dca79e092d0616f58211fc93a8393676c3c04b5aa6fd9ae9153bc0e1"
+    },
+    {
+      "path": "src/persistence/canonical-json.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "cd46429b4b6f1972963c7d1beebf80ab5a194478",
+      "sha256": "a77d0eb9935ad93f66693471174accd19eb94d3665cf6d29d50615329f572137"
+    },
+    {
+      "path": "src/persistence/coordination-claim.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "aa49f57e9cf257a2258e6551f99b9cdf71557cf1",
+      "sha256": "ec89c592ba9867c614e1e92b6c93481ab5b47452d38de40edb7bd5742924e150"
+    },
+    {
+      "path": "src/persistence/durable-envelope.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "9c60ecf3935c7613138c414aa8b23d2f528e620b",
+      "sha256": "539199de385e57629e54bb43d0b06b19e3ed202b2e4d8cf35646c048ed2fe373"
+    },
+    {
+      "path": "src/persistence/exact-pair-inspection.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "ef2b242f333632859a72a91e91030359a2174fb2",
+      "sha256": "1755f0c17b328f345ebe67a23a4281e7f060a060d24ab85a2f5b9adf20fb6567"
+    },
+    {
+      "path": "src/persistence/index.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "41229b41d572b5386336595b664ff0d535c7deed",
+      "sha256": "046658ccccbb4e4d01b090537c8942186e663f5541c36a2380ae2fce3c920a6f"
+    },
+    {
+      "path": "src/persistence/lease-coordination.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "bfa402ff4cd57f3a9a2e7be5edcef516d50aaef3",
+      "sha256": "f12ce363c3b60330647dcc4e47634fd7ae20e2a748a4a4b165bc7f2d64cc0f5f"
+    },
+    {
+      "path": "src/persistence/lease-witness.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "85df6faee968f3b0af732a4c353bf3d280479212",
+      "sha256": "581d1dffbf811dd3fb6c8828e323935c88369fc23e41af3d4347c9c177f39861"
+    },
+    {
+      "path": "src/persistence/runtime-lease.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e46b4e1335522921b402f06e35a16e0aa13e3a12",
+      "sha256": "febda94c3624c199652b848975fe6c4baa58859de91080426d18f3ca50ea310f"
+    },
+    {
+      "path": "src/persistence/runtime-persistence-latch.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "7af006580ff8c2046aa8dd5739cb6ab7cd644be5",
+      "sha256": "a961325bef3d610d5b2d2c65fbca924691bd81c13393e6fd0cc1448f534c5108"
+    },
+    {
+      "path": "src/risk/exposure.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e432d375982ff40151aa318f90f5368919fcdc48",
+      "sha256": "39595e136c0f8fa4578f566bfbfdee82313d420ad9637308455117802096c489"
+    },
+    {
+      "path": "src/risk/freshness.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "c0a94abec2f24efa323a8603f8c10269e512b293",
+      "sha256": "f97aebb477fe23b6cf9a4e54de20e2c0aa9d1d61f35e115bc53397bc597e512b"
+    },
+    {
+      "path": "src/risk/index.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "06b22fb796baff3a7406b537cef07452c2aa1bb7",
+      "sha256": "a904dc9d7c2590a5623ea6d58a36d178a5d82b8aead27b0049b8603fc5c14a30"
+    },
+    {
+      "path": "src/risk/risk-engine.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "49c2a71672e64d938c359d04c29fb990c51238b0",
+      "sha256": "6a25e49d6525abe5896e24e26f5018ee9f52152e386009ed9c4ab05d75a9f541"
+    },
+    {
+      "path": "src/risk/risk-input-admission.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "9a8bca88dd734f74cd1de5e2707fb362e0495e61",
+      "sha256": "06294c2231d8705747607fac82ba53996b18f5d7d3be9a440bac9d222a40635c"
+    },
+    {
+      "path": "src/risk/risk-input-parser.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "b4c5a66e97755fbb27b75259d60e3209e1398f38",
+      "sha256": "7dae9bf1879f7881c52a90c672a969c5bce3ef08151291142d716a3d971cf9e9"
+    },
+    {
+      "path": "src/risk/risk-input-validation.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "d7596fa574d233c9e082a4755798ceba67b1e084",
+      "sha256": "79f3592a2013df4a8aed103deeb0510b70d389d021f837066a281766b998c014"
+    },
+    {
+      "path": "src/risk/risk-json-text.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "a7ba261973a6e45df544794f920d629ce1785bdd",
+      "sha256": "244be490e0fc16f37b4f439d6b44baae96a6e6bf517061eeebcd7a503adbbe41"
+    },
+    {
+      "path": "src/risk/risk-types.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "c4fe5fe0769a3a4398cce65e4d868c86b6453d5d",
+      "sha256": "49dacb37e543f3466bb8135df697ab4b99e449e5e32a9c382085e2b732ebf908"
+    },
+    {
+      "path": "src/simulator/engine.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "d26fc98c0b7c2a510eb53f1a7938a3992dc8abbd",
+      "sha256": "e79f52105b3154eb4143b32485d6c82b78e7de55cc9e88710a6cbd49156c87ba"
+    },
+    {
+      "path": "src/simulator/snapshot.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "22232b909ad32af35de5abe7b48e7bcb153cbe79",
+      "sha256": "5bedad651651c22be045cb21d04a7b60852cdca4c209b36572f309f0774a8ef8"
+    },
+    {
+      "path": "src/strategy/geometry.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "3425f1df311c9643b6c18b0068c247bb791da5c0",
+      "sha256": "092af94216328b11060b2556d2ad2f8e9ace41d92240c77af326b35bc0febb57"
+    },
+    {
+      "path": "src/strategy/levelState.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "80d64a7c7ea18fc2851a704cb6b1cfcd15c0c68e",
+      "sha256": "b90ef6f64067483cce0bb98b4c2111f6f96c3fc70e6d587c2c9c5adc28b0395f"
+    },
+    {
+      "path": "src/strategy/marketRules.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e60e1835dc73fc2d7de9b76c62ae2939373f01f1",
+      "sha256": "14c7bb314f31b6c9465c1e809a80be9347a4a5ea86d49e07d25ef4c81b2a0ec0"
+    },
+    {
+      "path": "test/persistence/atomic-pair-store.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "95187ddbc246510ed8cfc3a2d0fadd99020bfe39",
+      "sha256": "d13e9d11337836e918bcf4382213c03360337b630b2c46c5cc22ca3efb786263"
+    },
+    {
+      "path": "test/persistence/canonical-json.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "1886c57bd23291a5e8f0f115f5024f44675d20d1",
+      "sha256": "6579bf5f0f6b1f00e8b564bd97e72d0eb1bbcd5f1f8da4e28233a4d5f7ec15d5"
+    },
+    {
+      "path": "test/persistence/durable-envelope.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "0d49cf41c3fcb6960bef3523058e882e936cd67f",
+      "sha256": "711510ca6b1d0f868ff7e725eb0c8ce68b966951d9515fa2d0f9700a0d643c57"
+    },
+    {
+      "path": "test/persistence/exact-pair-inspection.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "f63a5943ede74240aaed6800203b86b022aa88bb",
+      "sha256": "8a8c9ff55299c908edbae5ca2cbb916f2531270f4feb0c0e6da2343628e1b147"
+    },
+    {
+      "path": "test/persistence/runtime-lease-corrective-1.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "2644a63e02e9207fd56c6966d34cd683947a9dd7",
+      "sha256": "4aa238f7296e62aa17040fd3988bd93b54d395135258863e62ef196057410e09"
+    },
+    {
+      "path": "test/persistence/runtime-lease-corrective-2.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "edc4330214521de5eccfc6dcca44e5885ec7fabe",
+      "sha256": "5d404b6c437b09d7fc1e75c021c5e5fc7a5102aa60ad50232aee4f1683380094"
+    },
+    {
+      "path": "test/persistence/runtime-lease.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "b76e761ca1742d0658ed01f62dea3847fc346ccd",
+      "sha256": "1793eb46ec438003c08725b312358a7f859ba1070a6a4eff9bc0741508873b39"
+    },
+    {
+      "path": "test/risk/risk-engine-corrective-1.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "630afa1f0e518c7817c5a5fa7ab2fec67cc311eb",
+      "sha256": "c0c40c402ff8d57f033aa1d6c5765ca0c005a0be41220e328ca5532b80a56c76"
+    },
+    {
+      "path": "test/risk/risk-engine-corrective-2.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "ee55508a61bd8760d76b0cbed5208fc157cf5ee3",
+      "sha256": "68a6f1e4fc32bc54e032149146be5ad8614527b35d0ff7ce074b2359ed3a18d5"
+    },
+    {
+      "path": "test/risk/risk-engine-corrective-3.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "cecfe48965e24d2c968929c2d26949c3fa130991",
+      "sha256": "687477a5c367039928d40eb132bc38fd81070312517a9110ee4503339cc45db3"
+    },
+    {
+      "path": "test/risk/risk-engine-corrective-4.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "5978d447bc79154cd2cca72346890d7d7c0dc638",
+      "sha256": "2936f019990def81f0105ff2706f0b4784669d9c38be180a894615798cbb6016"
+    },
+    {
+      "path": "test/risk/risk-engine.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "09899a74e458a7be16da1615e8d8f9a6f520a921",
+      "sha256": "829a1e04a810dc56df66784d0c4d3175d6adf3454e654162eb828afa9e78e036"
+    },
+    {
+      "path": "test/simulator/helpers.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "a090b10a21a9dea7c49e66fcfa132e35495d077e",
+      "sha256": "134bb4d04ff530fed9d226c5fbfba06afe6ea86f666a820b15ec189152cdb47b"
+    },
+    {
+      "path": "test/simulator/p1-corrective-2.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "b23a5f7c5acc487761a9d3b893a4689dff652143",
+      "sha256": "c8500729aed2555386c165b2925d9b26c63d208f39b5ddb5548647c05df7b2c1"
+    },
+    {
+      "path": "test/simulator/p1-corrective-3.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "b11d588d875d0d61a41e58275f3b041d73a1f07c",
+      "sha256": "b12d92941c384bfbb05d72291bcfe42cf6ddea2e0d9e188f66277a45e8460241"
+    },
+    {
+      "path": "test/simulator/p1-corrective-4.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "6156a40bee3ff8d14e3daabc60cfc14ead62cb6a",
+      "sha256": "606e23aabd97aa1008aceb03fac9692058cbadfa0543c7a53bc37a5211349160"
+    },
+    {
+      "path": "test/simulator/p1-corrective-5.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "3111d7797f804eb1b7660ef063a62a6a527d7f82",
+      "sha256": "d0555198d7e5fd962341c1872abe717f68f80903dc4bd021b51bdd11906df15c"
+    },
+    {
+      "path": "test/simulator/p1-corrective-6.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "6dc741bec00fb98f281a338dcc82c350e90dbee1",
+      "sha256": "0d9817f70b7fa8eba4186b20c4f160c7ad2652c6481794b4bf7b415fc25fbff1"
+    },
+    {
+      "path": "test/simulator/p1-corrective-7.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "32cdd8eb237f5e4a7e1932200b213edbfc7cbc1e",
+      "sha256": "39430999db0929e8a04f3a38664aac4a6537081e2f14641a0313793eed6d57a2"
+    },
+    {
+      "path": "test/simulator/p1-corrective.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "a4531322b76283314aa0901ac1c9e3fffcbd927e",
+      "sha256": "ea933b97e0d36f9375faf38938a5784ba071f366666b3af410e9dc6574b6a0fc"
+    },
+    {
+      "path": "test/simulator/p1-identity.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "b1fd1bfb5bd4844410ece75ba88e89f6e64a4de3",
+      "sha256": "9a69318f6d06ede7648fd7db87dc1efb626ea2539672c611ed46589e71763014"
+    },
+    {
+      "path": "test/simulator/p1-restart.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "d50630dab5a36c14baba6c609324c159ba1cb450",
+      "sha256": "0424e6998b0440cb6322319d629a1b139b9e73fb932452d467ea272d74279f8c"
+    },
+    {
+      "path": "test/simulator/p1-state.test.ts",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "fe9542d7cfe8bfa264fffdfbc26629923d311673",
+      "sha256": "8c6eed9b6fdb0ca07cbc477ea4b9528f2dfa392829fe4470ca8765fd7ca6b00c"
+    }
+  ],
+  "trustedGovernancePathRules": [
+    ".github/workflows/trusted-phase2d-freeze.yml",
+    ".github/workflows/trusted-governance-self-test.yml",
+    ".github/trusted/**",
+    "scripts/governance/**",
+    ".github/CODEOWNERS"
+  ],
+  "packageLock": {
+    "path": "package-lock.json",
+    "mode": "100644",
+    "objectType": "blob",
+    "blobSha": "0f6240431a05a8cd358041b88c7b5f5fb8a31593",
+    "sha256": "a20cb9ac4dffb6cd9f19b594c6e9755dff5067a29bc0391a6ba99a80b5741b51"
+  },
+  "dependencyIdentity": {
+    "dependencies": {
+      "decimal.js": "10.6.0"
+    },
+    "devDependencies": {
+      "@biomejs/biome": "2.5.10",
+      "@types/node": "26.2.0",
+      "tsx": "4.23.12",
+      "typescript": "7.0.2"
+    }
+  },
+  "packageJsonScriptsPolicy": {
+    "allowedScriptKeysChanged": ["test:phase2e"],
+    "expectedBaseTestScript": "tsx --test --test-reporter tap test/bootstrap/*.test.ts test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts test/persistence/*.test.ts test/risk/*.test.ts test/evidence/*.test.ts",
+    "expectedHeadScripts": {
+      "test:phase2e": "tsx --test --test-reporter tap test/halt/*.test.ts"
+    }
+  },
+  "requiredNodeVersion": "v22.23.2",
+  "requiredNpmVersion": "10.9.8",
+  "requiredRuntimeCommands": [
+    "npm ci",
+    "npm run typecheck",
+    "npm run lint",
+    "npm run format:check",
+    "npm test",
+    "npm run test:phase2e",
+    "npm run build",
+    "npm run scan:secrets",
+    "npm run dry-run"
+  ],
+  "forbiddenRuntimeCommands": [
+    "npm run evidence:phase2d-corrective4:verify",
+    "npm run evidence:phase2d-corrective4"
+  ],
+  "npmTestHistoricalMismatch": {
+    "boundCandidateHeadSha": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+    "testFilePath": "test/evidence/phase2d-corrective4-evidence.test.ts",
+    "expectedExitCode": 0,
+    "expectedTapTests": 474,
+    "expectedTapPass": 474,
+    "expectedTapFail": 0,
+    "expectedTapCancelled": 0,
+    "expectedTapSkipped": 0,
+    "expectedTapTodo": 0,
+    "expectedFailureType": "testCodeFailure",
+    "expectedFailureCode": "ERR_ASSERTION",
+    "expectedErrorSubstring": "PACKAGE_SCRIPT",
+    "expectedFailureNames": [],
+    "expectedSuiteFailureName": "Phase 2D Corrective 4 evidence verifier",
+    "expectedSuiteFailureType": "subtestsFailed",
+    "expectedSuiteFailureCode": "ERR_TEST_FAILURE"
+  },
+  "phase2eSuiteTap": {
+    "expectedExitCode": 0,
+    "expectedTapTests": 79,
+    "expectedTapPass": 79,
+    "expectedTapFail": 0,
+    "expectedTapCancelled": 0,
+    "expectedTapSkipped": 0,
+    "expectedTapTodo": 0
+  }
+}

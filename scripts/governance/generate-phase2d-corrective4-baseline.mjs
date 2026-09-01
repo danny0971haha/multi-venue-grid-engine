@@ -271,7 +271,7 @@ function spawnExit(args) {
   }
 }
 
-export { uncommittedGovernancePaths, TRUSTED_GOVERNANCE_PATH_RULES };
+export { uncommittedGovernancePaths, TRUSTED_GOVERNANCE_PATH_RULES, trustedGovernanceManifest };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main();

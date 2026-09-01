@@ -739,6 +739,20 @@
       "sha256": "52065b56c2bd40a1ac3ed86448a84e560b8474cef68281930c7dd823e6279a04"
     },
     {
+      "path": ".github/trusted/phase2e-corrective1-baseline.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "3a73e2c87e15563929ff377c694c5322e8796a85",
+      "sha256": "7b925d40cc4e17b2a89ac676cf469686261c9bffa4ca4fab932015e767b90cd8"
+    },
+    {
+      "path": ".github/trusted/phase2e-corrective3-baseline.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "a3fafd52ad681057476d16bb5b27575dd61194ba",
+      "sha256": "432384e66fe29b86ec9eacf11da67ccafed190ed6156246104cc9e5bbe5419f8"
+    },
+    {
       "path": ".github/trusted/repository-governance-policy.json",
       "mode": "100644",
       "objectType": "blob",
@@ -749,15 +763,92 @@
       "path": ".github/workflows/trusted-governance-self-test.yml",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "33a48eaf0c23d03b1415d9c787899163479d4f04",
-      "sha256": "2104c02e5c04cb2d6e473f13e569a8ae13fa2433327019902823e4cbc6468eac"
+      "blobSha": "056a819cc7848847874e69c0d05a729daedbc675",
+      "sha256": "0636a6a8b74dba1515ad77e77648ebfcf10f8b38e7d77c9bd1f74f2701473290"
     },
     {
       "path": ".github/workflows/trusted-phase2d-freeze.yml",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "3bc1bd6cb8444d7a116c494f26c1b64aa4934997",
-      "sha256": "b7885a047ee563d921100f05f9a906aae9bc0df3366fd36cfa8cb9751c557cc2"
+      "blobSha": "034ca8822c3bf0d2a2bcb9802808d5563664b83a",
+      "sha256": "cbf14add8bfe184018af4269889a8cbc0935d8d123195a8f7380f862f0017f73"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/extra-changed-path.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4b834ec8702bb011cd4b15cfa76fd7c55800c21",
+      "sha256": "27d54f1094ce6c8f11afc319a208662eef65ad4dc7626fb3b12299263b6521ae"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/fork-phase2e.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "d83e7dd52251babff0e8f84107343df0db324323",
+      "sha256": "9638579763cf79737d76e7c9a3d9e2de05c6cce6ec3be0bb47d777610bbb2949"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/governance-only.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e9868ed31d0cb7b7caea219a7a530c2f362cd6a8",
+      "sha256": "2baba5fc8ab29a90d32d8703123f85c78f88590fc70e7d203332aa3a6645d61f"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/malformed-pr-metadata.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "4d8207f02cbda1af14eed581402a88144169bdca",
+      "sha256": "438d8191c798bcb539c1fd3d0acb03316c228a5eee34ac312bc8e57aede95272"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/old-corrective1-head.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4ebda9f6063776669715870d7c4746ad5413f7c",
+      "sha256": "4bdee82967ecfa56f4b462fcd257e980503597f69ce76496a9459b47d84aa3ef"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/omitted-test-file.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4b834ec8702bb011cd4b15cfa76fd7c55800c21",
+      "sha256": "27d54f1094ce6c8f11afc319a208662eef65ad4dc7626fb3b12299263b6521ae"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/unrelated.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "c2675fe117a644e63d09a31f24029b3ab5a335bb",
+      "sha256": "b34c3cfd5085f40201b5c412ea37a2b8384a1439e445fc392a74b37e85c09a12"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/valid-phase2d.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "66eb324c44101e1b4e37b9ff6d0c018aa9037408",
+      "sha256": "3edb44cbc22bee280909238aa11549beac5f40f577e6bfa9ee9c610f1700a543"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/valid-phase2e.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "e4b834ec8702bb011cd4b15cfa76fd7c55800c21",
+      "sha256": "27d54f1094ce6c8f11afc319a208662eef65ad4dc7626fb3b12299263b6521ae"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/wrong-head.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "2393ca7ea9cbf8777f25052a1d6037d67fb0e8e8",
+      "sha256": "a06a45c5dcd365061ffc6e2f84d97ac13427f542c264c6054f1999560a49838e"
+    },
+    {
+      "path": "scripts/governance/fixtures/events/wrong-pr-number.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "1b536b52f9df93fb88d37a25999832aacb2cff30",
+      "sha256": "173321d44f1e04a1cf9f99640b960ab2e4a077feb33958cd758696b66b74201e"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/deployment-authorized.json",
@@ -900,11 +991,18 @@
       "sha256": "3e511807546e618d24baae231eb2a52bb0caaef1450b06c8eb47d4e031694fb4"
     },
     {
+      "path": "scripts/governance/fixtures/wrong-tree.json",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "52a1c9edc4c06219d6799f480ab5455f1e681b89",
+      "sha256": "9870d93153297d13df028f308c34aed4cbeebfca7c6b373b3d294bae44d3f8ac"
+    },
+    {
       "path": "scripts/governance/generate-phase2d-corrective4-baseline.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "b490ed8ca888a389c346f07710d9838ee0f943bf",
-      "sha256": "102bb65ca4390419b3e480f44c41604f8a95ff1d6406473e297a82dc3e3afdf8"
+      "blobSha": "350b49b5a6aa33e6fc781880c24c68ed5eb2b20c",
+      "sha256": "1d1a414a73feb3ea33f4879dc246d1361a31814e940dd7b630f86a3c2ea18728"
     },
     {
       "path": "scripts/governance/generate-phase2d-corrective4-baseline.test.mjs",
@@ -914,25 +1012,32 @@
       "sha256": "8a56c8ada2f527782a32740e225663f3d541a6dc7f0205b11f3aace61719571d"
     },
     {
+      "path": "scripts/governance/generate-phase2e-baseline.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "4bfe979dc2395d1792f30422843026a67c6010d5",
+      "sha256": "0ae5d66a4311fb84936bd316bebb556d284f6b59dce6e402a26a9338ab5de39a"
+    },
+    {
       "path": "scripts/governance/phase2d-trusted-control.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "034ec7ca56a17719beff237bd8b1b1e42049342c",
-      "sha256": "6470bbc1164964e1c0e0a53c0d3b7aad4c8f5d4febda3bf15d1ffd8a98af22fd"
+      "blobSha": "252aa6786eb8b14acd4f659d6aaa67238805dfe4",
+      "sha256": "8dd20e0e58f7dfcea6600ba1bae5701c0244d0db66f2778ed13b562b68c0c8c3"
     },
     {
       "path": "scripts/governance/phase2d-trusted-control.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "23d3f63683b1cd924332083c1c2e1072ab2f6a43",
-      "sha256": "3cff7ea18cdcd861c5eaf7cd7c92cd736df993b1f7d9ff2ad1c4554182304af2"
+      "blobSha": "382f76b1a2f8ee59cb5ec6139f20c5c3739f4c15",
+      "sha256": "b81d9724cb67dd18d763a12a79138b3cb81c93aa5062c0485d9ba750e70a88e9"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-check.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "2d3db15f1fb754b79df29e7e0cda49acf5531f0a",
-      "sha256": "5b09ed284fb07405e285f1ebf4e229b8de0da9db7719aefcd8cdb5f7ca10634e"
+      "blobSha": "0e3373007bb1b0ed62741aedfc38fa58bc2d37fd",
+      "sha256": "f7b9679defd48ec5190fe86681d8b48913c60ecd57685ac265397aadbd77274c"
     },
     {
       "path": "scripts/governance/phase2d-trusted-freeze-github.mjs",
@@ -966,22 +1071,64 @@
       "path": "scripts/governance/phase2d-trusted-gate.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "b4318dc3ad938cfe36fdde13c64318b04401f839",
-      "sha256": "237fc43266b740405410a0c29d2061f3adf18bad4b47f1a28edfd745ea715d13"
+      "blobSha": "5f8af1e0f9605be074e87eddfd0cd83fa2bfcb51",
+      "sha256": "9934b183f4964a17dde924029efc23c0ee9ab20462bef3e63cd77d6b5dec5e05"
     },
     {
       "path": "scripts/governance/phase2d-trusted-gate.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "5c4d32090e1ffeec3357d91583cabe410579859f",
-      "sha256": "d73190972ea074f0e53f5984a6605d69b05ab8aea4ec7d2344a25d339103b192"
+      "blobSha": "cc6afc8a9061edce6000a0413b6de3c586da7511",
+      "sha256": "1dad4f6a0da3136c189e52be03f4a751a7b84e6410410407eb83b675757f4675"
     },
     {
       "path": "scripts/governance/phase2d-workflow-structure.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "8450ebe149903a28d69246ca3275513d3a419d78",
-      "sha256": "410dd8f0a79f30719220a882fb46153b702b521a7e115645353984eb71f2243a"
+      "blobSha": "7929bcb451d56c20949d4befcf466ad93499007e",
+      "sha256": "3b03140ecd878ea20d65d3f1e41044a01831558e88514d5af4b827f409310ba0"
+    },
+    {
+      "path": "scripts/governance/phase2e-trusted-freeze-check.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "09a1e282d0c163c6129b245f0d73bc9e7510c5a8",
+      "sha256": "16a05284b0521fe0be241b9fa7a78ca9c682d4479396e424e24b9b54ad43c568"
+    },
+    {
+      "path": "scripts/governance/phase2e-trusted-freeze-lib.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "2b450e10e88417a24918600459d2784e41b741f1",
+      "sha256": "4c2f9570ae31f44ee32aeb093a4cfa0c4876d8472b878b869f2eee5b6e68e4eb"
+    },
+    {
+      "path": "scripts/governance/phase2e-trusted-freeze-lib.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "58d779d4d8cbf793f1b8a7769963a8464e6db801",
+      "sha256": "100215e1a151022e3644536e3f79f0db8ca1f5f2ea46c9017577009465e22bd6"
+    },
+    {
+      "path": "scripts/governance/phase2e-trusted-gate.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "1b4f208fab5943e2b55676037fdf876f38814b58",
+      "sha256": "617d64a174371ecfd739a740d050bb4d302c46e458a2082000482597076fbb77"
+    },
+    {
+      "path": "scripts/governance/phase2e-trusted-runtime.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "f64bb334e688a91a267a794bb2c73bea23888c10",
+      "sha256": "4ea37df2cef2210e55d00e72a5a55ead1a78d1c1d73dfc77511fe8dd8ad322d6"
+    },
+    {
+      "path": "scripts/governance/phase2e-trusted-runtime.test.mjs",
+      "mode": "100644",
+      "objectType": "blob",
+      "blobSha": "7d867954b714efdbb40b99f74b803a4452858a49",
+      "sha256": "674ff615eaf2e34afe3317a25e9e3dee65eef509d56664b26936c651e3430dfc"
     },
     {
       "path": "scripts/governance/repository-governance-policy.mjs",
@@ -994,8 +1141,8 @@
       "path": "scripts/governance/repository-governance-policy.test.mjs",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "7cb79e9b2067f36904aa57d322fdd41a811ec684",
-      "sha256": "5746a375ed162c6e62d3e5797431811a7831cb4026e0f77946adbd82b10408bc"
+      "blobSha": "ecfc66a7212867b1929c720b103b0be1a5190c97",
+      "sha256": "bfcad51a3a6d203a3dbee14f1a7dd9e7a970df424ad79218594c48936882b6b8"
     }
   ]
 }

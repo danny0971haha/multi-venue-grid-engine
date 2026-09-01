@@ -277,6 +277,7 @@ describe("bootstrap sequence vs classifier whitelist", () => {
     assert.doesNotMatch(gateSource, /experiment\/v0\.1-phase1/);
     assert.doesNotMatch(gateSource, /whitelist/);
     assert.doesNotMatch(gateSource, /bypass/);
+    assert.doesNotMatch(gateSource, /\bENFORCE\b/);
 
     const baseline = {
       repository: "danny0971haha/multi-venue-grid-engine",
@@ -293,7 +294,7 @@ describe("bootstrap sequence vs classifier whitelist", () => {
         headRepository: baseline.repository,
         baseRepository: baseline.repository,
       }).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
     assert.equal(
       classifyGate({
@@ -303,7 +304,7 @@ describe("bootstrap sequence vs classifier whitelist", () => {
         headRepository: baseline.repository,
         baseRepository: baseline.repository,
       }).mode,
-      "ENFORCE",
+      "PHASE2D_ENFORCE",
     );
 
     const parsed = loadCommittedRepositoryGovernancePolicy(root);
