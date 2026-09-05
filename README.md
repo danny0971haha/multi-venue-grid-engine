@@ -6,6 +6,8 @@ Independent, from-scratch multi-exchange perpetual-grid trading engine.
 
 **Frozen Phase 2D baseline; separate Phase 2E runtime and governance review candidates.** Read [CURRENT_STATUS.md](docs/CURRENT_STATUS.md) for exact identities and review limitations. Live/testnet exchange writes, deployment and merge remain unauthorized.
 
+Agent work starts with [AGENTS.md](AGENTS.md) and the impact-based reading map in [AI_START_HERE.md](AI_START_HERE.md). Complete authorized objectives end to end without treating historical phase instructions as new authorization.
+
 Validation commands and evidence classes: [VALIDATION_GUIDE.md](docs/VALIDATION_GUIDE.md).
 
 This repository is deliberately independent. Third-party projects may be researched for public behavior and architecture, but source code must not be copied unless a compatible license is independently verified and the user separately authorizes the import.
@@ -30,21 +32,16 @@ The objective of v0.1 is execution correctness, recovery correctness, state inte
 
 ## Authoritative document map
 
-Read in this order:
+Start with AGENTS.md and CURRENT_STATUS.md, then use AI_START_HERE.md to select the contracts affected by the task. This map is not a requirement to reread every unrelated historical document for a small documentation change, and it does not change document authority.
 
-1. `AGENTS.md` — binding agent behavior and safety rules.
-2. `docs/EXPERIMENT_SPEC.md` — authoritative numerical experiment envelope.
-3. `docs/ARCHITECTURE.md` — component boundaries and system topology.
-4. `docs/DOMAIN_CONTRACTS.md` — canonical identities, observations, intents, and state semantics.
-5. `docs/VENUE_ADAPTER_CONTRACT.md` — exchange capability and ACK/REJECT/UNKNOWN semantics.
-6. `docs/RISK_PERSISTENCE_CONTRACT.md` — fail-closed risk, halt, lease, and durable-state protocol.
-7. `docs/IMPLEMENTATION_CONTRACT.md` — phase sequence and phase boundaries.
-8. `docs/CURRENT_STATUS.md` — present candidate identities and bounded operator task.
-9. `docs/TEST_FAULT_MATRIX.md` — required test and process-crash matrix.
-10. `docs/ACCEPTANCE_GATES.md` — independent PASS / REJECT / BLOCKED gates.
-11. `docs/EVIDENCE_TEMPLATE.md` — mandatory checkpoint evidence packet.
-12. `docs/REVIEW_CHANGE_PROTOCOL.md` — contract-change and review workflow.
-13. `docs/THIRD_PARTY_BOUNDARY.md` — source/research boundary.
+| Purpose | Documents |
+| --- | --- |
+| Behavior, present state and task routing | `AGENTS.md`, `docs/CURRENT_STATUS.md`, `AI_START_HERE.md` |
+| Numerical envelope and safety authority | `docs/EXPERIMENT_SPEC.md`, `docs/RISK_PERSISTENCE_CONTRACT.md` |
+| Component, domain and venue semantics | `docs/ARCHITECTURE.md`, `docs/DOMAIN_CONTRACTS.md`, `docs/VENUE_ADAPTER_CONTRACT.md` |
+| Phase scope and independent gates | `docs/IMPLEMENTATION_CONTRACT.md`, the authorized phase contract, `docs/ACCEPTANCE_GATES.md` |
+| Validation and evidence | `docs/VALIDATION_GUIDE.md`, `docs/TEST_FAULT_MATRIX.md`, `docs/EVIDENCE_TEMPLATE.md` |
+| Change protocol and third-party boundary | `docs/REVIEW_CHANGE_PROTOCOL.md`, `docs/THIRD_PARTY_BOUNDARY.md` |
 
 If documents appear to conflict, the implementation agent must not guess. Follow the precedence rules in `docs/REVIEW_CHANGE_PROTOCOL.md` and stop with a contract-change request when the conflict is material.
 
