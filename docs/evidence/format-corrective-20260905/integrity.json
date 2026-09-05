@@ -1,0 +1,38 @@
+[
+  {
+    "path": "docs/evidence/current-candidate/diagnostic-results.json",
+    "originalSha256": "ee9181bc40095cb3bd7e2ec0baf4fb721863686692ac9241fe8b2695dda4a258",
+    "formattedSha256": "06c33eab34546a62753a71c1c431127c771dd5327634c42f67778997ac76ff1e",
+    "semanticEquality": true
+  },
+  {
+    "path": "docs/evidence/current-candidate/results.json",
+    "originalSha256": "9b7c063ef802792a06e48c38bb972c14d87db80ee5db6b95749aeed1d5183590",
+    "formattedSha256": "543eb037eeaf2a2a5c45a59565e60c900a553a5132e552631138b0fd0518cf83",
+    "semanticEquality": true
+  },
+  {
+    "path": "docs/evidence/current-candidate/simulate-summary.json",
+    "originalSha256": "2b3977e21d7202ebc8e686aa61d068a184d291839f08fe9f152586fa71510230",
+    "formattedSha256": "9cac70be9558c9859a217d56f72c8ff47ff564cf22f5ea709058c31faed28f6e",
+    "semanticEquality": true
+  },
+  {
+    "path": "docs/evidence/current-candidate/umbrella-summary.json",
+    "originalSha256": "fa725d364109fb354a8bacd304b30e8b6ac8bbd1deb8b3195e4abe9f6e5debec",
+    "formattedSha256": "899ea5b420917a16a88bb5ad0d9a732b8e5860261aec70c35f2f812e8607b878",
+    "semanticEquality": true
+  },
+  {
+    "path": "test/offline-integration/reload-worker.ts",
+    "originalSha256": "3dd79ce015287bc7b63e0972231842f1f17277f56869f16cc9b7a12f76977ad4",
+    "formattedSha256": "23b9c3197f396a9a7bee01324705a04d047728a04f090aea342a5ad129269173",
+    "semanticEquality": true
+  },
+  {
+    "path": "test/offline-integration/scenarios.ts",
+    "originalSha256": "57f61265cd32473cc8046ee4f573fb6c96c5769e5aec9ab4ae4a583623de316c",
+    "formattedSha256": "d69953d8ba3804ab8352bce37dd87fa545e8b67e584bcee7a74f299600182204",
+    "semanticEquality": true
+  }
+]

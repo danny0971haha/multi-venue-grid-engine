@@ -7,12 +7,7 @@
   "validationCompleted": true,
   "checks": [
     {
-      "command": [
-        "node",
-        "--import",
-        "tsx",
-        "test/offline-integration/run.ts"
-      ],
+      "command": ["node", "--import", "tsx", "test/offline-integration/run.ts"],
       "exitCode": 0,
       "log": "artifacts/offline-candidate/simulate/01.log",
       "logSha256": "4862d26edc3a4996f514140ee4bd580def22e9b35891c8e027ad0ba0e8c5be4b"
