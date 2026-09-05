@@ -1,44 +1,35 @@
 # AI START HERE
 
-You are the bounded implementation agent for this repository.
+Use this entrypoint for the current bounded task, not as a standing instruction to restart an earlier phase. [AGENTS.md](AGENTS.md) defines behavior and safety; this file is a reading map, not a second authorization source.
 
-## Required reading order
+## Start every task here
 
-Read these files completely before editing:
+1. Read [AGENTS.md](AGENTS.md) and [CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
+2. Read [REVIEW_CHANGE_PROTOCOL.md](docs/REVIEW_CHANGE_PROTOCOL.md) for authority, material conflicts, phase gates and evidence integrity.
+3. Identify the operator's current objective, analysis-only versus implementation mode, allowed paths and required checks. Record actual branch, HEAD/tree, working-tree status and relevant candidate refs before changes.
 
-1. `AGENTS.md`
-2. `docs/EXPERIMENT_SPEC.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/DOMAIN_CONTRACTS.md`
-5. `docs/VENUE_ADAPTER_CONTRACT.md`
-6. `docs/RISK_PERSISTENCE_CONTRACT.md`
-7. `docs/IMPLEMENTATION_CONTRACT.md`
-8. `docs/CURRENT_STATUS.md` and `docs/VALIDATION_GUIDE.md`
-9. `docs/TEST_FAULT_MATRIX.md`
-10. `docs/ACCEPTANCE_GATES.md`
-11. `docs/EVIDENCE_TEMPLATE.md`
-12. `docs/REVIEW_CHANGE_PROTOCOL.md`
-13. `docs/THIRD_PARTY_BOUNDARY.md`
+A status snapshot is not proof that remote refs still match it. Check expected identities through permitted reads; an offline workflow must not enable networking to do so. State which refs could not be checked. Missing scope does not authorize a new phase.
 
-## Current bounded task
+## Read according to impact
 
-Use `docs/CURRENT_STATUS.md` for the candidate timeline and `docs/VALIDATION_GUIDE.md` for evidence classes. Earlier phase contracts are retained as historical scope documents; they do not authorize restarting old implementation work.
+| Task impact | Additional required reading |
+| --- | --- |
+| Documentation, navigation or formatting only | Affected documents, their incoming/outgoing references and any contract statement being described. |
+| Validation tooling, fixtures or tests | [VALIDATION_GUIDE.md](docs/VALIDATION_GUIDE.md), the affected test contract, [TEST_FAULT_MATRIX.md](docs/TEST_FAULT_MATRIX.md) and [EVIDENCE_TEMPLATE.md](docs/EVIDENCE_TEMPLATE.md). |
+| Runtime, risk, persistence, halt/ACK or execution | [EXPERIMENT_SPEC.md](docs/EXPERIMENT_SPEC.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [DOMAIN_CONTRACTS.md](docs/DOMAIN_CONTRACTS.md), [RISK_PERSISTENCE_CONTRACT.md](docs/RISK_PERSISTENCE_CONTRACT.md), relevant phase contracts and fault matrices; also [VENUE_ADAPTER_CONTRACT.md](docs/VENUE_ADAPTER_CONTRACT.md) when venue semantics are involved. |
+| Phase implementation or formal gate handoff | [IMPLEMENTATION_CONTRACT.md](docs/IMPLEMENTATION_CONTRACT.md), the explicitly authorized phase/checkpoint contract, [ACCEPTANCE_GATES.md](docs/ACCEPTANCE_GATES.md) and [EVIDENCE_TEMPLATE.md](docs/EVIDENCE_TEMPLATE.md). |
+| External concepts, venue research or dependencies | [THIRD_PARTY_BOUNDARY.md](docs/THIRD_PARTY_BOUNDARY.md), relevant venue/dependency contracts and verified primary sources for facts used. |
 
-The current operator request covers status/navigation corrections, local verification tooling and fake-only integration evidence on a separate feature branch. It does not authorize a new runtime phase, change of frozen identities, exchange access, deployment or merge. Do not treat implemented Phase 2E candidate code as authorization to begin another phase.
+Read the applicable material fully enough to establish the affected semantics. Explicit task/gate reading requirements remain mandatory. If impact is uncertain, expand read-only investigation before editing. Convenience reading order does not override the protocol's precedence or any safety contract.
 
-## Absolute restrictions
+## Execution and stopping
 
-- Do not copy or import RitMEX source code.
-- Do not perform live exchange writes.
-- Do not use production trading credentials.
-- Do not add exchange authentication/signing or live order methods in this task.
-- Do not change the frozen experiment envelope.
-- Do not weaken fail-closed requirements.
-- Do not modify architecture/contract documents to make implementation easier.
-- Do not self-declare independent acceptance or a gate decision.
+For an authorized implementation, complete the objective end to end under the autonomy rules in AGENTS.md. Resolve ordinary in-scope implementation failures without requesting another prompt. Keep required validation commands, pinned dependencies, historical test identities and fail-closed behavior intact.
 
-If a contract is internally inconsistent or cannot be implemented as written, stop with `BLOCKED_CONTRACT_CHANGE_REQUIRED` and describe the exact conflict. Do not silently reinterpret it.
+On a material unresolved contract conflict, stop disputed implementation with `BLOCKED_CONTRACT_CHANGE_REQUIRED`. Give the exact files/statements, impact, safest no-change behavior and proposed resolution; do not silently reinterpret the contract or modify your rules to get unstuck.
 
-## Completion rule
+For the candidate status recorded in CURRENT_STATUS, real/testnet credentials, exchange networking, a new runtime phase, automatic governance rebind, deployment and merge remain unauthorized. Historical requests and implemented candidate code do not grant those permissions.
 
-Commit only the bounded implementation on its own feature branch. Return exact base/result commit and tree identities, changed files, commands, exit codes, counts, and unresolved blockers as requested by the operator and `docs/EVIDENCE_TEMPLATE.md`. Explicitly attest that no real/testnet credentials or exchange writes were used. Stop after evidence delivery; do not begin the next phase.
+## Completion
+
+Perform final diff/counterexample self-review and return the required evidence packet with exact identities, scope, real command exits, counts, hashes and unresolved blockers. State what was not run and whether credentials or exchange writes were used. Commit/push only where authorized, on the task's feature branch. Stop after handoff; self-review is not independent acceptance and does not start the next phase.
