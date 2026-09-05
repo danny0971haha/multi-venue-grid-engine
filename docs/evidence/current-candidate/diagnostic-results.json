@@ -37,24 +37,12 @@
     "exitCode": 1,
     "log": "/workspace/scratch/dc6fcc8945ba/.retrieval/evidence/multi-venue-grid-engine/diagnostic-historical.log",
     "counts": {
-      "tests": [
-        "474"
-      ],
-      "pass": [
-        "426"
-      ],
-      "fail": [
-        "2"
-      ],
-      "cancelled": [
-        "46"
-      ],
-      "skipped": [
-        "0"
-      ],
-      "todo": [
-        "0"
-      ]
+      "tests": ["474"],
+      "pass": ["426"],
+      "fail": ["2"],
+      "cancelled": ["46"],
+      "skipped": ["0"],
+      "todo": ["0"]
     }
   },
   {
@@ -73,33 +61,16 @@
     "exitCode": 0,
     "log": "/workspace/scratch/dc6fcc8945ba/.retrieval/evidence/multi-venue-grid-engine/diagnostic-phase2e.log",
     "counts": {
-      "tests": [
-        "79"
-      ],
-      "pass": [
-        "79"
-      ],
-      "fail": [
-        "0"
-      ],
-      "cancelled": [
-        "0"
-      ],
-      "skipped": [
-        "0"
-      ],
-      "todo": [
-        "0"
-      ]
+      "tests": ["79"],
+      "pass": ["79"],
+      "fail": ["0"],
+      "cancelled": ["0"],
+      "skipped": ["0"],
+      "todo": ["0"]
     }
   },
   {
-    "command": [
-      "node",
-      "--import",
-      "tsx",
-      "src/index.ts"
-    ],
+    "command": ["node", "--import", "tsx", "src/index.ts"],
     "exitCode": 0,
     "log": "/workspace/scratch/dc6fcc8945ba/.retrieval/evidence/multi-venue-grid-engine/diagnostic-bootstrap.log",
     "counts": {
