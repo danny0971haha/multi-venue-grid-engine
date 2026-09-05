@@ -63,6 +63,12 @@ jobs:
       - name: Tests
         run: npm test
 
+      - name: Offline integration and fresh-process reload
+        run: npm run test:offline-integration
+
+      - name: Phase 2E halt and reload tests
+        run: npm run test:phase2e
+
       - name: Build
         run: npm run build
 

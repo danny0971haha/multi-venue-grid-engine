@@ -35,8 +35,10 @@ The `pretest` lifecycle runs both checks before `npm test`. The exact historical
 manifest fixture suite uses a separate spec reporter before the historical TAP
 suite, so it cannot introduce duplicate TAP summaries into the independent
 Phase 2D verifier.
-CI also invokes the manifest verifier explicitly, while retaining its job name
-and Phase 2D generation/independent verification path. No trusted governance,
+CI also invokes the manifest verifier, offline integration and existing halt
+suite explicitly, while retaining its job name and Phase 2D generation/independent
+verification path. This permits exact-command validation on CI runners when a
+local environment blocks the tsx CLI's UNIX socket. No trusted governance,
 runtime, adapter, risk-control, lockfile or candidate-binding bytes changed.
 
 Final exact commit/tree, command exits, test totals and evidence hashes are
