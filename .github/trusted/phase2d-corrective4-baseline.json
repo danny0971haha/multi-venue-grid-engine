@@ -756,8 +756,8 @@
       "path": ".github/workflows/trusted-phase2d-freeze.yml",
       "mode": "100644",
       "objectType": "blob",
-      "blobSha": "3bc1bd6cb8444d7a116c494f26c1b64aa4934997",
-      "sha256": "b7885a047ee563d921100f05f9a906aae9bc0df3366fd36cfa8cb9751c557cc2"
+      "blobSha": "9134b62cbd3e202c175bbc24a9819b2260c09498",
+      "sha256": "5c1de94e41c3cc1927f53941067ee4220b97cc38305886dff3427052a44ef5bb"
     },
     {
       "path": "scripts/governance/fixtures/policy/negative/deployment-authorized.json",

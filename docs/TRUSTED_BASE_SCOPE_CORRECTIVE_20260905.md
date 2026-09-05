@@ -38,7 +38,9 @@ transfer when a tooling branch eventually targets main.
 
 ## Verification and evidence limits
 
-The workflow diff is exactly one added trigger line. The entire jobs mapping,
+The workflow diff is exactly one added trigger line. Its two hashes in the
+trusted governance file inventory are refreshed to those exact bytes; every
+candidate binding, protected file and other inventory entry remains unchanged. The entire jobs mapping,
 permissions, concurrency and event type list compare unchanged; base matching
 was checked for main, tooling and fork-head/main-base cases. No new execution
 path, gate mode, baseline or test total was added. This is static verification,
@@ -60,3 +62,13 @@ Preserved refs observed on GitHub: Phase 2D
 `52445f4c2b3eb65f13ae00dbef80f07b417a7d53`.
 No credentials, exchange writes, settings changes, force-push, deployment,
 third-party source import or new phase. No self-declared gate decision.
+
+## First corrective CI
+
+At `f1347c2bd081303249586f18ce962d59a51c6fef`, ordinary CI and the main
+trusted classification completed successfully. Governance run `33964968438`
+completed 78 tests with 0 failed/skipped/todo, then the unchanged generator
+correctly detected the stale workflow blob/SHA-256 inventory entry. The follow-up
+updates only those two values from independently calculated current workflow
+bytes, matching the generator diff. No candidate identity is rebound. The
+original failure remains part of the record; new-SHA CI must verify idempotence.
