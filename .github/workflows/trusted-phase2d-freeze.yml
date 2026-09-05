@@ -2,6 +2,7 @@ name: Trusted Phase 2D freeze gate
 
 on:
   pull_request_target:
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:
