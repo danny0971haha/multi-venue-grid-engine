@@ -4,7 +4,9 @@ Independent, from-scratch multi-exchange perpetual-grid trading engine.
 
 ## Current status
 
-**Architecture and implementation-contract baseline only. The next authorized implementation work is Phase 0. Live exchange writes are not authorized.**
+**Frozen Phase 2D baseline; separate Phase 2E runtime and governance review candidates.** Read [CURRENT_STATUS.md](docs/CURRENT_STATUS.md) for exact identities and review limitations. Live/testnet exchange writes, deployment and merge remain unauthorized.
+
+Validation commands and evidence classes: [VALIDATION_GUIDE.md](docs/VALIDATION_GUIDE.md).
 
 This repository is deliberately independent. Third-party projects may be researched for public behavior and architecture, but source code must not be copied unless a compatible license is independently verified and the user separately authorizes the import.
 
@@ -37,7 +39,7 @@ Read in this order:
 5. `docs/VENUE_ADAPTER_CONTRACT.md` — exchange capability and ACK/REJECT/UNKNOWN semantics.
 6. `docs/RISK_PERSISTENCE_CONTRACT.md` — fail-closed risk, halt, lease, and durable-state protocol.
 7. `docs/IMPLEMENTATION_CONTRACT.md` — phase sequence and phase boundaries.
-8. `docs/PHASE_0_CONTRACT.md` — exact first task to hand to an implementation AI.
+8. `docs/CURRENT_STATUS.md` — present candidate identities and bounded operator task.
 9. `docs/TEST_FAULT_MATRIX.md` — required test and process-crash matrix.
 10. `docs/ACCEPTANCE_GATES.md` — independent PASS / REJECT / BLOCKED gates.
 11. `docs/EVIDENCE_TEMPLATE.md` — mandatory checkpoint evidence packet.
@@ -59,4 +61,4 @@ If documents appear to conflict, the implementation agent must not guess. Follow
 
 ## Immediate next action
 
-An implementation AI should read `AI_START_HERE.md`, create `experiment/v0.1-phase0`, implement **Phase 0 only**, then stop and return the complete evidence packet for independent review.
+Read [AI_START_HERE.md](AI_START_HERE.md) and the current status/validation guide. Work only on the explicitly requested bounded task in a separate feature branch. Preserve frozen identities and return evidence for independent review; do not start the next phase automatically.

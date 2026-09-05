@@ -1,0 +1,53 @@
+{
+  "repository": "multi-venue-grid-engine",
+  "mode": "simulate",
+  "liveExchangeWrites": false,
+  "networkAccessRequired": false,
+  "authorizationGranted": false,
+  "validationCompleted": true,
+  "checks": [
+    {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "test/offline-integration/run.ts"
+      ],
+      "exitCode": 0,
+      "log": "artifacts/offline-candidate/simulate/01.log",
+      "logSha256": "4862d26edc3a4996f514140ee4bd580def22e9b35891c8e027ad0ba0e8c5be4b"
+    }
+  ],
+  "blockers": [],
+  "networkIsolation": "LINUX_SECCOMP_UNIX_SOCKETS_ONLY",
+  "candidate": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+  "candidateTree": "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+  "workingTreeStatus": "M  .gitignore\nM  AI_START_HERE.md\nM  README.md\nA  docs/CURRENT_STATUS.md\nA  docs/VALIDATION_GUIDE.md\nM  package.json\nA  scripts/offline-candidate.py\nA  scripts/validation-tests/test_offline_candidate.py\nA  test/offline-integration/integration.test.ts\nA  test/offline-integration/reload-worker.ts\nA  test/offline-integration/run.ts\nA  test/offline-integration/scenarios.ts",
+  "frozenBaselineTree": "1b0afe805269972cf7af40f7fbf0e4e6b3e35894",
+  "simulation": {
+    "mode": "OFFLINE_INTEGRATION",
+    "liveExchangeWrites": false,
+    "networkAccessRequired": false,
+    "replayDeterministic": true,
+    "authorizationGranted": false,
+    "fixtureSha256": "90352b23d3907159d3d0480d2cbe4d3e6b38aa3691ecbccb87c88b5062e1d9b7",
+    "finalCanonicalStateHash": "839f0467f13f6acf274dd509bb2706e000032e32cc20a48d443c773dfb7c9627",
+    "replayCanonicalStateHash": "839f0467f13f6acf274dd509bb2706e000032e32cc20a48d443c773dfb7c9627",
+    "checks": [
+      "normal-strategy-risk-execution-persistence-reload-reconciliation",
+      "duplicate-observation-intent-execution",
+      "ambiguous-write-is-not-success",
+      "stale-input-fails-closed",
+      "process-fence",
+      "expired-lease",
+      "mismatched-lease",
+      "persistence-latch",
+      "unresolved-exposure-blocks-continue",
+      "fresh-process-halt-no-auto-ack-valid-durable-ack",
+      "ack-durable-authority-conditions",
+      "same-fixture-canonical-replay"
+    ],
+    "canonicalStateScope": "full simulator snapshot plus continuation decision; host-local lease nonces excluded"
+  },
+  "frozenIdentityPreserved": true
+}

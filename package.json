@@ -34,7 +34,11 @@
     "test:phase2d-corrective-1": "tsx --test test/risk/risk-engine-corrective-1.test.ts",
     "test:phase2d-corrective-2": "tsx --test test/risk/risk-engine-corrective-2.test.ts",
     "test:phase2d-corrective-3": "tsx --test test/risk/risk-engine-corrective-3.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:phase2e-candidate": "python3 scripts/offline-candidate.py validate",
+    "simulate:offline-integration": "python3 scripts/offline-candidate.py simulate",
+    "test:offline-integration": "python3 scripts/offline-candidate.py test",
+    "test:validation-tooling": "python3 -m unittest discover -s scripts/validation-tests -p \"test_*.py\""
   },
   "dependencies": {
     "decimal.js": "10.6.0"
