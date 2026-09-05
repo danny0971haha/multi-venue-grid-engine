@@ -273,13 +273,16 @@ export async function staleInput(): Promise<void> {
   });
 }
 
-export async function fenced(kind: "process" | "expired" | "mismatched" | "persistence"): Promise<void> {
+export async function fenced(
+  kind: "process" | "expired" | "mismatched" | "persistence",
+): Promise<void> {
   await withTempDir(async (directory) => {
     const { context } = await seedHaltContext(directory, { orders: [] });
     if (kind === "process") context.processFence.trip();
     if (kind === "persistence") context.latch.block(["IO_FAILURE"]);
     if (kind === "expired") context.leaseClock = fixedLeaseClock(NOW_MS + LEASE_TTL_MS);
-    if (kind === "mismatched") context.leaseAuthority = { ...context.leaseAuthority, generation: "999" };
+    if (kind === "mismatched")
+      context.leaseAuthority = { ...context.leaseAuthority, generation: "999" };
     const sim = DeterministicSimulator.create(testInit());
     const { entry } = plan(sim);
     const result = await applyRiskDecision(context, baselineRiskInput());

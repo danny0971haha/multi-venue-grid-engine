@@ -40,6 +40,10 @@ No dependency, engine setting or lockfile was modified to accommodate this.
   halt reload. This was a dirty working-tree run, not exact-HEAD evidence.
 - `npm run format:check`: exit 127, `biome: not found`; environment blocker.
 - `git diff --check`: exit 0.
+- First corrective CI at `97d851ae120b4678d479eb9d7202a7333cbdd689`, run
+  `33964814247`: pinned install/typecheck/lint completed; formatter found two
+  remaining line wraps in `scenarios.ts` (one file). These were corrected from
+  the actual Biome diff. Later CI must be checked at the new result SHA.
 - Pinned clean install, lint, full 474 regression, 79 halt tests, build and dry-run:
   not run in this formatting checkpoint. No historical runtime safety acceptance
   is inferred from AST equality or the integration suite.

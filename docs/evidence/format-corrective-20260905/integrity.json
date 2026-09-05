@@ -32,7 +32,7 @@
   {
     "path": "test/offline-integration/scenarios.ts",
     "originalSha256": "57f61265cd32473cc8046ee4f573fb6c96c5769e5aec9ab4ae4a583623de316c",
-    "formattedSha256": "d69953d8ba3804ab8352bce37dd87fa545e8b67e584bcee7a74f299600182204",
+    "formattedSha256": "fd167de38dbf6f3a71ccad8742bd3e69e0a2da2bb81bea92d23ae16a644aa644",
     "semanticEquality": true
   }
 ]
