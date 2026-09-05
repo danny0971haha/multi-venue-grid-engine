@@ -38,7 +38,10 @@
     "validate:phase2e-candidate": "python3 scripts/offline-candidate.py validate",
     "simulate:offline-integration": "python3 scripts/offline-candidate.py simulate",
     "test:offline-integration": "python3 scripts/offline-candidate.py test",
-    "test:validation-tooling": "python3 -m unittest discover -s scripts/validation-tests -p \"test_*.py\""
+    "test:validation-tooling": "python3 -m unittest discover -s scripts/validation-tests -p \"test_*.py\"",
+    "pretest": "npm run verify:candidate-evidence && npm run test:candidate-evidence",
+    "verify:candidate-evidence": "node scripts/evidence/current-candidate-verify.mjs",
+    "test:candidate-evidence": "node --test --test-reporter=spec scripts/validation-tests/current-candidate-verify.test.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0"

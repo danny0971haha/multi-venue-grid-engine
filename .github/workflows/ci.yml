@@ -57,6 +57,9 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Verify immutable candidate evidence bytes
+        run: npm run verify:candidate-evidence
+
       - name: Tests
         run: npm test
 
