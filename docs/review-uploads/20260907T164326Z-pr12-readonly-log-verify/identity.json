@@ -1,0 +1,47 @@
+{
+  "schema": "review-upload-identity/1",
+  "packet": "PR12_READONLY_ORIGINAL_CHILD_LOG_CHECK",
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "pr": 12,
+  "dates": {
+    "original_named_review_reports_date": "NOT_FOUND",
+    "pr_created_utc": "2026-09-05T12:45:52Z",
+    "ci_run_created_utc": "2026-09-05T12:48:10Z",
+    "evidence_observation_start_utc": "2026-09-07T12:33:28Z",
+    "evidence_observation_end_utc": "2026-09-07T12:39:40Z",
+    "publication_utc": "2026-09-07T16:43:26Z"
+  },
+  "reviewed": {
+    "pr": 12,
+    "branch": "fix/multi-evidence-byte-identity-20260905",
+    "head": "4ead28400903ad6c62616835aa9459f67c6d8cd9",
+    "tree": "3a10f7645b30a33f27ecde824c16e0e36cacae6c",
+    "base_branch": "fix/multi-format-evidence-20260905",
+    "base_sha": "9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690"
+  },
+  "publication": {
+    "branch": "evidence/multi-pr12-review-upload-20260907-c9bf41",
+    "commit_sha": "FILLED_BY_GIT_COMMIT_DISTINCT_FROM_REVIEWED_HEAD",
+    "adds_only": "docs/review-uploads/20260907T164326Z-pr12-readonly-log-verify/"
+  },
+  "ci": {
+    "run_id": 33967073453,
+    "job_id": 101308992804,
+    "attempt": 1,
+    "artifact_id": 9969805255,
+    "github_artifact_digest": "sha256:f3642d425b6c1aa41b485be45f0f3f60c7b8567969924444e89cc951da73f6ff",
+    "local_recomputed_zip_digest": "NOT_RUN_THIS_ROUND"
+  },
+  "reviewer": "UNKNOWN",
+  "tools_observed": "Cursor agent; gh 2.95.0; git 2.50.1; python3 (host 3.13.14 for identity-before, workdir python 3.9.6 for identity-after)",
+  "github_actor_used_for_reads": "danny0971haha",
+  "independent_github_review": "none found (comments/reviews empty on 2026-09-07T12:36Z observation)",
+  "remote_at_publication_matches_reviewed_pin": true,
+  "self_declaration": {
+    "overall_pass": false,
+    "accept": false,
+    "merge_authorized": false,
+    "live_authorized": false,
+    "this_upload_is": "evidence publication only"
+  }
+}

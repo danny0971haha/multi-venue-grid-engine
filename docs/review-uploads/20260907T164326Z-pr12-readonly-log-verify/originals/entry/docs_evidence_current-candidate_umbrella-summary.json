@@ -1,0 +1,27 @@
+{
+  "repository": "multi-venue-grid-engine",
+  "mode": "validate",
+  "liveExchangeWrites": false,
+  "networkAccessRequired": false,
+  "authorizationGranted": false,
+  "validationCompleted": false,
+  "checks": [
+    {
+      "command": [
+        "npm",
+        "ci"
+      ],
+      "exitCode": 1,
+      "log": "artifacts/offline-candidate/validate/01.log",
+      "logSha256": "e13ae3cec82234b1fb8a5b5a010d93e5ca5b37e540370dd76fae1ba6a8d8563b"
+    }
+  ],
+  "blockers": [
+    "MANDATORY_COMMAND_FAILED"
+  ],
+  "networkIsolation": "LINUX_SECCOMP_UNIX_SOCKETS_ONLY",
+  "candidate": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+  "candidateTree": "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+  "workingTreeStatus": "M  .gitignore\nM  AI_START_HERE.md\nM  README.md\nA  docs/CURRENT_STATUS.md\nA  docs/VALIDATION_GUIDE.md\nM  package.json\nA  scripts/offline-candidate.py\nA  scripts/validation-tests/test_offline_candidate.py\nA  test/offline-integration/integration.test.ts\nA  test/offline-integration/reload-worker.ts\nA  test/offline-integration/run.ts\nA  test/offline-integration/scenarios.ts",
+  "frozenBaselineTree": "1b0afe805269972cf7af40f7fbf0e4e6b3e35894"
+}

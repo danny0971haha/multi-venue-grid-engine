@@ -1,0 +1,55 @@
+{
+  "name": "multi-venue-grid-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent multi-venue perpetual grid engine",
+  "type": "module",
+  "engines": {
+    "node": "22.23.2",
+    "npm": "10.9.8"
+  },
+  "packageManager": "npm@10.9.8",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run scan:secrets && npm run build",
+    "ci": "npm run check && npm run dry-run",
+    "dry-run": "tsx src/index.ts",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "scan:secrets": "node scripts/check-secrets.mjs",
+    "test": "tsx --test --test-reporter tap test/bootstrap/*.test.ts test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts test/persistence/*.test.ts test/risk/*.test.ts test/evidence/*.test.ts",
+    "test:phase2d-corrective-4": "tsx --test --test-reporter tap test/risk/risk-engine-corrective-4.test.ts",
+    "test:evidence:phase2d-corrective4": "node --import tsx --test --test-reporter=tap test/evidence/phase2d-corrective4-evidence.test.ts",
+    "evidence:phase2d-corrective4": "node scripts/evidence/phase2d-corrective4-generate.mjs",
+    "evidence:phase2d-corrective4:verify": "node scripts/evidence/phase2d-corrective4-verify.mjs",
+    "test:phase1": "tsx --test test/math/*.test.ts test/domain/*.test.ts test/strategy/*.test.ts test/simulator/*.test.ts",
+    "test:phase2a": "tsx --test test/persistence/canonical-json.test.ts test/persistence/durable-envelope.test.ts test/persistence/exact-pair-inspection.test.ts",
+    "test:phase2b": "tsx --test test/persistence/atomic-pair-store.test.ts",
+    "test:phase2c": "tsx --test test/persistence/runtime-lease.test.ts",
+    "test:phase2c-corrective": "tsx --test test/persistence/runtime-lease-corrective-1.test.ts",
+    "test:phase2c-corrective-2": "tsx --test test/persistence/runtime-lease-corrective-2.test.ts",
+    "test:phase2d": "tsx --test test/risk/risk-engine.test.ts",
+    "test:phase2e": "tsx --test --test-reporter tap test/halt/*.test.ts",
+    "test:phase2d-corrective-1": "tsx --test test/risk/risk-engine-corrective-1.test.ts",
+    "test:phase2d-corrective-2": "tsx --test test/risk/risk-engine-corrective-2.test.ts",
+    "test:phase2d-corrective-3": "tsx --test test/risk/risk-engine-corrective-3.test.ts",
+    "typecheck": "tsc --noEmit",
+    "validate:phase2e-candidate": "python3 scripts/offline-candidate.py validate",
+    "simulate:offline-integration": "python3 scripts/offline-candidate.py simulate",
+    "test:offline-integration": "python3 scripts/offline-candidate.py test",
+    "test:validation-tooling": "python3 -m unittest discover -s scripts/validation-tests -p \"test_*.py\"",
+    "pretest": "npm run verify:candidate-evidence && npm run test:candidate-evidence",
+    "verify:candidate-evidence": "node scripts/evidence/current-candidate-verify.mjs",
+    "test:candidate-evidence": "node --test --test-reporter=spec scripts/validation-tests/current-candidate-verify.test.mjs"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.10",
+    "@types/node": "26.2.0",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  }
+}

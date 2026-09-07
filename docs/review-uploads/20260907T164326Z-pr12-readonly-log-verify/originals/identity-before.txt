@@ -1,0 +1,17 @@
+CAPTURED_AT_UTC=2026-09-07T12:33:28Z
+HOSTNAME=appledeMacBook-Pro.local
+PWD=/Users/apple/multi-venue-grid-engine-starter
+LOCAL_REPO=/Users/apple/multi-venue-grid-engine-starter
+LOCAL_BRANCH=governance/phase2e-trusted-gate
+LOCAL_HEAD=52445f4c2b3eb65f13ae00dbef80f07b417a7d53
+LOCAL_TREE=13ed781c547cfa34a397565f6b78c9f94c31c903
+WORKTREE_CLEAN_TRACKED=0
+LOCAL_STATUS_PORCELAIN<<
+?? .omo/
+>>
+PYTHON3=Python 3.13.14
+GH=gh version 2.95.0 (2026-06-17)
+GIT=git version 2.50.1 (Apple Git-155)
+NODE=v26.5.0
+NPM=11.17.0
+NOTE=Local checkout is frozen Phase 2E governance branch (PR #11 scope). This round does not switch it. PR #12 identity is verified via remote APIs only.

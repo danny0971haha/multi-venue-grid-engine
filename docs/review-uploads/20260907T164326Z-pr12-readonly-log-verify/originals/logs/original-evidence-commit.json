@@ -1,0 +1,4 @@
+CMD=gh api ORIGINAL_EVIDENCE_SHA
+UTC=2026-09-07T12:34:21Z
+{"message":"docs(agents): enable end-to-end bounded autonomy and impact-based reading\n\nKeep existing architecture, third-party and safety semantics; clarify current\ntask routing, failure diagnosis, self-review and non-overlapping parallel work.\nUpdate AI_START_HERE and README without changing contract precedence or gates.\n\nDocumentation only. Preserve runtime, historical tests/evidence, lockfile,\nworkflows, frozen refs and trusted candidate bindings. No self-acceptance,\nmerge, deployment, exchange access or automatic next phase.","parents":["968ea3b201cd5be58f54df64a02ae29d4ed9ab75"],"sha":"a8402fd552d6e2fcf0436d8f2872b7618cb92412","tree":"608a2f82630d258181f65ad97196bf16489832ee"}
+EXIT=0

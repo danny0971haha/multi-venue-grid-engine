@@ -1,0 +1,39 @@
+{
+  "historical_reports": {
+    "multi-pr12-integration-log-delta.md": "NOT_FOUND",
+    "multi-pr12-closure.md": "NOT_FOUND",
+    "multi-pr12-evidence-review.md": "NOT_FOUND",
+    "multi-handoff.md": "NOT_FOUND",
+    "inheritance": "承接既有結論，本輪未重驗"
+  },
+  "inherited_completed_not_rerun": [
+    "original artifact ZIP digest/source",
+    "six historical payloads plus files.json raw Git byte identity",
+    "manifest/verifier/command logs",
+    "fixtures 25, historical 474, halt 79 evidence checks",
+    "integration wrapper 13/13 exit 0 with exact HEAD/tree",
+    "15 and 46 are subsets of historical 474, not additive",
+    "do not revert to earlier artifact 401 status"
+  ],
+  "known_non_original_01_log_hashes": [
+    {
+      "sha256": "d3b340fa4c75b7f8fb671f91ef48ca776c5afff864273bc0e793f0eddbe34a94",
+      "recorded_length_bytes": 2416,
+      "note": "Operator-identified local same-named file; not a new candidate; not found this round"
+    },
+    {
+      "sha256": "7b0acec7f565862f6a7d0db4120e3551da7a4d2d44f755c5e45b4bf8d250b3f5",
+      "utf8_length_in_raw_logs_json": 2415,
+      "note": "Committed integration-tap.txt / integration-summary logSha256; runtime candidate 704afa2 dirty tree, not CI 33967073453"
+    },
+    {
+      "sha256": "45b7351304693fd8f3613cdfb8a1455022116603bd5964bae664cff25431760a",
+      "note": "Cited inside raw-logs.json 09.txt nested wrapper summary; not obtained as a file; not CI original"
+    }
+  ],
+  "claimed_ci_original": {
+    "path": "artifacts/offline-candidate/test/01.log",
+    "sha256": "93ed10bd4541a22d16a7c44b5761dcf76b4e9afde8c9f64a7373ca8353c1ef07",
+    "obtained": false
+  }
+}

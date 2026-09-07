@@ -1,0 +1,9 @@
+CMD=gh auth status
+UTC=2026-09-07T12:33:57Z
+github.com
+  ✓ Logged in to github.com account danny0971haha (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+EXIT=0

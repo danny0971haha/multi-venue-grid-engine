@@ -1,0 +1,32 @@
+[
+  {
+    "file": "diagnostic-results.json",
+    "bytes": 2918,
+    "sha256": "ee9181bc40095cb3bd7e2ec0baf4fb721863686692ac9241fe8b2695dda4a258"
+  },
+  {
+    "file": "integration-summary.json",
+    "bytes": 1427,
+    "sha256": "0bf32e12d15fa60b0bd81b9674131ea8ca7052f8666144fb018f24f0a31b0fea"
+  },
+  {
+    "file": "raw-logs.json",
+    "bytes": 148333,
+    "sha256": "16579dc8084f8fdd52b15d6691b2ae8bdb2b64f12537ac07cad7a94f4a708350"
+  },
+  {
+    "file": "results.json",
+    "bytes": 4189,
+    "sha256": "9b7c063ef802792a06e48c38bb972c14d87db80ee5db6b95749aeed1d5183590"
+  },
+  {
+    "file": "simulate-summary.json",
+    "bytes": 2323,
+    "sha256": "2b3977e21d7202ebc8e686aa61d068a184d291839f08fe9f152586fa71510230"
+  },
+  {
+    "file": "umbrella-summary.json",
+    "bytes": 1160,
+    "sha256": "fa725d364109fb354a8bacd304b30e8b6ac8bbd1deb8b3195e4abe9f6e5debec"
+  }
+]

@@ -1,0 +1,114 @@
+[
+  {
+    "command": [
+      "node",
+      "--import",
+      "tsx",
+      "--test",
+      "--test-reporter=tap",
+      "test/bootstrap/runtimeMode.test.ts",
+      "test/math/decimal.test.ts",
+      "test/domain/ids-config.test.ts",
+      "test/strategy/geometry.test.ts",
+      "test/simulator/p1-corrective-2.test.ts",
+      "test/simulator/p1-corrective-3.test.ts",
+      "test/simulator/p1-corrective-4.test.ts",
+      "test/simulator/p1-corrective-5.test.ts",
+      "test/simulator/p1-corrective-6.test.ts",
+      "test/simulator/p1-corrective-7.test.ts",
+      "test/simulator/p1-corrective.test.ts",
+      "test/simulator/p1-identity.test.ts",
+      "test/simulator/p1-restart.test.ts",
+      "test/simulator/p1-state.test.ts",
+      "test/persistence/atomic-pair-store.test.ts",
+      "test/persistence/canonical-json.test.ts",
+      "test/persistence/durable-envelope.test.ts",
+      "test/persistence/exact-pair-inspection.test.ts",
+      "test/persistence/runtime-lease-corrective-1.test.ts",
+      "test/persistence/runtime-lease-corrective-2.test.ts",
+      "test/persistence/runtime-lease.test.ts",
+      "test/risk/risk-engine-corrective-1.test.ts",
+      "test/risk/risk-engine-corrective-2.test.ts",
+      "test/risk/risk-engine-corrective-3.test.ts",
+      "test/risk/risk-engine-corrective-4.test.ts",
+      "test/risk/risk-engine.test.ts",
+      "test/evidence/phase2d-corrective4-evidence.test.ts"
+    ],
+    "exitCode": 1,
+    "log": "/workspace/scratch/dc6fcc8945ba/.retrieval/evidence/multi-venue-grid-engine/diagnostic-historical.log",
+    "counts": {
+      "tests": [
+        "474"
+      ],
+      "pass": [
+        "426"
+      ],
+      "fail": [
+        "2"
+      ],
+      "cancelled": [
+        "46"
+      ],
+      "skipped": [
+        "0"
+      ],
+      "todo": [
+        "0"
+      ]
+    }
+  },
+  {
+    "command": [
+      "node",
+      "--import",
+      "tsx",
+      "--test",
+      "--test-reporter=tap",
+      "test/halt/halt-crash-matrix.test.ts",
+      "test/halt/p2-h-matrix.test.ts",
+      "test/halt/p2e-corrective-1.test.ts",
+      "test/halt/p2e-corrective-2.test.ts",
+      "test/halt/p2e-corrective-3.test.ts"
+    ],
+    "exitCode": 0,
+    "log": "/workspace/scratch/dc6fcc8945ba/.retrieval/evidence/multi-venue-grid-engine/diagnostic-phase2e.log",
+    "counts": {
+      "tests": [
+        "79"
+      ],
+      "pass": [
+        "79"
+      ],
+      "fail": [
+        "0"
+      ],
+      "cancelled": [
+        "0"
+      ],
+      "skipped": [
+        "0"
+      ],
+      "todo": [
+        "0"
+      ]
+    }
+  },
+  {
+    "command": [
+      "node",
+      "--import",
+      "tsx",
+      "src/index.ts"
+    ],
+    "exitCode": 0,
+    "log": "/workspace/scratch/dc6fcc8945ba/.retrieval/evidence/multi-venue-grid-engine/diagnostic-bootstrap.log",
+    "counts": {
+      "tests": [],
+      "pass": [],
+      "fail": [],
+      "cancelled": [],
+      "skipped": [],
+      "todo": []
+    }
+  }
+]

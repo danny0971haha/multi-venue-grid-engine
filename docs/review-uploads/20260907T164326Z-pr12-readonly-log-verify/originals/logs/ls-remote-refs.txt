@@ -1,0 +1,11 @@
+CMD=git ls-remote origin expected refs
+UTC=2026-09-07T12:33:58Z
+7f196d367e39640eee9517f742b0d61424f9d4cc	refs/heads/experiment/v0.1-phase2
+704afa2dd858c52dad06aa22941d463aa5ce4d69	refs/heads/experiment/v0.1-phase2e-halt-ack
+4ead28400903ad6c62616835aa9459f67c6d8cd9	refs/heads/fix/multi-evidence-byte-identity-20260905
+9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690	refs/heads/fix/multi-format-evidence-20260905
+52445f4c2b3eb65f13ae00dbef80f07b417a7d53	refs/heads/governance/phase2e-trusted-gate
+22665d7fa9274dfc05de043c8e9663e24e75087e	refs/heads/main
+4ead28400903ad6c62616835aa9459f67c6d8cd9	refs/pull/12/head
+dfa25c31a659b8e2a3f4ad197cfe0123b8b5fbda	refs/pull/12/merge
+EXIT=0

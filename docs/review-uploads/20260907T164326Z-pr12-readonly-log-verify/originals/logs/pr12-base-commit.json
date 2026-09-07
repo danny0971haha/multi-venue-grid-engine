@@ -1,0 +1,4 @@
+CMD=gh api git commit BASE
+UTC=2026-09-07T12:34:20Z
+{"message":"style: apply remaining CI formatter line wraps","parents":["97d851ae120b4678d479eb9d7202a7333cbdd689"],"sha":"9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690","tree":"75f5c4b4b5372db0cdf3eb519f910daada7bf61d"}
+EXIT=0

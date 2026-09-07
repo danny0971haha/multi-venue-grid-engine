@@ -1,0 +1,3 @@
+No native original was obtained this round.
+
+Do not place reconstructed TAP, job-log excerpts, wrapper summaries, or local re-runs here labeled as CI_RUN=33967073453.

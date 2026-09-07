@@ -1,0 +1,50 @@
+{
+  "task": "READ_ONLY_ORIGINAL_CHILD_LOG_SOURCE_CHECK",
+  "pr": 12,
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "round_utc": "2026-09-07T12:39:40Z",
+  "work_dir": "/Users/apple/multi-pr12-readonly-log-verify-20260907T123234Z",
+  "separate_from_pr11_dir": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z",
+  "local_checkout_not_switched": true,
+  "original_log_obtained": "NOT_OBTAINED_FROM_AVAILABLE_SOURCES",
+  "provenance_verified": false,
+  "hash_verified": false,
+  "reporter_counts_verified": "UNKNOWN",
+  "owner_retention_statement": "UNKNOWN",
+  "prospective_execution": "NOT_RUN",
+  "target": {
+    "path": "artifacts/offline-candidate/test/01.log",
+    "claimed_sha256": "93ed10bd4541a22d16a7c44b5761dcf76b4e9afde8c9f64a7373ca8353c1ef07",
+    "byte_length": "UNKNOWN",
+    "raw_reporter_counts": {
+      "tests": "UNKNOWN",
+      "pass": "UNKNOWN",
+      "fail": "UNKNOWN",
+      "cancelled": "UNKNOWN",
+      "skipped": "UNKNOWN",
+      "todo": "UNKNOWN"
+    }
+  },
+  "identity": {
+    "pr_state": "OPEN",
+    "is_draft": true,
+    "merged": false,
+    "branch": "fix/multi-evidence-byte-identity-20260905",
+    "head": "4ead28400903ad6c62616835aa9459f67c6d8cd9",
+    "tree": "3a10f7645b30a33f27ecde824c16e0e36cacae6c",
+    "base_branch": "fix/multi-format-evidence-20260905",
+    "base_sha": "9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690",
+    "ci_run": 33967073453,
+    "ci_job": 101308992804,
+    "ci_attempt": 1,
+    "artifact_id": 9969805255,
+    "artifact_sha256": "f3642d425b6c1aa41b485be45f0f3f60c7b8567969924444e89cc951da73f6ff",
+    "identity_drift": false
+  },
+  "self_declaration": {
+    "overall_pass": false,
+    "accept": false,
+    "merge_authorized": false,
+    "live_authorized": false
+  }
+}

@@ -1,0 +1,11 @@
+.github/workflows
+.github/workflows/README.md
+.github/workflows/ci.yml
+docs/evidence/current-candidate/integration-summary.json
+scripts/offline-candidate.py
+scripts/validation-tests/test_offline_candidate.py
+test/offline-integration
+test/offline-integration/integration.test.ts
+test/offline-integration/reload-worker.ts
+test/offline-integration/run.ts
+test/offline-integration/scenarios.ts

@@ -1,0 +1,11 @@
+CMD=list root files on PR12 HEAD
+UTC=2026-09-07T12:34:40Z
+{"path":"AGENTS.md","sha":"7c06b5fd7bac2b0c21ef076a9485cce1238611ec","size":9924,"type":"blob"}
+{"path":"AI_START_HERE.md","sha":"7cc3212d0f6d8ed1dff9b24745a2fb36538f56fc","size":3930,"type":"blob"}
+{"path":"README.md","sha":"4494cc4d953ffb0e7feb365cf61ced5b22c03f78","size":3554,"type":"blob"}
+{"path":"docs/CURRENT_STATUS.md","sha":"73afabb5733648ab0f1c1adcd8ed24904008cb4b","size":3579,"type":"blob"}
+--- all CURRENT_STATUS / AI_START / evidence-related names ---
+AI_START_HERE.md
+docs/CURRENT_STATUS.md
+scripts/offline-candidate.py
+EXIT=0
