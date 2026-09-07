@@ -1,0 +1,3 @@
+M	.github/trusted/phase2d-corrective4-baseline.json
+M	.github/workflows/trusted-phase2d-freeze.yml
+A	docs/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md

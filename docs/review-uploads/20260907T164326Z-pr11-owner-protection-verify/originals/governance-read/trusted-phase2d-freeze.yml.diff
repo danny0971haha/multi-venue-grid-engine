@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/trusted-phase2d-freeze.yml b/.github/workflows/trusted-phase2d-freeze.yml
+index 3bc1bd6..9134b62 100644
+--- a/.github/workflows/trusted-phase2d-freeze.yml
++++ b/.github/workflows/trusted-phase2d-freeze.yml
+@@ -2,6 +2,7 @@ name: Trusted Phase 2D freeze gate
+ 
+ on:
+   pull_request_target:
++    branches: [main]
+     types: [opened, synchronize, reopened, ready_for_review, edited]
+ 
+ permissions:

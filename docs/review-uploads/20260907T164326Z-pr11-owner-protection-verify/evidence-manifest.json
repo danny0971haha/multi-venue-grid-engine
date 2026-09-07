@@ -1,0 +1,453 @@
+{
+  "schema": "review-upload-evidence-manifest/1",
+  "packet": "20260907T164326Z-pr11-owner-protection-verify",
+  "pr": 11,
+  "reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+  "reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2",
+  "publication_commit_distinct_from_reviewed_head": true,
+  "corrective_note_copy_vs_reviewed_git": {
+    "workdir_rel": "governance-read/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+    "git_path": "docs/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+    "bytes": 4188,
+    "sha256": "2bfb039368715ef58321aacef4dc5a9c9c0eceb977b47955606fa61e65b5715f",
+    "matches_reviewed_git_bytes": true,
+    "git_blob_sha": "c12a14a9e6f71ad1b9196a5828ad21d9388a4302"
+  },
+  "files": [
+    {
+      "path": "INDEX.md",
+      "bytes": 3708,
+      "sha256": "20b39d9ba97bc1174a28d1422f7d1fd2037eaa8ac7529eece841b6d0cd0963b1",
+      "rewritten": false,
+      "role": "publication_wrapper",
+      "source": "created_this_publication",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "NOT_FOUND.md",
+      "bytes": 1223,
+      "sha256": "b2dea294a170ce613604e774892b45d3ca0976dea777717dad8682fda3a50719",
+      "rewritten": false,
+      "role": "publication_wrapper",
+      "source": "created_this_publication",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "REVIEW.md",
+      "bytes": 6286,
+      "sha256": "2b95e504a3d0a74f63adb6e7d720655be42387d52f778ea3bc3959dd3500b195",
+      "rewritten": false,
+      "role": "publication_wrapper",
+      "source": "created_this_publication",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "blob-compare-corrective-note-vs-reviewed-git.json",
+      "bytes": 439,
+      "sha256": "f13daa4dddae9c49afcc6ebff1a242de22b2dc3f2699b33a28d95a632010e4a2",
+      "rewritten": false,
+      "role": "publication_wrapper",
+      "source": "created_this_publication",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2",
+      "note_cmp": {
+        "workdir_rel": "governance-read/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+        "git_path": "docs/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+        "bytes": 4188,
+        "sha256": "2bfb039368715ef58321aacef4dc5a9c9c0eceb977b47955606fa61e65b5715f",
+        "matches_reviewed_git_bytes": true,
+        "git_blob_sha": "c12a14a9e6f71ad1b9196a5828ad21d9388a4302"
+      }
+    },
+    {
+      "path": "identity.json",
+      "bytes": 1719,
+      "sha256": "5b34f512c75c990923b1c8c550c074969c72f99f7a973213df57168e7c521d04",
+      "rewritten": false,
+      "role": "publication_wrapper",
+      "source": "created_this_publication",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/WORKDIR.txt",
+      "bytes": 57,
+      "sha256": "a5ceab975f7297a5172d7ce95f99c8838f1e17299a6f2bcb7cad89ea82354191",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/WORKDIR.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/governance-read/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+      "bytes": 4188,
+      "sha256": "2bfb039368715ef58321aacef4dc5a9c9c0eceb977b47955606fa61e65b5715f",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/governance-read/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/governance-read/entrypoint-blob-identity.txt",
+      "bytes": 484,
+      "sha256": "8cc0e55b38b06ffdcaa98b0b4c03d07ff1d8d07d5c56592e7d0e48badfd4428b",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/governance-read/entrypoint-blob-identity.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/governance-read/phase2d-corrective4-baseline.json.diff",
+      "bytes": 790,
+      "sha256": "3a3fb9fc9849329f97bc8b3a34804506b258a9d3ebc86ba78c87545620b6f3fc",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/governance-read/phase2d-corrective4-baseline.json.diff",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/governance-read/trusted-phase2d-freeze-pr11-head-snip.yml",
+      "bytes": 2619,
+      "sha256": "5c1de94e41c3cc1927f53941067ee4220b97cc38305886dff3427052a44ef5bb",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/governance-read/trusted-phase2d-freeze-pr11-head-snip.yml",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/governance-read/trusted-phase2d-freeze.yml.diff",
+      "bytes": 427,
+      "sha256": "8b36988dcc7587f9cdc3fff25a05689a712d7163d2e365c9f2e79ce9682d1b84",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/governance-read/trusted-phase2d-freeze.yml.diff",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/identity-after.txt",
+      "bytes": 979,
+      "sha256": "d65c47f58c4d98b95f5ba3eefbbb0d14881ebc43c0b45559de6439d1a8979b7e",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/identity-after.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/identity-before.txt",
+      "bytes": 621,
+      "sha256": "4acf7766e7bfcb178bfe1568148d9f3316e16d99718ef5db4e9b765de920cdb9",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/identity-before.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/auth-actor-identity.json",
+      "bytes": 55,
+      "sha256": "f85e18652b928db799387f895ce2c5fc59bb00954c5933ac36a8436496060a8e",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/auth-actor-identity.json",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/collector-output-dir-check.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/collector-output-dir-check.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/gh-auth-status-after.txt",
+      "bytes": 242,
+      "sha256": "53cf5d3d2311cac43218d2e2453fefab52841b89b8c6027e0d631d2cd98284aa",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/gh-auth-status-after.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/gh-auth-status-all-before.txt",
+      "bytes": 242,
+      "sha256": "53cf5d3d2311cac43218d2e2453fefab52841b89b8c6027e0d631d2cd98284aa",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/gh-auth-status-all-before.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/gh-auth-status-before.txt",
+      "bytes": 242,
+      "sha256": "53cf5d3d2311cac43218d2e2453fefab52841b89b8c6027e0d631d2cd98284aa",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/gh-auth-status-before.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/gh-search-collector.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/gh-search-collector.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/gh-search-owner-instructions.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/gh-search-owner-instructions.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/gist-list.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/gist-list.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/git-fetch-origin.txt",
+      "bytes": 623,
+      "sha256": "29ab4ca71bed4c88a3a7f4bc5bce81cc1efc3507cbb4dca3df728cd2ea8ee290",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/git-fetch-origin.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/git-log-collector-paths.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/git-log-collector-paths.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/main-tree-governance-names.txt",
+      "bytes": 27,
+      "sha256": "1187ad9016ea9709c9e74c881ff8b7651e82f370430fa64ca626d6f755213cde",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/main-tree-governance-names.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-body.json",
+      "bytes": 3270,
+      "sha256": "693038d90f0b74dd50eef54c0ef72dc7ccfff35dcf3a82f2ef626ad2cee1f798",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-body.json",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-diff-stat.txt",
+      "bytes": 248,
+      "sha256": "310a47cc001582f118fb932558f7b03cc6bd3eb943237c9eb702be32000586d6",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-diff-stat.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-files.txt",
+      "bytes": 142,
+      "sha256": "451a137251ac3f838e929ee75a5446ef5cdada2445aea6e81fb44eec2bca6bf1",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-files.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-name-status.txt",
+      "bytes": 148,
+      "sha256": "aa0195f09cdd31940e7b0da70487a6efe9c7496ac782eb604c8189e78a63513b",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-name-status.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-rest-get.json",
+      "bytes": 313,
+      "sha256": "205226b1c5143964cf538bcf5a3502864b02bc20f75316c54baa94dcca799991",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-rest-get.json",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-tree-governance-names.txt",
+      "bytes": 27,
+      "sha256": "1187ad9016ea9709c9e74c881ff8b7651e82f370430fa64ca626d6f755213cde",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-tree-governance-names.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/pr11-view.json",
+      "bytes": 2543,
+      "sha256": "165080407ee1e0add05a8e776c2f9443018e2e38cecbf2911ef091a0976b48d8",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/pr11-view.json",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/remote-branches.txt",
+      "bytes": 575,
+      "sha256": "b2cdb7a35d8998dc84e71bd4d61f1a049141631b5ac0b4ae38afbd70ed8061f6",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/remote-branches.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/remote-refs-after-fetch.txt",
+      "bytes": 773,
+      "sha256": "3962c06de754dd6dab599e327cebbdf9be4dcc722670a0351127d5bd7bcde73a",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/remote-refs-after-fetch.txt",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "originals/logs/repo-owner-identity.json",
+      "bytes": 257,
+      "sha256": "ecddf0c6525822d0b188ae6e73e254c70a7d7bf78213f77f2f6a31cdf242685e",
+      "rewritten": false,
+      "role": "existing_local_original_copy",
+      "source": "/Users/apple/multi-pr11-readonly-verify-20260907T095010Z/logs/repo-owner-identity.json",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/evidence-branches-before.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/gh-auth-status-masked.txt",
+      "bytes": 242,
+      "sha256": "53cf5d3d2311cac43218d2e2453fefab52841b89b8c6027e0d631d2cd98284aa",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/ls-remote-before.txt",
+      "bytes": 881,
+      "sha256": "54a2981b333ff7f67d8eb596adddcd4f7a869625f31ddad1913e4e99ac64a7e4",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/main-commit.json",
+      "bytes": 101,
+      "sha256": "5ba4f65ea528a5432fbc500023f0157429745b7ad2e6c93137315439d5bd4981",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/pr11-comment-count-before.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/pr11-head-commit.json",
+      "bytes": 156,
+      "sha256": "71783fa918775e4172a4144096656fb8cfe365d6beaed885bda3eb5dcbf8f9eb",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/pr11-view-before.json",
+      "bytes": 463,
+      "sha256": "775b9d5e6620b8e11d3e6f9af2c60927f3600223c85c8b8dfa6a59e190c9de59",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    },
+    {
+      "path": "publication/publisher-checkout-not-user-review.txt",
+      "bytes": 329,
+      "sha256": "6aa2ac83358c61edf9b3921ba2844ca021757629ea1e39d4a96b41d18b985462",
+      "rewritten": false,
+      "role": "publication_time_remote_identity_snapshot",
+      "source": "/tmp/mvge-evidence-publish-snap-20260907T164326Z",
+      "bound_reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "bound_reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2"
+    }
+  ],
+  "sha256sums_txt_excludes_itself": true,
+  "notes": [
+    "Original files were copied without reformatting.",
+    "gh-auth-status originals already contain gh-masked tokens (gho_***).",
+    "No collector output exists. Missing HTTP 401/403/404 is not treated as proof that other protection rules do not exist.",
+    "Intended handoff markdown from a blocked write is NOT_FOUND and was not reconstructed."
+  ]
+}

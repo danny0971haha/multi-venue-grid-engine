@@ -1,0 +1,14 @@
+  origin/HEAD -> origin/main
+  origin/chore/current-candidate-verification-20260905-dc6fcc
+  origin/docs/multi-agent-autonomy-20260905
+  origin/experiment/v0.1-phase0
+  origin/experiment/v0.1-phase1
+  origin/experiment/v0.1-phase2
+  origin/experiment/v0.1-phase2e-halt-ack
+  origin/fix/multi-evidence-byte-identity-20260905
+  origin/fix/multi-format-evidence-20260905
+  origin/fix/multi-trusted-base-scope-20260905
+  origin/governance/phase2d-trusted-review-boundary
+  origin/governance/phase2e-trusted-gate
+  origin/governance/post-bootstrap-format-corrective
+  origin/main

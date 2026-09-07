@@ -1,0 +1,6 @@
+From https://github.com/danny0971haha/multi-venue-grid-engine
+ * [new branch]      chore/current-candidate-verification-20260905-dc6fcc -> origin/chore/current-candidate-verification-20260905-dc6fcc
+ * [new branch]      docs/multi-agent-autonomy-20260905 -> origin/docs/multi-agent-autonomy-20260905
+ * [new branch]      fix/multi-evidence-byte-identity-20260905 -> origin/fix/multi-evidence-byte-identity-20260905
+ * [new branch]      fix/multi-format-evidence-20260905 -> origin/fix/multi-format-evidence-20260905
+ * [new branch]      fix/multi-trusted-base-scope-20260905 -> origin/fix/multi-trusted-base-scope-20260905

@@ -1,0 +1,42 @@
+{
+  "schema": "review-upload-identity/1",
+  "packet": "PR11_READONLY_OWNER_PROTECTION_AND_GOVERNANCE_OBSERVATION",
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "pr": 11,
+  "dates": {
+    "original_named_protection_followup_and_owner_closure_date": "NOT_FOUND",
+    "pr_updated_utc_at_observation": "2026-09-05T12:08:29Z",
+    "committed_corrective_note_date": "2026-09-05",
+    "evidence_observation_start_utc": "2026-09-07T09:50:10Z",
+    "evidence_observation_end_utc": "2026-09-07T09:54:51Z",
+    "publication_utc": "2026-09-07T16:43:26Z"
+  },
+  "reviewed": {
+    "pr": 11,
+    "branch": "fix/multi-trusted-base-scope-20260905",
+    "head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "tree": "1b443a620670216968b95cc43de96397550c24f2",
+    "base_branch": "main",
+    "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e",
+    "base_tree": "6981c1124524895273fb09b53d769ca9dbb722bc"
+  },
+  "publication": {
+    "branch": "evidence/multi-pr11-review-upload-20260907-bf4a1c",
+    "commit_sha": "FILLED_BY_GIT_COMMIT_DISTINCT_FROM_REVIEWED_HEAD",
+    "adds_only": "docs/review-uploads/20260907T164326Z-pr11-owner-protection-verify/"
+  },
+  "reviewer": "UNKNOWN",
+  "tools_observed": "Cursor agent; gh 2.95.0; git 2.50.1; python3 3.13.14",
+  "github_actor_used_for_reads": "danny0971haha",
+  "collector_executed": false,
+  "owner_prerequisites_verified": false,
+  "remote_at_publication_matches_reviewed_pin": true,
+  "ephemeral_test_merge_commit_sha_while_unmerged": "a61b1f87ecb7d14fd7dc2a73f68e7db4921f0160",
+  "self_declaration": {
+    "overall_pass": false,
+    "accept": false,
+    "merge_authorized": false,
+    "live_authorized": false,
+    "this_upload_is": "evidence publication only"
+  }
+}

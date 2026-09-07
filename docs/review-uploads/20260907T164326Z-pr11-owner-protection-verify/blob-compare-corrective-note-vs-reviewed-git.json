@@ -1,0 +1,11 @@
+{
+  "reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+  "comparison": {
+    "workdir_rel": "governance-read/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+    "git_path": "docs/TRUSTED_BASE_SCOPE_CORRECTIVE_20260905.md",
+    "bytes": 4188,
+    "sha256": "2bfb039368715ef58321aacef4dc5a9c9c0eceb977b47955606fa61e65b5715f",
+    "matches_reviewed_git_bytes": true,
+    "git_blob_sha": "c12a14a9e6f71ad1b9196a5828ad21d9388a4302"
+  }
+}

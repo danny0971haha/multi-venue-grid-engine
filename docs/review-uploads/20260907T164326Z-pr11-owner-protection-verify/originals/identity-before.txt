@@ -1,0 +1,17 @@
+CAPTURED_AT_UTC=2026-09-07T09:50:10Z
+HOSTNAME=appledeMacBook-Pro.local
+PWD=/Users/apple/multi-venue-grid-engine-starter
+LOCAL_REPO=/Users/apple/multi-venue-grid-engine-starter
+LOCAL_BRANCH=governance/phase2e-trusted-gate
+LOCAL_HEAD=52445f4c2b3eb65f13ae00dbef80f07b417a7d53
+LOCAL_TREE=13ed781c547cfa34a397565f6b78c9f94c31c903
+WORKTREE_CLEAN_TRACKED=0
+LOCAL_STATUS_PORCELAIN<<
+?? .omo/run-continuation/ses_fc3acbe02ffevq4gT6pbXwErHy.json
+?? .omo/run-continuation/ses_fc3aecdaeffe4MN8OHJZE0l6g6.json
+>>
+PYTHON3=Python 3.13.14
+GH=gh version 2.95.0 (2026-06-17)
+GIT=git version 2.50.1 (Apple Git-155)
+NODE=v26.5.0
+NPM=11.17.0

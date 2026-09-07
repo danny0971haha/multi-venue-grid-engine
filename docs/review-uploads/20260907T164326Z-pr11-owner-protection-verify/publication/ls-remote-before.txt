@@ -1,0 +1,11 @@
+7f196d367e39640eee9517f742b0d61424f9d4cc	refs/heads/experiment/v0.1-phase2
+704afa2dd858c52dad06aa22941d463aa5ce4d69	refs/heads/experiment/v0.1-phase2e-halt-ack
+4ead28400903ad6c62616835aa9459f67c6d8cd9	refs/heads/fix/multi-evidence-byte-identity-20260905
+9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690	refs/heads/fix/multi-format-evidence-20260905
+de2f5c0fd055e418d0b6d806f994b52baa743544	refs/heads/fix/multi-trusted-base-scope-20260905
+35e5c18ad81f8932f93038129dec26955673f8b4	refs/heads/governance/phase2d-trusted-review-boundary
+52445f4c2b3eb65f13ae00dbef80f07b417a7d53	refs/heads/governance/phase2e-trusted-gate
+0cfb5f76900e637951959a45387b2991e9061f2f	refs/heads/governance/post-bootstrap-format-corrective
+22665d7fa9274dfc05de043c8e9663e24e75087e	refs/heads/main
+de2f5c0fd055e418d0b6d806f994b52baa743544	refs/pull/11/head
+4ead28400903ad6c62616835aa9459f67c6d8cd9	refs/pull/12/head
