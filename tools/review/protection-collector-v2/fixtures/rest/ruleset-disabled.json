@@ -1,0 +1,16 @@
+{
+  "id": 10000002,
+  "name": "disabled overlay",
+  "target": "branch",
+  "source_type": "Repository",
+  "source": "danny0971haha/multi-venue-grid-engine",
+  "enforcement": "disabled",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/*"],
+      "exclude": []
+    }
+  },
+  "rules": []
+}

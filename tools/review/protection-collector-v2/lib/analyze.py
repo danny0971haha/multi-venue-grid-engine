@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .collect import CollectionBundle, SourceResult
-from .patterns import classic_pattern_matches_branch, pattern_scope, ref_for_branch, ruleset_applies_to_ref, ruleset_non_default_possible
+from .patterns import pattern_scope, ref_for_branch, ruleset_applies_to_ref, ruleset_non_default_possible
 
 
 ABSENCE_FORBIDDEN_CLASSES = {
@@ -282,8 +282,11 @@ def analyze(bundle: CollectionBundle) -> dict[str, Any]:
         unknown_reasons.append("includes_parents=true list not OK")
     org_probe = bundle.sources.get("org_or_enterprise_probe")
     enterprise_unknown = True
-    if org_probe and org_probe.extra.get("enterprise") == "UNKNOWN_NOT_READ":
-        unknown_reasons.append("enterprise inherited rulesets were not read")
+    if org_probe and org_probe.extra.get("enterprise") != "UNKNOWN_NOT_READ":
+        enterprise_unknown = False
+    # Unread enterprise overlays stay UNKNOWN in unconfirmed sources. They do
+    # not convert a complete repository-source export into "no rules". They also
+    # do not block a repository-scoped limited conclusion.
 
     active_non_main_hits = [
         h for h in non_main_context_hits if h.get("enforcement") in {None, "active"} or h.get("source") == "classic_branchProtectionRule"
@@ -328,11 +331,13 @@ def analyze(bundle: CollectionBundle) -> dict[str, Any]:
             "non-main refs unable to produce the required check."
         )
     else:
-        conflict = "NO_CONFLICT_IN_COMPLETE_EXPORT"
+        conflict = "NO_CONFLICT_IN_REPOSITORY_EXPORT"
         conflict_reason = (
-            "Within the complete repository ruleset + classic pattern export, the expected context is "
-            "not required on non-default-capable patterns. Effective-rules endpoint evidence is listed "
-            "separately and does not replace classic protection. Enterprise overlays remain UNKNOWN."
+            "Within the complete repository ruleset list/details (includes_parents true and false) "
+            "and complete GraphQL classic pattern list, the expected context is not required on "
+            "non-default-capable active rulesets or classic patterns. Evaluate/disabled hits are listed "
+            "separately. Effective-rules endpoint evidence is listed separately and does not replace "
+            "classic protection. Enterprise overlays remain UNKNOWN."
         )
 
     owner_prereqs = []
@@ -536,6 +541,9 @@ def render_coverage_md(bundle: CollectionBundle, analysis: dict[str, Any]) -> st
             "",
             "Effective rules (rulesets, active only) and classic branch protection are listed separately above.",
             "Neither is treated as a complete substitute for the other.",
+            "",
+            "Open PR identities, including PR #12, are collected only so their bases can be checked for",
+            "applicable protection. PR #12 evidence is not PR #11 acceptance evidence.",
             "",
             "## Owner adoption prerequisites still missing",
             "",

@@ -11,7 +11,7 @@ from typing import Any
 from .analyze import analyze, render_coverage_md
 from .collect import CollectionBundle, SourceResult
 from .constants import IDENTITY_DISCLAIMER, TOOL_NAME, VERSION
-from .redact import evidence_contains_secret, redact_text
+from .redact import evidence_contains_secret
 from .transport import HttpExchange
 
 

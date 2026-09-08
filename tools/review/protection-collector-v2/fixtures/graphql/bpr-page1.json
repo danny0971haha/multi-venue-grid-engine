@@ -1,0 +1,51 @@
+{
+  "data": {
+    "viewer": { "login": "danny0971haha", "databaseId": 202909309 },
+    "rateLimit": { "limit": 5000, "remaining": 4990, "reset": 0, "used": 10 },
+    "repository": {
+      "nameWithOwner": "danny0971haha/multi-venue-grid-engine",
+      "databaseId": 1,
+      "isPrivate": false,
+      "owner": { "login": "danny0971haha", "__typename": "User" },
+      "defaultBranchRef": { "name": "main" },
+      "branchProtectionRules": {
+        "totalCount": 2,
+        "pageInfo": { "hasNextPage": true, "endCursor": "cursor-1" },
+        "nodes": [
+          {
+            "id": "BPR_MAIN",
+            "databaseId": 11,
+            "pattern": "main",
+            "isAdminEnforced": true,
+            "requiresStatusChecks": false,
+            "requiresStrictStatusChecks": false,
+            "requiredStatusCheckContexts": [],
+            "requiredStatusChecks": [],
+            "requiresApprovingReviews": false,
+            "requiredApprovingReviewCount": 0,
+            "requiresCodeOwnerReviews": false,
+            "requiresConversationResolution": false,
+            "requiresCommitSignatures": false,
+            "requiresLinearHistory": false,
+            "requireLastPushApproval": false,
+            "allowsForcePushes": false,
+            "allowsDeletions": false,
+            "lockBranch": false,
+            "lockAllowsFetchAndMerge": false,
+            "blocksCreations": false,
+            "restrictsPushes": false,
+            "restrictsReviewDismissals": false,
+            "dismissesStaleReviews": false,
+            "requiresDeployments": false,
+            "requiredDeploymentEnvironments": [],
+            "matchingRefs": { "totalCount": 1, "pageInfo": { "hasNextPage": false } },
+            "bypassForcePushAllowances": { "pageInfo": { "hasNextPage": false }, "nodes": [] },
+            "bypassPullRequestAllowances": { "pageInfo": { "hasNextPage": false }, "nodes": [] },
+            "pushAllowances": { "pageInfo": { "hasNextPage": false }, "nodes": [] },
+            "reviewDismissalAllowances": { "pageInfo": { "hasNextPage": false }, "nodes": [] }
+          }
+        ]
+      }
+    }
+  }
+}
