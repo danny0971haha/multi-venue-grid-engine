@@ -3,14 +3,7 @@
   "identity": {
     "label": "before",
     "captured_at": "2026-09-08T17:33:46Z",
-    "exchange_ids": [
-      "0001",
-      "0002",
-      "0003",
-      "0004",
-      "0005",
-      "0006"
-    ],
+    "exchange_ids": ["0001", "0002", "0003", "0004", "0005", "0006"],
     "http_classes": {
       "repo": "OK",
       "pr": "OK",
@@ -66,7 +59,5 @@
     "status": "OK",
     "complete": true
   },
-  "required_header_only_absence_claim": [
-    "main"
-  ]
+  "required_header_only_absence_claim": ["main"]
 }

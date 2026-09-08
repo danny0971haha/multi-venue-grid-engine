@@ -1,0 +1,8 @@
+{
+  "base": "b2ea605d5ed507b634f9a2ee5907db39bf129d13",
+  "sha256": "ff8478133a258a9e0738d1b6e17b1b7df50ceceb3d41a0a24acad1b29311c08b",
+  "bytes": 173214,
+  "LF_count": 3641,
+  "file": "final-tool.patch.gz",
+  "encoding": "gzip lossless; identity is uncompressed patch bytes"
+}

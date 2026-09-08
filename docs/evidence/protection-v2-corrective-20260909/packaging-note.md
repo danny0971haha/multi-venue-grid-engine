@@ -1,0 +1,11 @@
+# Acquisition and packaging identities
+
+Exactly one new protection collection issued 67 requests (66 REST GET, 1 GraphQL query over POST) at acquisition HEAD 9b13a7fd3c0d7b354d6a5bf8ceefab4c838d112b, tree 92420dbc44da482c3328fad10658018128f38f26. Its window was 2026-09-08 17:37:48–17:38:25 UTC (2026-09-09 01:37:48–01:38:25 Asia/Taipei). The working tree was clean.
+
+The network command exited 1 at the final secret scan, after all raw responses, identity captures and analysis had been written. Two commit responses included a bare token prefix in public synthetic test code. This was not a caller credential. The failed packet remains at /Users/apple/.codex/artifacts/protection-v2-corrective-20260909/collection, and its command/exit/traceback are preserved. No result was backdated or reclassified as a historical recovery.
+
+The sanitizer was corrected at HEAD 43e9a371492bf807db23b3046824807c52beeefe, tree d4954aa9348d0886948fa3ac8857900af9f04acf. Sixty offline tests passed. repack_saved_collection.py performed zero network requests, verified all 67 original body hashes against the saved ledger, verified the acquisition/analysis implementation files were unchanged, masked only the two bare prefixes, recorded old/new hashes, and wrote a new packet with 145 verified file hashes. Derived analysis bytes are identical. tool-manifest.json intentionally retains the acquisition HEAD; repack-provenance.json separately binds the packaging HEAD and sanitizer hash.
+
+collection-repacked.tar.gz contains raw/, derived/, request-ledger.json, tool-manifest.json, status.json, repack-provenance.json and SHA256SUMS. Extract it to inspect raw and derived evidence separately. Do not treat the embedded LIVE_COLLECTION=COMPLETE as the exit result of the initially failed packaging command; collection-command.json and repack-command-output.json distinguish them.
+
+An optional format check on unarchived evidence was terminated with SIGTERM while computing a huge diff for the verbatim schema JSON; its diagnostics are retained. Native schema bodies and exact query documents now use .body/.query extensions, preserving their bytes rather than reformatting API evidence. Patch context whitespace and a verbatim failing unittest line were similarly preserved as lossless gzip files after a nonzero git diff --check. No whitespace guard or governance workflow was relaxed.

@@ -2,7 +2,7 @@
 
 Repository: danny0971haha/multi-venue-grid-engine. Independent v2 corrective candidate; no previous collector review is inherited.
 
-The authoritative GraphQL contract was read from `https://api.github.com/graphql` using the existing gh login and a query-only `__schema` request. `schema-query.graphql` and `schema-response.json` retain the request and the unmodified response (1,047,204 bytes; exit 0, no GraphQL errors). The first attempt used many aliases of `__type` and was rejected with INTROSPECTION_LIMIT_EXCEEDED (exit 1); both rejected files remain alongside the successful single-schema query. That API error was not converted into an empty schema.
+The authoritative GraphQL contract was read from `https://api.github.com/graphql` using the existing gh login and a query-only `__schema` request. `schema-query.query` and `schema-response.body` retain the request and the unmodified response (1,047,204 bytes; exit 0, no GraphQL errors). The first attempt used many aliases of `__type` and was rejected with INTROSPECTION_LIMIT_EXCEEDED (exit 1); both rejected files remain alongside the successful single-schema query. That API error was not converted into an empty schema.
 
 `tests/test_schema_contract.py` traverses every selection, argument name, leaf type and actor-union fragment of the actual collector query against this saved response. It rejects the old `reset` query and accepts `RateLimit.resetAt` plus `limit`, `remaining`, `used`. It covers Repository.viewerPermission, BranchProtectionRule fields, required status checks with app identity, allowance connections and PageInfo. This check is bound to the saved schema date; it does not promise future schema stability. The corrected collector also performs a real query in the new collection.
 

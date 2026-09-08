@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from lib.collect import BRANCH_PROTECTION_RULES_QUERY
 
-SCHEMA = Path(__file__).resolve().parents[4] / 'docs/evidence/protection-v2-corrective-20260909/schema-response.json'
+SCHEMA = Path(__file__).resolve().parents[4] / 'docs/evidence/protection-v2-corrective-20260909/schema-response.body'
 
 
 def validate_selection(document, schema):

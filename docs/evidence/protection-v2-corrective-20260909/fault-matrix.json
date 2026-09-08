@@ -1,0 +1,422 @@
+[
+  {
+    "test_name": "test_classic_protection_on_non_main_and_pattern_conflict",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_classic_protection_on_non_main_and_pattern_conflict",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_credentials_never_enter_packet",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_credentials_never_enter_packet",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_drift_is_recorded_separately",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_drift_is_recorded_separately",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_http_errors_are_gaps_not_absence",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_http_errors_are_gaps_not_absence",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_main_only_complete_export_is_limited_not_sampled",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_main_only_complete_export_is_limited_not_sampled",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_malformed_effective_is_not_empty_rules",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_malformed_effective_is_not_empty_rules",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rest_write_and_graphql_mutation_still_blocked_on_scripted_transport",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_rest_write_and_graphql_mutation_still_blocked_on_scripted_transport",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_same_context_different_integration_ids",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_same_context_different_integration_ids",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_single_and_multi_page_duplicate_and_enforcement_kinds",
+    "test_path": "tests.test_collect_offline.OfflineCollectionTests.test_single_and_multi_page_duplicate_and_enforcement_kinds",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_bpr_missing_matching_count_or_malformed_actor_is_incomplete",
+    "test_path": "tests.test_corrective.AdditionalBoundaryTests.test_bpr_missing_matching_count_or_malformed_actor_is_incomplete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_effective_incomplete_keeps_seen_hits_but_no_empty_absence",
+    "test_path": "tests.test_corrective.AdditionalBoundaryTests.test_effective_incomplete_keeps_seen_hits_but_no_empty_absence",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_missing_ref_response_and_invalid_ruleset_ids_are_recorded",
+    "test_path": "tests.test_corrective.AdditionalBoundaryTests.test_missing_ref_response_and_invalid_ruleset_ids_are_recorded",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_real_transport_rejects_mutations_before_subprocess",
+    "test_path": "tests.test_corrective.AdditionalBoundaryTests.test_real_transport_rejects_mutations_before_subprocess",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_allowances_incomplete_missing_duplicate_and_count_never_empty",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_allowances_incomplete_missing_duplicate_and_count_never_empty",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_complex_main_pattern_cannot_be_main_only_from_samples",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_complex_main_pattern_cannot_be_main_only_from_samples",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_endpoint_permission_header_and_oauth_scope_are_not_caller_admin",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_endpoint_permission_header_and_oauth_scope_are_not_caller_admin",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_cursor_duplicates_missing_cursor_and_count_mismatch",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_graphql_cursor_duplicates_missing_cursor_and_count_mismatch",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_errors_and_partial_data_preserve_seen_rules",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_graphql_errors_and_partial_data_preserve_seen_rules",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_genuine_empty_is_complete",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_graphql_genuine_empty_is_complete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_midpage_http_failures_and_malformed",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_graphql_midpage_http_failures_and_malformed",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_missing_null_or_invalid_connection_never_complete",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_graphql_missing_null_or_invalid_connection_never_complete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_total_changes_between_pages",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_graphql_total_changes_between_pages",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_identity_http_missing_and_wrong_commit_do_not_supply_tree",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_identity_http_missing_and_wrong_commit_do_not_supply_tree",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_identity_midrun_moves_main_pr_base_and_each_frozen_ref",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_identity_midrun_moves_main_pr_base_and_each_frozen_ref",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_main_ref_mismatch_before_not_hidden_by_existing_expected_commit",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_main_ref_mismatch_before_not_hidden_by_existing_expected_commit",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_missing_permission_bypass_and_partial_data_keep_positive_observations",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_missing_permission_bypass_and_partial_data_keep_positive_observations",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_observed_pr_head_tree_come_from_same_sha",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_observed_pr_head_tree_come_from_same_sha",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_open_prs_multipage_collected_and_interruption_blocks_identity",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_open_prs_multipage_collected_and_interruption_blocks_identity",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_packet_never_overwrites_prior_input_missing",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_packet_never_overwrites_prior_input_missing",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_product_nonapplicability_needs_ownership_nonfork_and_documentation",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_product_nonapplicability_needs_ownership_nonfork_and_documentation",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rate_limit_contract_uses_reset_at",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_rate_limit_contract_uses_reset_at",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rest_duplicate_nonforward_and_bad_link",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_rest_duplicate_nonforward_and_bad_link",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rest_empty_valid_on_last_allowed_page",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_rest_empty_valid_on_last_allowed_page",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rest_pr_ruleset_and_effective_pagination_failure_matrix",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_rest_pr_ruleset_and_effective_pagination_failure_matrix",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_ruleset_200_missing_required_fields_is_incomplete",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_ruleset_200_missing_required_fields_is_incomplete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_timeout_and_os_failure_are_recordable_http_gaps",
+    "test_path": "tests.test_corrective.CorrectiveTests.test_timeout_and_os_failure_are_recordable_http_gaps",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_duplicate_items_recorded",
+    "test_path": "tests.test_pagination.PaginationTests.test_duplicate_items_recorded",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_incomplete_when_has_next",
+    "test_path": "tests.test_pagination.PaginationTests.test_graphql_incomplete_when_has_next",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_interrupted_pagination_not_complete",
+    "test_path": "tests.test_pagination.PaginationTests.test_interrupted_pagination_not_complete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_multi_page_then_complete",
+    "test_path": "tests.test_pagination.PaginationTests.test_multi_page_then_complete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_single_page_complete",
+    "test_path": "tests.test_pagination.PaginationTests.test_single_page_complete",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_classic_star_matches_all_branches",
+    "test_path": "tests.test_patterns.PatternTests.test_classic_star_matches_all_branches",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_default_and_all_tokens",
+    "test_path": "tests.test_patterns.PatternTests.test_default_and_all_tokens",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_exclude",
+    "test_path": "tests.test_patterns.PatternTests.test_exclude",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_fnmatch_star_does_not_cross_slash",
+    "test_path": "tests.test_patterns.PatternTests.test_fnmatch_star_does_not_cross_slash",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_bare_prefix_in_public_synthetic_source_is_redacted",
+    "test_path": "tests.test_redact.RedactTests.test_bare_prefix_in_public_synthetic_source_is_redacted",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_headers_drop_authorization",
+    "test_path": "tests.test_redact.RedactTests.test_headers_drop_authorization",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_json_token_fields_redacted",
+    "test_path": "tests.test_redact.RedactTests.test_json_token_fields_redacted",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_masked_gh_status_token_is_redacted",
+    "test_path": "tests.test_redact.RedactTests.test_masked_gh_status_token_is_redacted",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_token_prefixes_redacted",
+    "test_path": "tests.test_redact.RedactTests.test_token_prefixes_redacted",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_fake_transport_rejects_graphql_mutation",
+    "test_path": "tests.test_safety.SafetyTests.test_fake_transport_rejects_graphql_mutation",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_fake_transport_rejects_rest_write",
+    "test_path": "tests.test_safety.SafetyTests.test_fake_transport_rejects_rest_write",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_mutation_forbidden",
+    "test_path": "tests.test_safety.SafetyTests.test_graphql_mutation_forbidden",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_mutation_hidden_in_comment_still_query",
+    "test_path": "tests.test_safety.SafetyTests.test_graphql_mutation_hidden_in_comment_still_query",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_query_allowed",
+    "test_path": "tests.test_safety.SafetyTests.test_graphql_query_allowed",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_graphql_string_named_mutation_is_still_query",
+    "test_path": "tests.test_safety.SafetyTests.test_graphql_string_named_mutation_is_still_query",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rest_get_allowed",
+    "test_path": "tests.test_safety.SafetyTests.test_rest_get_allowed",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_rest_writes_forbidden",
+    "test_path": "tests.test_safety.SafetyTests.test_rest_writes_forbidden",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_every_query_field_and_argument_in_official_schema",
+    "test_path": "tests.test_schema_contract.SchemaContractTests.test_every_query_field_and_argument_in_official_schema",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  },
+  {
+    "test_name": "test_old_rate_limit_reset_rejected_by_official_schema",
+    "test_path": "tests.test_schema_contract.SchemaContractTests.test_old_rate_limit_reset_rejected_by_official_schema",
+    "process_isolation": false,
+    "observed_result": "ok",
+    "suite_exit": 0
+  }
+]
