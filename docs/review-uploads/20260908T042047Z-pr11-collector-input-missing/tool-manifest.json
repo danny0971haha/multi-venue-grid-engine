@@ -1,0 +1,26 @@
+{
+  "schema": "pr11-owner-collector-tool-manifest/1",
+  "round": "20260908T042047Z",
+  "executed_tool": null,
+  "execution_blocked_reason": "COLLECTOR_INPUT_MISSING",
+  "substitute_collector_rewritten_this_round": false,
+  "protection_api_calls_used_as_substitute": false,
+  "expected_from_prior_owner_instructions": {
+    "collect-owner-protection.py": {
+      "expected_sha256": "347c046aab4088d8bd9c7e2ebaffb727ee824ec59dea2df10a885893fa80a73f",
+      "observed_path": null,
+      "observed_sha256": null,
+      "identity_result": "INPUT_MISSING",
+      "read_only_inspection": "NOT_PERFORMED_NO_FILE"
+    },
+    "OWNER-INSTRUCTIONS.md": {
+      "expected_sha256": "fef438d84c18d11dc35c31c980157e0dd79d632b1a8135863d6002a050a1de23",
+      "observed_path": null,
+      "observed_sha256": null,
+      "identity_result": "INPUT_MISSING"
+    }
+  },
+  "command_that_was_not_run": "python3 collect-owner-protection.py --output \"$HOME/multi-pr11-owner-protection-$(date -u +%Y%m%dT%H%M%SZ)\"",
+  "output_dir_pattern_still_absent": "$HOME/multi-pr11-owner-protection-*",
+  "prior_packet_tool_hashes": "never computed on a real file; expected hashes only"
+}

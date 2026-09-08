@@ -1,0 +1,107 @@
+{
+  "schema": "pr11-collector-recovery-identity/1",
+  "task": "PR11_OWNER_COLLECTOR_RECOVERY_VERIFY_READONLY_EXECUTE_AND_COVERAGE",
+  "task_is_governance_implementation": false,
+  "task_authorizes_adoption_or_integration": false,
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "pr": 11,
+  "captured_at_utc": "2026-09-08T04:19:04Z",
+  "captured_at_asia_taipei": "2026-09-08T12:19:04+0800",
+  "tree_confirm_utc": "2026-09-08T04:19:27Z",
+  "round_search_start_utc": "2026-09-08T04:20:47Z",
+  "round_search_start_asia_taipei": "2026-09-08T12:20:47+0800",
+  "packet_staged_utc": "2026-09-08T04:23:16Z",
+  "historical_review_anchor": {
+    "pr": 11,
+    "branch": "fix/multi-trusted-base-scope-20260905",
+    "head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "tree": "1b443a620670216968b95cc43de96397550c24f2",
+    "base_branch": "main",
+    "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e",
+    "base_tree": "6981c1124524895273fb09b53d769ca9dbb722bc",
+    "note": "historical review pin; not a reset instruction"
+  },
+  "remote_this_round": {
+    "pr_state": "open",
+    "draft": true,
+    "title": "fix(governance): restrict Phase 2D trusted trigger to supported main base",
+    "html_url": "https://github.com/danny0971haha/multi-venue-grid-engine/pull/11",
+    "updated_at": "2026-09-07T16:55:34Z",
+    "user": "danny0971haha",
+    "head_ref": "fix/multi-trusted-base-scope-20260905",
+    "head_sha": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "head_tree": "1b443a620670216968b95cc43de96397550c24f2",
+    "base_ref": "main",
+    "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e",
+    "base_tree": "6981c1124524895273fb09b53d769ca9dbb722bc",
+    "ls_remote_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "ls_remote_base": "22665d7fa9274dfc05de043c8e9663e24e75087e",
+    "ls_remote_pull_11_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "identity_drift_vs_historical_anchor": false
+  },
+  "frozen_refs_this_round": {
+    "experiment/v0.1-phase2": "7f196d367e39640eee9517f742b0d61424f9d4cc",
+    "experiment/v0.1-phase2e-halt-ack": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+    "governance/phase2e-trusted-gate": "52445f4c2b3eb65f13ae00dbef80f07b417a7d53",
+    "fix/multi-format-evidence-20260905": "9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690",
+    "fix/multi-evidence-byte-identity-20260905": "4ead28400903ad6c62616835aa9459f67c6d8cd9"
+  },
+  "prior_evidence_only_publication": {
+    "branch": "evidence/multi-pr11-review-upload-20260907-bf4a1c",
+    "commit": "c448e2a1b21c7e3cbcb9785478caa3919aec1fad",
+    "tree": "2ad174785057aca473d79cbfe769dd39e0dc0cbc",
+    "parent": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "batch": "20260907T164326Z-pr11-owner-protection-verify",
+    "index_url": "https://github.com/danny0971haha/multi-venue-grid-engine/blob/c448e2a1b21c7e3cbcb9785478caa3919aec1fad/docs/review-uploads/20260907T164326Z-pr11-owner-protection-verify/INDEX.md",
+    "index_sha256_reverified_this_round": "20b39d9ba97bc1174a28d1422f7d1fd2037eaa8ac7529eece841b6d0cd0963b1",
+    "index_sha256_matches_published_SHA256SUMS": true,
+    "collector_executed_in_that_packet": false,
+    "complete_live_protection_export_present": false
+  },
+  "pr11_comment_pointing_at_publication": {
+    "id": 5573669044,
+    "created_at": "2026-09-07T16:55:33Z",
+    "html_url": "https://github.com/danny0971haha/multi-venue-grid-engine/pull/11#issuecomment-5573669044",
+    "author": "danny0971haha",
+    "states_collector_originals_not_obtained": true
+  },
+  "status_entry": {
+    "AGENTS.md": "present on workspace and on PR11 HEAD / main",
+    "AI_START_HERE.md": "present; Phase 0 implementation entry, not a live CURRENT_STATUS ledger",
+    "docs/CURRENT_STATUS.md": "ABSENT on origin/main and on PR11 HEAD de2f5c0. Present only on PR12-related refs (not used as PR11 adoption evidence).",
+    "GITHUB_BOOTSTRAP.md": "one-time repo creation note; historical bootstrap steps are not this round's authorization"
+  },
+  "github_actor": {
+    "login": "danny0971haha",
+    "id": 202909309,
+    "type": "User",
+    "auth_account": "danny0971haha",
+    "scopes_observed": ["gist", "read:org", "repo", "workflow"],
+    "token_value": "NOT_RECORDED"
+  },
+  "repo_owner_this_round": {
+    "login": "danny0971haha",
+    "type": "User",
+    "visibility": "public",
+    "default_branch": "main"
+  },
+  "user_workspace_not_modified_as_implementation_branch": {
+    "path": "/Users/apple/multi-venue-grid-engine-starter",
+    "branch": "governance/phase2e-trusted-gate",
+    "head": "52445f4c2b3eb65f13ae00dbef80f07b417a7d53",
+    "untracked_at_start": [".omo/"]
+  },
+  "pr12_workdir_not_shared": "/Users/apple/multi-pr12-readonly-log-verify-20260907T123234Z",
+  "collector_executed": false,
+  "collector_identity_result": "INPUT_MISSING",
+  "owner_prerequisites_verified": false,
+  "protection_apis_called_this_round": false,
+  "self_declaration": {
+    "overall_pass": false,
+    "accept": false,
+    "merge_authorized": false,
+    "live_authorized": false,
+    "governance_adoption_authorized": false,
+    "this_packet_is": "collector-recovery evidence; COLLECTOR_INPUT_MISSING"
+  }
+}

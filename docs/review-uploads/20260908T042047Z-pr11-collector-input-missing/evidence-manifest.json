@@ -1,0 +1,58 @@
+{
+  "schema": "review-upload-evidence-manifest/1",
+  "packet": "20260908T042047Z-pr11-collector-input-missing",
+  "pr": 11,
+  "reviewed_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+  "reviewed_tree": "1b443a620670216968b95cc43de96397550c24f2",
+  "publication_commit_distinct_from_reviewed_head": true,
+  "collector_executed": false,
+  "files": [
+    {
+      "path": "COVERAGE.md",
+      "bytes": 6039,
+      "sha256": "ba6ad5b7dd51c9f61ef5172b18c53fa9f2120e81a47b03d449707addebd88cf6"
+    },
+    {
+      "path": "INDEX.md",
+      "bytes": 2825,
+      "sha256": "dd080a142f32414af9988664d6b2abf4425c9d858df5f6d03f1840e96d0e0c07"
+    },
+    {
+      "path": "NOT_FOUND.md",
+      "bytes": 4495,
+      "sha256": "373687dd0db82436bb10fe6b5f2bffea0906f7bcd8b319c2e69c538972903337"
+    },
+    {
+      "path": "identity.json",
+      "bytes": 5121,
+      "sha256": "bd179c4506773fb4ca463f77db686e104435cc02107a64cd866052b901516b15"
+    },
+    {
+      "path": "input-search-ledger.md",
+      "bytes": 1773,
+      "sha256": "47ef4480d68a3752c05d937db9edef35c099361fcff1a269c6926a033142ee92"
+    },
+    {
+      "path": "request-ledger.md",
+      "bytes": 4051,
+      "sha256": "f61a9e75ef23564be61243c3542232f9d8ccf37c4c2db07ae3a6749aa544954a"
+    },
+    {
+      "path": "status.json",
+      "bytes": 1071,
+      "sha256": "e98dc2bef79928f2f8849fff8bf80457d4ea40948451bacd8b13ef55ce8aafeb"
+    },
+    {
+      "path": "tool-manifest.json",
+      "bytes": 1153,
+      "sha256": "2ff303002055f69c889ccc38606833af41a0133131596e4645d1968eb80d61e6"
+    }
+  ],
+  "sha256sums_txt_excludes_itself": true,
+  "notes": [
+    "No collector original was copied. Expected hashes were not computed on files.",
+    "No Authorization, Cookie, or token values are stored.",
+    "PR #12 evidence is not included.",
+    "evidence-manifest.json is hashed in SHA256SUMS.txt after this object is written."
+  ]
+}

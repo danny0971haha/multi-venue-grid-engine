@@ -1,0 +1,26 @@
+{
+  "schema": "pr11-owner-collector-round-status/1",
+  "round": "20260908T042047Z",
+  "task_status": "COLLECTOR_INPUT_MISSING",
+  "CODE_CHANGE_IMPLEMENTED": {
+    "value": "NOT_THIS_TASK",
+    "note": "This round is collector recovery only. PR #11 remaining code change is unmerged Draft at de2f5c0; not re-implemented here."
+  },
+  "REVIEW_EVIDENCE_COMPLETE": {
+    "value": false,
+    "note": "Prior publication c448e2a1 is identity/governance-read only. Live effective-protection export is still missing."
+  },
+  "OWNER_EVIDENCE_COLLECTION_COMPLETE": false,
+  "PREREQUISITE_ASSESSMENT": "UNKNOWN",
+  "PREREQUISITE_ASSESSMENT_BASIS": "No verified collector run; historical ruleset 21580900 citation is not a complete live export; 403/404/empty-array were not observed this round and are not used as absence proofs.",
+  "OWNER_PREREQUISITES_VERIFIED": false,
+  "CHANGE_INTEGRATED": false,
+  "DEPLOYED_TRIGGER_BEHAVIOR_OBSERVED": false,
+  "NOT_DECLARED": [
+    "PASS",
+    "ACCEPT",
+    "MERGE AUTHORIZED",
+    "LIVE AUTHORIZED",
+    "governance adoption approved"
+  ]
+}
