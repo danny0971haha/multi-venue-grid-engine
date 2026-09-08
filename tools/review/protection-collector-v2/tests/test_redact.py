@@ -38,3 +38,9 @@ class RedactTests(unittest.TestCase):
         redacted = redact_json_value(payload)
         self.assertEqual(redacted["token"], "[REDACTED]")
         self.assertEqual(redacted["login"], "danny0971haha")
+
+    def test_bare_prefix_in_public_synthetic_source_is_redacted(self) -> None:
+        text = 'const planted = `ghp_${"a".repeat(36)}`;'
+        result = redact_text(text)
+        self.assertIn('[REDACTED_TOKEN]', result)
+        self.assertFalse(evidence_contains_secret(result))
