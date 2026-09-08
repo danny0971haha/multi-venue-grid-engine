@@ -1,0 +1,18 @@
+[
+  {
+    "id": 21580900,
+    "name": "main freeze gate",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "danny0971haha/multi-venue-grid-engine",
+    "enforcement": "active"
+  },
+  {
+    "id": 10000001,
+    "name": "evaluate overlay",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "danny0971haha/multi-venue-grid-engine",
+    "enforcement": "evaluate"
+  }
+]

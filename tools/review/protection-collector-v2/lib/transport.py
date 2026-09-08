@@ -117,8 +117,8 @@ class GhTransport(Transport):
                 check=False,
                 env=env,
             )
-        except subprocess.TimeoutExpired as exc:
-            raise TimeoutError(f"gh timed out after {self.timeout_sec}s") from exc
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return 1, "", type(exc).__name__
         stdout = completed.stdout or ""
         stderr = completed.stderr or ""
         return completed.returncode, stdout, stderr
@@ -151,7 +151,7 @@ class GhTransport(Transport):
             body = stdout or stderr
             try:
                 parsed_err = json.loads(stdout)
-                status = int(parsed_err.get("status") or 0) or (401 if "Bad credentials" in stdout else 0)
+                status = int(parsed_err.get("status") or 0) if isinstance(parsed_err, dict) else 0
             except (TypeError, json.JSONDecodeError, ValueError):
                 status = 0
             if status == 0:
@@ -233,7 +233,8 @@ class GhTransport(Transport):
             parsed=parsed,
             parse_ok=parse_ok,
             graphql=True,
-            extra={"gh_exit": code, "stderr_redacted": redact_text(stderr)[:4000]},
+            extra={"gh_exit": code, "stderr_redacted": redact_text(stderr)[:4000],
+                   "query": query, "variables": variables or {}},
         )
         self.calls.append(exchange)
         return exchange

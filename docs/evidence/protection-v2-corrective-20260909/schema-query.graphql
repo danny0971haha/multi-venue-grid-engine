@@ -1,0 +1,1 @@
+query CollectorSchemaVerification { __schema { types { name kind fields { name args { name type { kind name ofType { kind name } } } type { kind name ofType { kind name ofType { kind name } } } } possibleTypes { name } } } }

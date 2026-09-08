@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import platform
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
+
+from .validation import obj, sha, connection_errors, bpr_errors, ruleset_errors, pr_errors, rule_errors, effective_rule_errors
 
 from .constants import (
     DOCUMENTATION_BASIS,
@@ -19,16 +22,17 @@ from .constants import (
     TOOL_NAME,
     VERSION,
 )
-from .pagination import graphql_pagination_status, merge_unique, next_page_number, rest_pagination_status
+from .pagination import graphql_pagination_status, merge_unique, next_page_number, rest_pagination_status, parse_link_rels, page_from_url
 from .redact import redact_text
 from .transport import HttpExchange, Transport, utc_now
 
 BRANCH_PROTECTION_RULES_QUERY = """
 query ProtectionCollectorV2BranchProtectionRules($owner: String!, $name: String!, $cursor: String) {
   viewer { login databaseId }
-  rateLimit { limit remaining reset used }
+  rateLimit { limit remaining resetAt used }
   repository(owner: $owner, name: $name) {
     nameWithOwner
+    viewerPermission
     databaseId
     isPrivate
     owner { login __typename }
@@ -64,46 +68,50 @@ query ProtectionCollectorV2BranchProtectionRules($owner: String!, $name: String!
         requiredDeploymentEnvironments
         matchingRefs(first: 1) { totalCount pageInfo { hasNextPage } }
         bypassForcePushAllowances(first: 20) {
-          pageInfo { hasNextPage }
+          totalCount
+          pageInfo { hasNextPage endCursor }
           nodes {
             actor {
               __typename
-              ... on User { login }
-              ... on Team { slug name }
-              ... on App { databaseId slug name }
+              ... on User { id login }
+              ... on Team { id slug name }
+              ... on App { id databaseId slug name }
             }
           }
         }
         bypassPullRequestAllowances(first: 20) {
-          pageInfo { hasNextPage }
+          totalCount
+          pageInfo { hasNextPage endCursor }
           nodes {
             actor {
               __typename
-              ... on User { login }
-              ... on Team { slug name }
-              ... on App { databaseId slug name }
+              ... on User { id login }
+              ... on Team { id slug name }
+              ... on App { id databaseId slug name }
             }
           }
         }
         pushAllowances(first: 20) {
-          pageInfo { hasNextPage }
+          totalCount
+          pageInfo { hasNextPage endCursor }
           nodes {
             actor {
               __typename
-              ... on User { login }
-              ... on Team { slug name }
-              ... on App { databaseId slug name }
+              ... on User { id login }
+              ... on Team { id slug name }
+              ... on App { id databaseId slug name }
             }
           }
         }
         reviewDismissalAllowances(first: 20) {
-          pageInfo { hasNextPage }
+          totalCount
+          pageInfo { hasNextPage endCursor }
           nodes {
             actor {
               __typename
-              ... on User { login }
-              ... on Team { slug name }
-              ... on App { databaseId slug name }
+              ... on User { id login }
+              ... on Team { id slug name }
+              ... on App { id databaseId slug name }
             }
           }
         }
@@ -128,6 +136,18 @@ class CollectConfig:
     out_dir: Path
     per_page: int = REST_PER_PAGE
     max_pages: int = MAX_PAGES
+    expected_frozen_refs: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self):
+        refs = []
+        for entry in self.frozen_refs:
+            ref, sep, expected = entry.partition("=")
+            if sep:
+                if not sha(expected):
+                    raise ValueError("frozen ref requires a full commit SHA")
+                self.expected_frozen_refs[ref] = expected
+            refs.append(ref)
+        self.frozen_refs = refs
 
 
 @dataclass
@@ -312,7 +332,8 @@ def _scope_from_headers(headers: dict[str, str]) -> dict[str, Any]:
     return {
         "oauth_scopes": scopes,
         "accepted_oauth_scopes": accepted,
-        "accepted_github_permissions": accepted_permissions,
+        "endpoint_required_github_permissions": accepted_permissions,
+        "accepted_headers_are_caller_permissions": False,
         "token_not_recorded": True,
     }
 
@@ -346,89 +367,90 @@ def _tree_sha_from_commit(parsed: Any) -> str | None:
 
 
 def capture_identity(transport: Transport, config: CollectConfig, label: str) -> dict[str, Any]:
-    repo_ex = transport.rest_get(_repo_path(config))
-    pr_ex = transport.rest_get(f"{_repo_path(config)}/pulls/{config.review_pr}")
-    prs_ex = transport.rest_get(
-        f"{_repo_path(config)}/pulls",
-        {"state": "open", "per_page": config.per_page, "page": 1},
-    )
-    main_ex = transport.rest_get(f"{_repo_path(config)}/commits/{config.expected_main}")
-    head_ex = transport.rest_get(f"{_repo_path(config)}/commits/{config.review_head}")
-    rate_ex = transport.rest_get("rate_limit")
+    root = _repo_path(config)
+    exchanges = []
+    issues = []
 
-    repo_parsed = repo_ex.parsed if isinstance(repo_ex.parsed, dict) else {}
-    pr_parsed = pr_ex.parsed if isinstance(pr_ex.parsed, dict) else {}
-    prs = _as_list(prs_ex.parsed) or []
-    open_prs = []
-    for item in prs:
-        if not isinstance(item, dict):
-            continue
-        head = item.get("head") or {}
-        base = item.get("base") or {}
-        open_prs.append(
-            {
-                "number": item.get("number"),
-                "title": item.get("title"),
-                "draft": item.get("draft"),
-                "head_ref": head.get("ref"),
-                "head_sha": head.get("sha"),
-                "base_ref": base.get("ref"),
-                "base_sha": base.get("sha"),
-            }
-        )
-    observed_head = (pr_parsed.get("head") or {}).get("sha")
-    observed_base = (pr_parsed.get("base") or {}).get("sha")
-    observed_base_ref = (pr_parsed.get("base") or {}).get("ref")
-    observed_head_ref = (pr_parsed.get("head") or {}).get("ref")
-    observed_tree = _tree_sha_from_commit(head_ex.parsed)
-    main_sha = main_ex.parsed.get("sha") if isinstance(main_ex.parsed, dict) else None
-    main_tree = _tree_sha_from_commit(main_ex.parsed)
-    identity = {
-        "label": label,
-        "captured_at": utc_now(),
-        "exchange_ids": [repo_ex.id, pr_ex.id, prs_ex.id, main_ex.id, head_ex.id, rate_ex.id],
-        "http_classes": {
-            "repo": classify_http(repo_ex),
-            "pr": classify_http(pr_ex),
-            "open_prs": classify_http(prs_ex),
-            "expected_main_commit": classify_http(main_ex),
-            "review_head_commit": classify_http(head_ex),
-            "rate_limit": classify_http(rate_ex),
-        },
-        "owner_login": (repo_parsed.get("owner") or {}).get("login"),
-        "owner_type": (repo_parsed.get("owner") or {}).get("type"),
-        "default_branch": repo_parsed.get("default_branch"),
-        "visibility": repo_parsed.get("visibility") or repo_parsed.get("private"),
-        "review_pr": {
-            "number": pr_parsed.get("number"),
-            "state": pr_parsed.get("state"),
-            "draft": pr_parsed.get("draft"),
-            "head_ref": observed_head_ref,
-            "head_sha": observed_head,
-            "head_tree": observed_tree,
-            "base_ref": observed_base_ref,
-            "base_sha": observed_base,
-        },
-        "main": {"sha": main_sha, "tree": main_tree},
-        "open_prs": open_prs,
-        "open_prs_pagination": {
-            "page": 1,
-            "count": len(prs),
-            "next_page": next_page_number(repo_header(prs_ex, "link")),
-            "complete": next_page_number(repo_header(prs_ex, "link")) is None and classify_http(prs_ex) == "OK",
-        },
-        "expected": {
-            "review_head": config.review_head,
-            "review_tree": config.review_tree,
-            "expected_main": config.expected_main,
-        },
-        "match": {
-            "head": observed_head == config.review_head,
-            "tree": observed_tree == config.review_tree if observed_tree else None,
-            "main": main_sha == config.expected_main,
-        },
+    def get(path):
+        ex = transport.rest_get(path)
+        exchanges.append(ex)
+        if classify_http(ex) != "OK":
+            issues.append({"endpoint": path, "class": classify_http(ex), "exchange_id": ex.id})
+            return {}, ex
+        if not isinstance(ex.parsed, dict):
+            issues.append({"endpoint": path, "class": "MALFORMED", "exchange_id": ex.id})
+            return {}, ex
+        return ex.parsed, ex
+
+    def commit(observed_sha):
+        if not sha(observed_sha):
+            issues.append({"class": "MISSING_OBSERVED_SHA", "value": observed_sha})
+            return None
+        body, ex = get(f"{root}/commits/{observed_sha}")
+        tree = _tree_sha_from_commit(body)
+        if body.get("sha") != observed_sha or not sha(tree):
+            issues.append({"class": "COMMIT_IDENTITY_INCOMPLETE_OR_MISMATCH", "exchange_id": ex.id})
+            return None
+        return tree
+
+    def ref(name, expected):
+        body, ex = get(f"{root}/git/ref/heads/{quote(name, safe='/')}")
+        observed = obj(body.get("object")).get("sha")
+        if body.get("ref") != f"refs/heads/{name}" or obj(body.get("object")).get("type") != "commit":
+            issues.append({"class": "REF_IDENTITY_INCOMPLETE_OR_MISMATCH", "ref": name, "exchange_id": ex.id})
+            observed = None
+        return {"ref": name, "sha": observed, "tree": commit(observed),
+                "expected_sha": expected, "matches_expected": observed == expected if expected else None,
+                "exchange_id": ex.id}
+
+    repo, repo_ex = get(root)
+    owner = obj(repo.get("owner"))
+    if repo.get("full_name") != f"{config.owner}/{config.repo}" or owner.get("login") != config.owner or owner.get("type") not in ("User", "Organization") or not repo.get("default_branch"):
+        issues.append({"class": "REPOSITORY_IDENTITY_INCOMPLETE_OR_MISMATCH"})
+    pr, pr_ex = get(f"{root}/pulls/{config.review_pr}")
+    issues.extend({"class": e} for e in pr_errors(pr))
+    if pr.get("number") != config.review_pr:
+        issues.append({"class": "PR_NUMBER_MISMATCH"})
+    head, base = obj(pr.get("head")), obj(pr.get("base"))
+    prs = paginate_rest_list(transport, f"{root}/pulls", {"state": "open", "per_page": config.per_page},
+                            key_fn=lambda p: p.get("number"), max_pages=config.max_pages,
+                            validate_item=pr_errors)
+    if prs.status != "OK":
+        issues.append({"class": "OPEN_PRS_INCOMPLETE", "source": asdict(prs)})
+    main = ref("main", config.expected_main)
+    head_tree, base_tree = commit(head.get("sha")), commit(base.get("sha"))
+    base_ref = ref(base["ref"], config.expected_main if base["ref"] == "main" else None) if isinstance(base.get("ref"), str) else {}
+    frozen = {name: ref(name, config.expected_frozen_refs.get(name)) for name in config.frozen_refs}
+    get("rate_limit")
+    match = {"head": head.get("sha") == config.review_head,
+             "tree": head_tree == config.review_tree if head_tree else None,
+             "main": main["matches_expected"],
+             "base_ref": base.get("ref") == "main",
+             "base_sha": base.get("sha") == config.expected_main,
+             "base_ref_sha": base_ref.get("sha") == base.get("sha") if base_ref.get("sha") else None}
+    match.update({f"frozen:{name}": item["matches_expected"] for name, item in frozen.items()})
+    if not all(v is True for v in match.values()):
+        issues.append({"class": "EXPECTED_IDENTITY_MISMATCH_OR_UNVERIFIED", "match": match})
+    return {
+        "label": label, "captured_at": utc_now(), "exchange_ids": [e.id for e in exchanges] + prs.exchanges,
+        "http_classes": {e.endpoint: classify_http(e) for e in exchanges},
+        "complete": not issues, "issues": issues,
+        "owner_login": owner.get("login"), "owner_type": owner.get("type"),
+        "repository_full_name": repo.get("full_name"), "repository_http_class": classify_http(repo_ex),
+        "repository_permissions": repo.get("permissions"), "repository_exchange_id": repo_ex.id,
+        "fork": repo.get("fork"), "default_branch": repo.get("default_branch"),
+        "visibility": repo.get("visibility"),
+        "review_pr": {"number": pr.get("number"), "state": pr.get("state"), "draft": pr.get("draft"),
+                      "head_ref": head.get("ref"), "head_sha": head.get("sha"), "head_tree": head_tree,
+                      "base_ref": base.get("ref"), "base_sha": base.get("sha"), "base_tree": base_tree},
+        "main": main, "review_base_ref": base_ref, "frozen_refs": frozen,
+        "open_prs": [{"number": p.get("number"), "head_ref": obj(p.get("head")).get("ref"),
+                      "head_sha": obj(p.get("head")).get("sha"), "base_ref": obj(p.get("base")).get("ref"),
+                      "base_sha": obj(p.get("base")).get("sha")} for p in prs.items if isinstance(p, dict)],
+        "open_prs_pagination": prs.pagination, "open_prs_source": asdict(prs),
+        "expected": {"review_head": config.review_head, "review_tree": config.review_tree,
+                     "expected_main": config.expected_main, "frozen_refs": config.expected_frozen_refs}, "match": match,
     }
-    return identity
 
 
 def repo_header(exchange: HttpExchange, name: str) -> str | None:
@@ -440,92 +462,78 @@ def repo_header(exchange: HttpExchange, name: str) -> str | None:
 
 
 def compare_identity(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
-    keys = [
-        ("review_pr.head_sha", (before.get("review_pr") or {}).get("head_sha"), (after.get("review_pr") or {}).get("head_sha")),
-        ("review_pr.head_tree", (before.get("review_pr") or {}).get("head_tree"), (after.get("review_pr") or {}).get("head_tree")),
-        ("review_pr.base_sha", (before.get("review_pr") or {}).get("base_sha"), (after.get("review_pr") or {}).get("base_sha")),
-        ("main.sha", (before.get("main") or {}).get("sha"), (after.get("main") or {}).get("sha")),
-        ("owner_type", before.get("owner_type"), after.get("owner_type")),
-        ("default_branch", before.get("default_branch"), after.get("default_branch")),
-    ]
     changed = []
-    for name, left, right in keys:
+    def substantive(value):
+        if isinstance(value, dict):
+            return {k: substantive(v) for k, v in value.items() if k != "exchange_id"}
+        return value
+    for key in ("main", "review_pr", "review_base_ref", "frozen_refs", "owner_login", "owner_type",
+                "repository_full_name", "fork", "default_branch", "open_prs", "repository_permissions"):
+        left, right = substantive(before.get(key)), substantive(after.get(key))
         if left != right:
-            changed.append({"field": name, "before": left, "after": right})
-    before_prs = {(p.get("number"), p.get("base_ref"), p.get("base_sha")) for p in before.get("open_prs") or []}
-    after_prs = {(p.get("number"), p.get("base_ref"), p.get("base_sha")) for p in after.get("open_prs") or []}
-    if before_prs != after_prs:
-        changed.append({"field": "open_prs", "before": sorted(before_prs), "after": sorted(after_prs)})
-    return {
-        "drift_detected": bool(changed),
-        "changed": changed,
-        "note": (
-            "Before and after are separate observations. They are not merged into one snapshot."
-            if changed
-            else "No identity field listed here changed between the two captures."
-        ),
-    }
+            changed.append({"field": key, "before": left, "after": right})
+    return {"drift_detected": bool(changed), "changed": changed,
+            "identity_verified": before.get("complete") is True and after.get("complete") is True and not changed,
+            "before_issues": before.get("issues"), "after_issues": after.get("issues"),
+            "note": "Separate before/after observations; stable refs do not prove atomic protection settings."}
 
 
-def paginate_rest_list(
-    transport: Transport,
-    path: str,
-    params: dict[str, Any],
-    *,
-    key_fn,
-    max_pages: int,
-) -> SourceResult:
-    exchanges: list[HttpExchange] = []
-    pages: list[Any] = []
-    next_page = 1
-    last_status = None
-    last_count = None
-    link_next = None
-    notes: list[str] = []
+def paginate_rest_list(transport: Transport, path: str, params: dict[str, Any], *,
+                       key_fn, max_pages: int, validate_item=None) -> SourceResult:
+    exchanges, items, notes = [], [], []
+    page, next_page, last_count = 1, 1, None
+    seen_pages = set()
+    terminal = False
+    status = "INCOMPLETE"
     for _ in range(max_pages):
-        page_params = dict(params)
-        page_params["page"] = next_page
-        exchange = transport.rest_get(path, page_params)
-        exchanges.append(exchange)
-        http_class = classify_http(exchange)
-        last_status = exchange.status
-        items = _as_list(exchange.parsed)
-        if http_class != "OK" or items is None:
-            notes.append(f"page {next_page} class={http_class} status={exchange.status}")
-            last_count = None if items is None else len(items)
-            link_next = next_page_number(repo_header(exchange, "link"))
+        if page in seen_pages:
+            notes.append("repeated page")
             break
-        last_count = len(items)
-        pages.extend(items)
-        link_next = next_page_number(repo_header(exchange, "link"))
-        if link_next is None:
+        seen_pages.add(page)
+        ex = transport.rest_get(path, {**params, "page": page})
+        exchanges.append(ex)
+        status = classify_http(ex)
+        if status != "OK":
+            notes.append(f"page {page}: {status}")
             break
-        next_page = link_next
-    unique, duplicates = merge_unique(pages, key_fn)
-    pagination = rest_pagination_status(
-        pages_fetched=len(exchanges),
-        last_status=last_status,
-        last_item_count=last_count,
-        next_page=link_next,
-        per_page=int(params.get("per_page") or REST_PER_PAGE),
-        max_pages=max_pages,
-    )
-    status = "OK" if pagination["complete"] and classify_http(exchanges[-1]) == "OK" else "INCOMPLETE"
-    if any(classify_http(ex) != "OK" for ex in exchanges):
-        status = classify_http(exchanges[-1])
-        if status == "OK":
-            status = "INCOMPLETE"
-    return SourceResult(
-        name=path,
-        exchanges=[ex.id for ex in exchanges],
-        status=status,
-        http_statuses=[ex.status for ex in exchanges],
-        pagination=pagination,
-        items=unique,
-        duplicates=duplicates,
-        notes=notes,
-        extra={"raw_item_count": len(pages)},
-    )
+        if not isinstance(ex.parsed, list):
+            status = "MALFORMED"
+            notes.append(f"page {page}: expected array, not empty by default")
+            break
+        last_count = len(ex.parsed)
+        for item in ex.parsed:
+            errors = validate_item(item) if validate_item else ([] if isinstance(item, dict) else ["invalid item"])
+            notes.extend(f"page {page}: {e}" for e in errors)
+            items.append(item)
+        link = repo_header(ex, "link")
+        rels = parse_link_rels(link)
+        next_page = next_page_number(link)
+        if link and not rels:
+            notes.append("malformed Link header")
+            break
+        if "next" in rels and (next_page is None or next_page <= page):
+            notes.append("invalid/repeated/non-forward next page")
+            break
+        if next_page is None and 'last' in rels and (page_from_url(rels['last']) is None or page_from_url(rels['last']) > page):
+            notes.append("last page indicates missing next link")
+            break
+        if next_page is None:
+            # A documented Link-free array is a terminal page, including [] and an exact full page.
+            terminal = True
+            break
+        page = next_page
+    unique, duplicates = merge_unique(items, key_fn)
+    if duplicates:
+        notes.append("duplicate identities; pagination is not a consistent complete export")
+    complete = terminal and status == "OK" and not notes
+    pagination = {"complete": complete, "pages_fetched": len(exchanges), "next_page": next_page,
+                  "last_item_count": last_count, "truncated_by_max_pages": not terminal and len(exchanges) >= max_pages,
+                  "interrupted": not terminal, "validated_empty_collection": complete and not items}
+    return SourceResult(name=path, exchanges=[e.id for e in exchanges],
+                        status="OK" if complete else (status if status != "OK" else "INCOMPLETE"),
+                        http_statuses=[e.status for e in exchanges], pagination=pagination,
+                        items=unique, duplicates=duplicates, notes=notes,
+                        extra={"raw_item_count": len(items)})
 
 
 def collect_ruleset_details(
@@ -546,10 +554,13 @@ def collect_ruleset_details(
         http_class = classify_http(exchange)
         statuses.append(exchange.status)
         parsed = exchange.parsed if isinstance(exchange.parsed, dict) else None
+        shape_errors = ruleset_errors(parsed, ruleset_id) if http_class == "OK" else []
         details.append(
             {
                 "id": ruleset_id,
                 "http_class": http_class,
+                "complete": http_class == "OK" and not shape_errors,
+                "shape_errors": shape_errors,
                 "status": exchange.status,
                 "exchange_id": exchange.id,
                 "body": parsed,
@@ -557,6 +568,7 @@ def collect_ruleset_details(
                 "rules_present": bool(parsed and parsed.get("rules") is not None) if parsed else False,
             }
         )
+        notes.extend(f"ruleset {ruleset_id}: {error}" for error in shape_errors)
         if http_class != "OK":
             notes.append(f"ruleset {ruleset_id} class={http_class}")
         elif parsed and "bypass_actors" not in parsed:
@@ -564,11 +576,11 @@ def collect_ruleset_details(
                 f"ruleset {ruleset_id}: bypass_actors omitted. GitHub documents omission unless the "
                 "caller has write access to the ruleset. Not treated as empty bypass."
             )
-    ok = all(row["http_class"] == "OK" for row in details) and bool(details)
+    ok = all(row["complete"] for row in details)
     return SourceResult(
         name="ruleset_details",
         exchanges=[ex.id for ex in exchanges],
-        status="OK" if ok else ("EMPTY" if not ruleset_ids else "INCOMPLETE"),
+        status="OK" if ok else "INCOMPLETE",
         http_statuses=statuses,
         items=details,
         notes=notes,
@@ -577,80 +589,68 @@ def collect_ruleset_details(
 
 
 def collect_branch_protection_rules(transport: Transport, config: CollectConfig) -> SourceResult:
-    pages = []
-    exchanges = []
-    cursor = None
-    last_ok = False
-    has_next = False
-    notes = []
-    graphql_errors = []
+    pages, exchanges, notes, graphql_errors = [], [], [], []
+    cursor, total, viewer_permission = None, None, None
+    seen_cursors = set()
+    terminal = False
+    status = "INCOMPLETE"
     for _ in range(config.max_pages):
-        exchange = transport.graphql_query(
-            BRANCH_PROTECTION_RULES_QUERY,
-            {"owner": config.owner, "name": config.repo, "cursor": cursor},
-        )
-        exchanges.append(exchange)
-        http_class = classify_http(exchange)
-        if http_class != "OK" and http_class != "GRAPHQL_ERRORS":
-            notes.append(f"graphql class={http_class} status={exchange.status}")
-            last_ok = False
+        ex = transport.graphql_query(BRANCH_PROTECTION_RULES_QUERY,
+                                    {"owner": config.owner, "name": config.repo, "cursor": cursor})
+        exchanges.append(ex)
+        status = classify_http(ex)
+        if status not in ("OK", "GRAPHQL_ERRORS"):
+            notes.append(f"GraphQL {status}")
             break
-        parsed = exchange.parsed if isinstance(exchange.parsed, dict) else {}
+        parsed = obj(ex.parsed)
         if parsed.get("errors"):
-            graphql_errors.extend(parsed.get("errors") or [])
-        data = parsed.get("data") if isinstance(parsed.get("data"), dict) else {}
-        repo = data.get("repository") if isinstance(data.get("repository"), dict) else None
-        if repo is None:
-            notes.append("repository is null in GraphQL data; not treated as empty rule list")
-            last_ok = False
+            graphql_errors.append(parsed["errors"])
+        repo = obj(obj(parsed.get("data")).get("repository"))
+        if repo.get("nameWithOwner") != f"{config.owner}/{config.repo}":
+            notes.append("GraphQL repository identity missing/mismatch")
+        viewer_permission = repo.get("viewerPermission")
+        conn = repo.get("branchProtectionRules")
+        errors = connection_errors(conn)
+        # Keep observed nodes even from partial data, but never complete that source.
+        nodes = obj(conn).get("nodes")
+        if isinstance(nodes, list):
+            pages.extend(nodes)
+            for node in nodes:
+                notes.extend(bpr_errors(node))
+        if errors:
+            notes.extend(errors)
             break
-        connection = repo.get("branchProtectionRules") or {}
-        nodes = connection.get("nodes") or []
-        pages.extend(nodes)
-        page_info = connection.get("pageInfo") or {}
-        has_next = bool(page_info.get("hasNextPage"))
-        last_ok = http_class in {"OK", "GRAPHQL_ERRORS"} and repo is not None
-        if not has_next:
+        count = conn['totalCount']
+        if total is not None and count != total:
+            notes.append("totalCount moved across pages")
+        total = count
+        info = conn['pageInfo']
+        if not info['hasNextPage']:
+            terminal = True
             break
-        cursor = page_info.get("endCursor")
-        if not cursor:
-            notes.append("hasNextPage true but endCursor missing")
-            last_ok = False
+        cursor = info['endCursor']
+        if cursor in seen_cursors:
+            notes.append("repeated cursor")
             break
-    unique, duplicates = merge_unique(
-        pages,
-        lambda node: (node or {}).get("id") or (node or {}).get("databaseId") or json.dumps(node, sort_keys=True),
-    )
-    pagination = graphql_pagination_status(
-        pages_fetched=len(exchanges),
-        last_ok=last_ok,
-        has_next_page=has_next,
-        max_pages=config.max_pages,
-    )
-    status = "OK" if pagination["complete"] and not graphql_errors else "INCOMPLETE"
-    if exchanges and classify_http(exchanges[-1]) not in {"OK", "GRAPHQL_ERRORS"}:
-        status = classify_http(exchanges[-1])
-    return SourceResult(
-        name="branchProtectionRules",
-        exchanges=[ex.id for ex in exchanges],
-        status=status,
-        http_statuses=[ex.status for ex in exchanges],
-        pagination=pagination,
-        items=unique,
-        duplicates=duplicates,
-        notes=notes,
-        extra={
-            "graphql_page_size": GRAPHQL_PAGE_SIZE,
-            "graphql_errors": graphql_errors,
-            "total_count_last_page": (
-                (((exchanges[-1].parsed or {}).get("data") or {}).get("repository") or {})
-                .get("branchProtectionRules")
-                or {}
-            ).get("totalCount")
-            if exchanges and isinstance(exchanges[-1].parsed, dict)
-            else None,
-        },
-    )
+        seen_cursors.add(cursor)
+        if graphql_errors:
+            break
+    unique, duplicates = merge_unique(pages, lambda n: obj(n).get('id'))
+    if duplicates:
+        notes.append("duplicate rule identities")
+    if total is not None and len(unique) != total:
+        notes.append("totalCount does not equal unique rule count")
+    complete = terminal and status == "OK" and not notes and not graphql_errors
+    return SourceResult(name="branchProtectionRules", exchanges=[e.id for e in exchanges],
+        status="OK" if complete else (status if status not in ("OK", "GRAPHQL_ERRORS") else "INCOMPLETE"),
+        http_statuses=[e.status for e in exchanges], items=unique, duplicates=duplicates, notes=notes,
+        pagination={"complete": complete, "pages_fetched": len(exchanges),
+                    "truncated_by_max_pages": not terminal and len(exchanges) >= config.max_pages,
+                    "validated_empty_collection": complete and not unique},
+        extra={"graphql_errors": graphql_errors, "total_count_last_page": total,
+               "viewer_permission": viewer_permission,
+               "allowance_policy": "First 20 per connection; any unfinished/invalid allowance makes coverage incomplete.",
+               "matching_refs_policy": "Count only; not a full ref list and not used to prove absence."})
 
 
 def collect_classic_and_effective(
@@ -665,11 +665,13 @@ def collect_classic_and_effective(
     effective_ex = []
     meta_ex = []
     for branch in branches:
-        encoded = branch.replace("/", "%2F")
+        encoded = quote(branch, safe="")
         classic = transport.rest_get(f"{_repo_path(config)}/branches/{encoded}/protection")
         classic_ex.append(classic)
         http_class = classify_http(classic)
-        parsed = classic.parsed if isinstance(classic.parsed, dict) else classic.parsed
+        parsed = classic.parsed
+        if http_class == "OK" and (not isinstance(parsed, dict) or not isinstance(parsed.get("url"), str) or not isinstance(parsed.get("enforce_admins"), dict)):
+            http_class = "MALFORMED"
         classic_items.append(
             {
                 "branch": branch,
@@ -680,50 +682,17 @@ def collect_classic_and_effective(
                 "message": (parsed or {}).get("message") if isinstance(parsed, dict) else None,
             }
         )
-        effective = transport.rest_get(
-            f"{_repo_path(config)}/rules/branches/{encoded}",
-            {"per_page": config.per_page, "page": 1},
-        )
-        # Paginate effective rules if needed.
-        effective_pages = []
-        eff_exchanges = [effective]
-        if classify_http(effective) == "OK" and isinstance(effective.parsed, list):
-            effective_pages.extend(effective.parsed)
-            nxt = next_page_number(repo_header(effective, "link"))
-            page = nxt
-            while page and len(eff_exchanges) < config.max_pages:
-                more = transport.rest_get(
-                    f"{_repo_path(config)}/rules/branches/{encoded}",
-                    {"per_page": config.per_page, "page": page},
-                )
-                eff_exchanges.append(more)
-                if classify_http(more) != "OK" or not isinstance(more.parsed, list):
-                    break
-                effective_pages.extend(more.parsed)
-                page = next_page_number(repo_header(more, "link"))
-        effective_ex.extend(eff_exchanges)
-        last_eff = eff_exchanges[-1]
-        effective_items.append(
-            {
-                "branch": branch,
-                "http_class": classify_http(last_eff) if classify_http(effective) == "OK" else classify_http(effective),
-                "statuses": [ex.status for ex in eff_exchanges],
-                "exchange_ids": [ex.id for ex in eff_exchanges],
-                "rules": effective_pages if classify_http(effective) == "OK" else None,
-                "pagination": rest_pagination_status(
-                    pages_fetched=len(eff_exchanges),
-                    last_status=last_eff.status,
-                    last_item_count=len(last_eff.parsed) if isinstance(last_eff.parsed, list) else None,
-                    next_page=next_page_number(repo_header(last_eff, "link")),
-                    per_page=config.per_page,
-                    max_pages=config.max_pages,
-                ),
-                "note": (
-                    "Effective rules endpoint returns active ruleset rules only. "
-                    "It is not a complete substitute for classic branch protection."
-                ),
-            }
-        )
+        effective = paginate_rest_list(
+            transport, f"{_repo_path(config)}/rules/branches/{encoded}", {"per_page": config.per_page},
+            key_fn=lambda r: (r.get("ruleset_id"), r.get("type")),
+            max_pages=config.max_pages, validate_item=effective_rule_errors)
+        effective_items.append({"branch": branch, "http_class": effective.status,
+            "statuses": effective.http_statuses, "exchange_ids": effective.exchanges,
+            "rules": effective.items if effective.status == "OK" else None,
+            "observed_rules": effective.items, "pagination": effective.pagination,
+            "duplicates": effective.duplicates, "notes": effective.notes,
+            "note": "Active ruleset rules only; not classic branch protection."})
+        effective_ex.extend(effective.exchanges)
         meta = transport.rest_get(f"{_repo_path(config)}/branches/{encoded}")
         meta_ex.append(meta)
         meta_parsed = meta.parsed if isinstance(meta.parsed, dict) else {}
@@ -750,9 +719,9 @@ def collect_classic_and_effective(
     )
     effective_result = SourceResult(
         name="effective_ruleset_rules",
-        exchanges=[ex.id for ex in effective_ex],
-        status="COLLECTED",
-        http_statuses=[ex.status for ex in effective_ex],
+        exchanges=effective_ex,
+        status="OK" if all(i["http_class"] == "OK" for i in effective_items) else "INCOMPLETE",
+        http_statuses=[code for i in effective_items for code in i["statuses"]],
         items=effective_items,
     )
     meta_result = SourceResult(
@@ -765,46 +734,22 @@ def collect_classic_and_effective(
     return classic_result, effective_result, meta_result
 
 
-def collect_org_or_enterprise_probe(transport: Transport, config: CollectConfig, owner_type: str | None) -> SourceResult:
-    notes = []
-    items = []
-    exchanges = []
-    if owner_type == "User":
-        exchange = transport.rest_get(f"orgs/{config.owner}/rulesets", {"per_page": 1, "page": 1})
-        exchanges.append(exchange)
-        items.append(
-            {
-                "probe": f"GET /orgs/{config.owner}/rulesets",
-                "http_class": classify_http(exchange),
-                "status": exchange.status,
-                "exchange_id": exchange.id,
-                "note": (
-                    "Owner type is User. Organization rulesets are not applicable as an org product class "
-                    "if this probe is 404. This does not prove enterprise overlays are absent."
-                ),
-            }
-        )
-        notes.append("User-owned repository: org ruleset product class probed once; enterprise remains UNKNOWN unless separately evidenced.")
-    elif owner_type == "Organization":
-        listed = paginate_rest_list(
-            transport,
-            f"orgs/{config.owner}/rulesets",
-            {"per_page": config.per_page},
-            key_fn=lambda row: (row or {}).get("id"),
-            max_pages=config.max_pages,
-        )
-        return listed
-    else:
-        notes.append(f"owner_type={owner_type!r}; org/enterprise inherited rules UNKNOWN")
-    return SourceResult(
-        name="org_or_enterprise_probe",
-        exchanges=[ex.id for ex in exchanges],
-        status="PROBED",
-        http_statuses=[ex.status for ex in exchanges],
-        items=items,
-        notes=notes,
-        extra={"enterprise": "UNKNOWN_NOT_READ", "owner_type": owner_type},
-    )
+def collect_org_or_enterprise_probe(transport: Transport, config: CollectConfig, identity: dict) -> SourceResult:
+    # Product scope + observed ownership, never an unauthorized org endpoint 404.
+    from .constants import APPLICABILITY_DOCUMENTATION
+    user_root = (identity.get("repository_http_class") == "OK" and
+                 identity.get("repository_full_name") == f"{config.owner}/{config.repo}" and
+                 identity.get("owner_login") == config.owner and identity.get("owner_type") == "User" and
+                 identity.get("fork") is False)
+    if user_root:
+        return SourceResult(name="org_or_enterprise_probe", exchanges=[], status="NOT_APPLICABLE",
+            http_statuses=[], extra={"organization": "NOT_APPLICABLE", "enterprise": "NOT_APPLICABLE",
+            "ownership_exchange_id": identity.get("repository_exchange_id"),
+            "documentation": APPLICABILITY_DOCUMENTATION,
+            "basis": "Personal-owned non-fork repository; org/enterprise targeting is scoped to organizations. Fork inheritance explicitly excluded by observed fork=false."})
+    return SourceResult(name="org_or_enterprise_probe", exchanges=[], status="INCOMPLETE", http_statuses=[],
+        notes=["Org/enterprise product coverage not established; includes_parents export retained separately. Unknown ownership/fork ancestry is not a non-applicability proof."],
+        extra={"organization": "UNKNOWN", "enterprise": "UNKNOWN_NOT_READ", "documentation": APPLICABILITY_DOCUMENTATION})
 
 
 def target_branches_from_identity(identity: dict[str, Any], frozen_refs: list[str]) -> list[str]:
@@ -850,6 +795,7 @@ def run_collection(transport: Transport, config: CollectConfig, *, tool_root: Pa
         {"per_page": config.per_page, "includes_parents": True},
         key_fn=_ruleset_key,
         max_pages=config.max_pages,
+        validate_item=lambda row: ruleset_errors(row, detail=False),
     )
     sources["rulesets_includes_parents_true"] = parents_true
     parents_false = paginate_rest_list(
@@ -858,12 +804,13 @@ def run_collection(transport: Transport, config: CollectConfig, *, tool_root: Pa
         {"per_page": config.per_page, "includes_parents": False},
         key_fn=_ruleset_key,
         max_pages=config.max_pages,
+        validate_item=lambda row: ruleset_errors(row, detail=False),
     )
     sources["rulesets_includes_parents_false"] = parents_false
     ids = []
     for row in parents_true.items + parents_false.items:
-        if isinstance(row, dict) and row.get("id") is not None:
-            ids.append(int(row["id"]))
+        if isinstance(row, dict) and type(row.get("id")) is int:
+            ids.append(row["id"])
     if config.known_ruleset_id not in ids:
         ids.append(int(config.known_ruleset_id))
         parents_true.notes.append(
@@ -882,15 +829,27 @@ def run_collection(transport: Transport, config: CollectConfig, *, tool_root: Pa
     sources["effective_ruleset_rules"] = effective
     sources["branch_metadata"] = meta
     sources["org_or_enterprise_probe"] = collect_org_or_enterprise_probe(
-        transport, config, identity_before.get("owner_type")
+        transport, config, identity_before
     )
+    product = sources["org_or_enterprise_probe"]
+    if product.status == "NOT_APPLICABLE" and any(
+        obj(row).get("source_type") in ("Organization", "Enterprise")
+        for row in parents_true.items + parents_false.items
+    ):
+        product.status = "INCOMPLETE"
+        product.extra.update(organization="UNKNOWN", enterprise="UNKNOWN_NOT_READ")
+        product.notes.append("Inherited source contradicts personal non-fork ownership; reconcile before non-applicability.")
     identity_after = capture_identity(transport, config, "after")
     drift = compare_identity(identity_before, after=identity_after)
-    # Also compare ruleset ids and BPR ids if both sides collected inside this same run
-    # (identity drift only; rule-body drift is compared from before/after identity, not mixed).
+    # Protection sources are sequential reads, not an atomic settings snapshot.
     gaps = []
+    for identity in (identity_before, identity_after):
+        if not identity["complete"]:
+            gaps.append({"source": "identity_" + identity["label"], "status": "INCOMPLETE", "issues": identity["issues"]})
+    if drift["drift_detected"]:
+        gaps.append({"source": "identity", "status": "DRIFT"})
     for name, source in sources.items():
-        if source.status not in {"OK", "COLLECTED", "PROBED"}:
+        if source.status not in {"OK", "COLLECTED", "NOT_APPLICABLE"}:
             gaps.append({"source": name, "status": source.status, "notes": source.notes})
         if source.pagination and not source.pagination.get("complete", True):
             if source.status == "OK":

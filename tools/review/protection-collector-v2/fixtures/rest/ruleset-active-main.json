@@ -1,0 +1,33 @@
+{
+  "id": 21580900,
+  "name": "main freeze gate",
+  "target": "branch",
+  "source_type": "Repository",
+  "source": "danny0971haha/multi-venue-grid-engine",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [
+          {
+            "context": "trusted-phase2d-freeze-gate",
+            "integration_id": 15368
+          },
+          {
+            "context": "Clean install, static checks, tests, secret scan, and dry-run",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}

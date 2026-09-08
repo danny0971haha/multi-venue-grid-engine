@@ -1,0 +1,28 @@
+[
+  {
+    "number": 11,
+    "title": "fix(governance): restrict Phase 2D trusted trigger to supported main base",
+    "draft": true,
+    "head": {
+      "ref": "fix/multi-trusted-base-scope-20260905",
+      "sha": "de2f5c0fd055e418d0b6d806f994b52baa743544"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+    }
+  },
+  {
+    "number": 12,
+    "title": "unrelated stacked PR listed only as an open-PR base identity",
+    "draft": true,
+    "head": {
+      "ref": "fix/multi-evidence-byte-identity-20260905",
+      "sha": "4ead28400903ad6c62616835aa9459f67c6d8cd9"
+    },
+    "base": {
+      "ref": "fix/multi-format-evidence-20260905",
+      "sha": "9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690"
+    }
+  }
+]

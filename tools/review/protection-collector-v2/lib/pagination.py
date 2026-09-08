@@ -44,6 +44,7 @@ def merge_unique(items: Iterable[Any], key_fn: Callable[[Any], Any]) -> tuple[li
     for item in items:
         try:
             key = key_fn(item)
+            hash(key)
         except Exception:
             ordered.append(item)
             continue
@@ -68,7 +69,8 @@ def rest_pagination_status(
         last_status == 200
         and next_page is None
         and pages_fetched > 0
-        and pages_fetched < max_pages
+        and pages_fetched <= max_pages
+        and last_item_count is not None
     )
     truncated = pages_fetched >= max_pages and next_page is not None
     interrupted = last_status not in (None, 200) or (pages_fetched == 0)

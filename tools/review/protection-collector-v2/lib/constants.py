@@ -1,6 +1,6 @@
 """Collector identity and documented API constants."""
 
-VERSION = "2.0.0-independent"
+VERSION = "2.0.1-independent-corrective"
 TOOL_NAME = "protection-collector-v2"
 IDENTITY_DISCLAIMER = (
     "Independent new collector. Not a restoration of collect-owner-protection.py, "
@@ -108,3 +108,18 @@ DOCUMENTATION_BASIS = [
         "notes": "Link rel=next/last; per_page max 100.",
     },
 ]
+
+APPLICABILITY_DOCUMENTATION = {
+    "verified_at": "2026-09-09",
+    "organization": "https://docs.github.com/en/organizations/managing-organization-settings/creating-rulesets-for-repositories-in-your-organization",
+    "enterprise": "https://docs.github.com/en/enterprise-cloud@latest/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets",
+    "fork_exception": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/managing-rulesets-for-a-repository",
+}
+DOCUMENTATION_BASIS.extend([
+    {"title": "Live GraphQL schema verification", "url": "https://api.github.com/graphql",
+     "verified_at": "2026-09-09", "notes": "Read-only __schema introspection: RateLimit.resetAt; full collector selection validated against returned types/fields/args. Saved with corrective evidence."},
+    {"title": "REST permission interpretation", "url": "https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api",
+     "verified_at": "2026-09-09", "notes": "Accepted permissions describe endpoint requirements, not caller grants. OAuth scopes alone are not repository authorization."},
+    {"title": "Product applicability", "url": APPLICABILITY_DOCUMENTATION["enterprise"],
+     "verified_at": "2026-09-09", "notes": "Organization/enterprise rules target repositories in organizations. Personal non-fork ownership must be observed before NOT_APPLICABLE; fork inheritance is not assumed absent."},
+])

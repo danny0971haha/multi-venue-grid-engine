@@ -31,9 +31,9 @@ def _required_checks_from_ruleset(body: dict[str, Any] | None) -> list[dict[str,
             continue
         if rule.get("type") != "required_status_checks":
             continue
-        params = rule.get("parameters") or {}
-        for check in params.get("required_status_checks") or []:
-            if not isinstance(check, dict):
+        params = rule.get("parameters") if isinstance(rule.get("parameters"), dict) else {}
+        for check in (params.get("required_status_checks") if isinstance(params.get("required_status_checks"), list) else []):
+            if not isinstance(check, dict) or not isinstance(check.get("context"), str) or (check.get("integration_id") is not None and type(check.get("integration_id")) is not int):
                 continue
             checks.append(
                 {
@@ -53,6 +53,8 @@ def _classic_checks(node: dict[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(item, dict):
                 continue
             app = item.get("app") or {}
+            if not isinstance(app, dict) or (app.get("databaseId") is not None and type(app.get("databaseId")) is not int):
+                continue
             out.append(
                 {
                     "context": item.get("context"),
@@ -76,381 +78,133 @@ def _source_complete(source: SourceResult) -> bool:
 
 
 def analyze(bundle: CollectionBundle) -> dict[str, Any]:
+    from .validation import obj, bpr_errors, ruleset_errors
     config = bundle.config
-    default_branch = bundle.identity_before.get("default_branch") or "main"
     expected = config.expected_context
-    details = bundle.sources.get("ruleset_details")
-    list_true = bundle.sources.get("rulesets_includes_parents_true")
-    list_false = bundle.sources.get("rulesets_includes_parents_false")
-    bpr = bundle.sources.get("branchProtectionRules")
-    classic_rest = bundle.sources.get("classic_branch_protection_rest")
-    effective = bundle.sources.get("effective_ruleset_rules")
-
-    ruleset_rows = []
-    for item in (details.items if details else []):
-        body = item.get("body") if isinstance(item, dict) else None
-        http_class = item.get("http_class")
-        if http_class != "OK" or not isinstance(body, dict):
-            ruleset_rows.append(
-                {
-                    "id": item.get("id"),
-                    "http_class": http_class,
-                    "conclusion": "UNKNOWN",
-                    "reason": "detail not OK; not treated as absent",
-                }
-            )
-            continue
-        checks = _required_checks_from_ruleset(body)
-        scope = ruleset_non_default_possible(body.get("conditions"), default_branch)
-        applies_main = ruleset_applies_to_ref(
-            body.get("conditions"), ref_for_branch(default_branch), default_branch
-        )
-        matching_expected = [c for c in checks if c.get("context") == expected]
-        ruleset_rows.append(
-            {
-                "id": body.get("id"),
-                "name": body.get("name"),
-                "enforcement": body.get("enforcement"),
-                "source_type": body.get("source_type"),
-                "source": body.get("source"),
-                "include": ((body.get("conditions") or {}).get("ref_name") or {}).get("include"),
-                "exclude": ((body.get("conditions") or {}).get("ref_name") or {}).get("exclude"),
-                "bypass_actors_present": "bypass_actors" in body,
-                "bypass_actors": body.get("bypass_actors") if "bypass_actors" in body else "OMITTED_UNKNOWN",
-                "required_checks": checks,
-                "expected_context_bindings": matching_expected,
-                "non_default_scope": scope,
-                "applies_to_default": applies_main,
-                "http_class": http_class,
-            }
-        )
-
-    bpr_rows = []
-    for node in (bpr.items if bpr else []):
+    default = bundle.identity_before.get("default_branch") or "main"
+    sources = bundle.sources
+    empty = SourceResult("missing", [], "MISSING", [])
+    details = sources.get("ruleset_details", empty)
+    bpr = sources.get("branchProtectionRules", empty)
+    classic = sources.get("classic_branch_protection_rest", empty)
+    effective = sources.get("effective_ruleset_rules", empty)
+    lists_complete = all(sources.get(n, empty).status == "OK" and sources[n].pagination.get("complete") is True
+                         for n in ("rulesets_includes_parents_true", "rulesets_includes_parents_false"))
+    details_complete = details.status == "OK" and all(i.get("complete") is True for i in details.items)
+    bpr_complete = bpr.status == "OK" and bpr.pagination.get("complete") is True
+    repo_admin = all(i.get("repository_http_class") == "OK" and
+                     i.get("repository_full_name") == f"{config.owner}/{config.repo}" and
+                     obj(i.get("repository_permissions")).get("admin") is True
+                     for i in (bundle.identity_before, bundle.identity_after))
+    permission_observed = repo_admin and bpr.extra.get("viewer_permission") == "ADMIN" and bundle.actor.get("http_class") == "OK"
+    identity_verified = bundle.drift.get("identity_verified") is True
+    exact_absent = [i["branch"] for i in classic.items
+                    if i.get("http_class") == "CLASSIC_NOT_PROTECTED_MESSAGE" and
+                    permission_observed and bpr_complete and identity_verified]
+    classic_complete = bool(classic.items) and all(i.get("http_class") == "OK" or i.get("branch") in exact_absent for i in classic.items)
+    effective_complete = bool(effective.items) and all(i.get("http_class") == "OK" and obj(i.get("pagination")).get("complete") is True for i in effective.items)
+    product = sources.get("org_or_enterprise_probe", empty)
+    product_na = (product.status == "NOT_APPLICABLE" and identity_verified)
+    unknown, confirmed, rulesets, patterns, active_hits, inactive_hits = [], [], [], [], [], []
+    for ok, reason in ((lists_complete, "ruleset list incomplete"), (details_complete, "ruleset detail incomplete"),
+                       (bpr_complete, "classic pattern/allowance export incomplete"),
+                       (classic_complete, "exact-name classic sources uninterpretable"),
+                       (effective_complete, "effective rules export incomplete"),
+                       (permission_observed, "caller repository administration not established by repository and GraphQL observations"),
+                       (identity_verified, "expected identity mismatch, missing observation or before/after drift"),
+                       (product_na, "org/enterprise coverage or product non-applicability not established")):
+        if not ok:
+            unknown.append(reason)
+    for item in details.items:
+        body = obj(item.get("body"))
+        checks = _required_checks_from_ruleset(body) if isinstance(body.get("rules"), list) else []
+        bindings = [c for c in checks if c.get("context") == expected]
+        errors = ruleset_errors(body, item.get("id"))
+        ref = obj(obj(body.get("conditions")).get("ref_name"))
+        conditions_valid = isinstance(ref.get("include"), list) and isinstance(ref.get("exclude"), list) and all(isinstance(p, str) for p in ref['include'] + ref['exclude'])
+        scope = ruleset_non_default_possible(body.get("conditions"), default) if conditions_valid else "unknown"
+        applies = ruleset_applies_to_ref(body.get("conditions"), f"refs/heads/{default}", default) if conditions_valid else None
+        row = {"id": item.get("id"), "name": body.get("name"), "target": body.get("target"),
+               "enforcement": body.get("enforcement"), "source_type": body.get("source_type"), "source": body.get("source"),
+               "include": ref.get("include"), "exclude": ref.get("exclude"), "required_checks": checks,
+               "expected_context_bindings": bindings, "non_default_scope": scope, "applies_to_default": applies,
+               "bypass_actors_present": isinstance(body.get("bypass_actors"), list),
+               "bypass_actors": body.get("bypass_actors"), "http_class": item.get("http_class"),
+               "complete": item.get("complete") is True, "shape_errors": errors}
+        rulesets.append(row)
+        if item.get("http_class") == "OK" and body.get("id") == item.get("id"):
+            confirmed.append({"kind": "observed_ruleset", "id": item['id'], "complete": row['complete'],
+                              "enforcement": row['enforcement'], "include": row['include'], "expected_context_bindings": bindings})
+        if bindings and body.get("target") == "branch":
+            if scope == "unknown":
+                unknown.append(f"ruleset {item['id']} branch scope unknown")
+            elif scope == "can_match_non_default":
+                hit = {"source": "ruleset", "id": item['id'], "enforcement": row['enforcement'], "bindings": bindings}
+                if body.get("enforcement") == "active":
+                    active_hits.append(hit)
+                elif body.get("enforcement") in ("evaluate", "disabled"):
+                    inactive_hits.append(hit)
+    for node in bpr.items:
         if not isinstance(node, dict):
             continue
-        pattern = node.get("pattern")
-        scope = pattern_scope(pattern, kind="classic", default_branch=default_branch)
-        checks = _classic_checks(node)
-        matching = [c for c in checks if c.get("context") == expected]
-        allowances_truncated = False
-        for key in (
-            "bypassForcePushAllowances",
-            "bypassPullRequestAllowances",
-            "pushAllowances",
-            "reviewDismissalAllowances",
-        ):
-            info = ((node.get(key) or {}).get("pageInfo") or {})
-            if info.get("hasNextPage"):
-                allowances_truncated = True
-        bpr_rows.append(
-            {
-                "id": node.get("id"),
-                "database_id": node.get("databaseId"),
-                "pattern": pattern,
-                "scope": scope,
-                "requires_status_checks": node.get("requiresStatusChecks"),
-                "required_checks": checks,
-                "expected_context_bindings": matching,
-                "is_admin_enforced": node.get("isAdminEnforced"),
-                "matching_refs_total": ((node.get("matchingRefs") or {}).get("totalCount")),
-                "matching_refs_not_fully_listed": True,
-                "allowances_truncated": allowances_truncated,
-            }
-        )
-
-    non_main_context_hits = []
-    for row in ruleset_rows:
-        if row.get("conclusion") == "UNKNOWN":
-            continue
-        if row.get("enforcement") not in {"active", "evaluate", "disabled"}:
-            continue
-        if row.get("expected_context_bindings") and row.get("non_default_scope") == "can_match_non_default":
-            non_main_context_hits.append(
-                {
-                    "source": "ruleset",
-                    "id": row.get("id"),
-                    "enforcement": row.get("enforcement"),
-                    "include": row.get("include"),
-                    "bindings": row.get("expected_context_bindings"),
-                }
-            )
-        if row.get("expected_context_bindings") and row.get("non_default_scope") == "unknown":
-            non_main_context_hits.append(
-                {
-                    "source": "ruleset",
-                    "id": row.get("id"),
-                    "enforcement": row.get("enforcement"),
-                    "scope": "unknown",
-                    "bindings": row.get("expected_context_bindings"),
-                }
-            )
-    for row in bpr_rows:
-        if row.get("expected_context_bindings") and row.get("scope") in {"can_match_non_default", "unknown"}:
-            non_main_context_hits.append(
-                {
-                    "source": "classic_branchProtectionRule",
-                    "pattern": row.get("pattern"),
-                    "scope": row.get("scope"),
-                    "bindings": row.get("expected_context_bindings"),
-                }
-            )
-
-    # Effective endpoint: per-branch, ruleset-only, active only.
-    effective_context = []
-    for item in (effective.items if effective else []):
-        rules = item.get("rules")
-        if rules is None:
-            effective_context.append(
-                {
-                    "branch": item.get("branch"),
-                    "http_class": item.get("http_class"),
-                    "expected_context": "UNKNOWN",
-                    "reason": "effective rules not OK; not treated as empty",
-                }
-            )
-            continue
-        hits = []
-        for rule in rules:
-            if not isinstance(rule, dict):
-                continue
-            params = rule.get("parameters") or {}
-            for check in params.get("required_status_checks") or []:
-                if isinstance(check, dict) and check.get("context") == expected:
-                    hits.append(check)
-            # Some effective payloads use type + context at top level.
-            if rule.get("type") == "required_status_checks":
-                for check in params.get("required_status_checks") or []:
-                    pass
-        effective_context.append(
-            {
-                "branch": item.get("branch"),
-                "http_class": item.get("http_class"),
-                "pagination": item.get("pagination"),
-                "expected_context_hits": hits,
-                "rule_count": len(rules),
-            }
-        )
-
-    lists_complete = bool(list_true and _source_complete(list_true) and list_false and _source_complete(list_false))
-    details_complete = bool(details and details.status == "OK")
-    bpr_complete = bool(bpr and _source_complete(bpr) and bpr.status == "OK")
-    classic_rest_complete = bool(classic_rest) and all(
-        row.get("http_class") in {"OK", "CLASSIC_NOT_PROTECTED_MESSAGE"} for row in (classic_rest.items if classic_rest else [])
-    )
-    # 404 without the specific message remains incomplete.
-    if classic_rest:
-        for row in classic_rest.items:
-            if row.get("http_class") in ABSENCE_FORBIDDEN_CLASSES and row.get("http_class") != "CLASSIC_NOT_PROTECTED_MESSAGE":
-                classic_rest_complete = False
-
-    actor_scopes = (bundle.actor.get("permissions") or {}).get("oauth_scopes") or []
-    has_repo_scope = "repo" in actor_scopes
-    has_admin_header = False
-    perm_header = (bundle.actor.get("permissions") or {}).get("accepted_github_permissions") or ""
-    if perm_header and "administration" in str(perm_header).lower():
-        has_admin_header = True
-
-    can_claim_classic_absence_for_exact_name = []
-    if classic_rest:
-        for row in classic_rest.items:
-            if row.get("http_class") == "CLASSIC_NOT_PROTECTED_MESSAGE" and (has_repo_scope or has_admin_header):
-                can_claim_classic_absence_for_exact_name.append(row.get("branch"))
-            elif row.get("http_class") == "OK":
-                continue
-            else:
-                can_claim_classic_absence_for_exact_name.append(None)
-
-    # non-main expected-context conclusion
-    unknown_reasons = []
-    if not lists_complete:
-        unknown_reasons.append("ruleset list pagination or HTTP was not complete")
-    if not details_complete:
-        unknown_reasons.append("one or more ruleset details were not OK")
-    if not bpr_complete:
-        unknown_reasons.append("GraphQL branchProtectionRules was not complete")
-    if details:
-        for item in details.items:
-            if item.get("http_class") != "OK":
-                unknown_reasons.append(f"ruleset {item.get('id')} detail {item.get('http_class')}")
-            elif isinstance(item.get("body"), dict) and "bypass_actors" not in item["body"]:
-                # bypass gap is not the same as context-scope unknown
-                pass
-    inherited_gap = False
-    if list_true and list_true.status not in {"OK"}:
-        inherited_gap = True
-        unknown_reasons.append("includes_parents=true list not OK")
-    org_probe = bundle.sources.get("org_or_enterprise_probe")
-    enterprise_unknown = True
-    if org_probe and org_probe.extra.get("enterprise") == "UNKNOWN_NOT_READ":
-        unknown_reasons.append("enterprise inherited rulesets were not read")
-
-    active_non_main_hits = [
-        h for h in non_main_context_hits if h.get("enforcement") in {None, "active"} or h.get("source") == "classic_branchProtectionRule"
-    ]
-    # ruleset evaluate/disabled hits are recorded separately
-    active_only_hits = []
-    evaluate_or_disabled_hits = []
-    for hit in non_main_context_hits:
-        if hit.get("source") == "classic_branchProtectionRule":
-            active_only_hits.append(hit)
-        elif hit.get("enforcement") == "active":
-            active_only_hits.append(hit)
-        else:
-            evaluate_or_disabled_hits.append(hit)
-
-    if unknown_reasons:
-        non_main_conclusion = "UNKNOWN"
-        non_main_basis = unknown_reasons
-    elif active_only_hits:
-        non_main_conclusion = "PRESENT"
-        non_main_basis = ["complete pattern analysis found expected context on a non-default-capable pattern"]
+        errors = bpr_errors(node)
+        checks = _classic_checks(node) if isinstance(node.get("requiredStatusChecks"), list) else []
+        bindings = [c for c in checks if c.get("context") == expected]
+        scope = pattern_scope(node.get("pattern"), kind="classic", default_branch=default) if isinstance(node.get("pattern"), str) else "unknown"
+        row = {"id": node.get("id"), "pattern": node.get("pattern"), "scope": scope,
+               "required_checks": checks, "expected_context_bindings": bindings,
+               "requires_status_checks": node.get("requiresStatusChecks"), "complete": not errors,
+               "shape_errors": errors, "allowances_truncated": any("Allowances" in e for e in errors)}
+        patterns.append(row)
+        if node.get("id") and node.get("pattern"):
+            confirmed.append({"kind": "observed_classic_pattern", **row})
+        if bindings and node.get("requiresStatusChecks") is True:
+            if scope == "unknown":
+                unknown.append("classic pattern scope unknown")
+            elif scope == "can_match_non_default":
+                active_hits.append({"source": "classic_branchProtectionRule", "pattern": node['pattern'], "bindings": bindings})
+    effective_rows = []
+    for item in effective.items:
+        hits = _required_checks_from_ruleset({"rules": item.get("observed_rules") or []})
+        hits = [c for c in hits if c.get("context") == expected]
+        complete = item.get("http_class") == "OK" and obj(item.get("pagination")).get("complete") is True
+        effective_rows.append({"branch": item.get("branch"), "http_class": item.get("http_class"),
+                               "pagination": item.get("pagination"), "expected_context_hits": hits,
+                               "expected_context": "PRESENT" if hits else ("NOT_PRESENT_IN_COMPLETE_EXPORT" if complete and permission_observed and identity_verified else "UNKNOWN")})
+    # Presence observations survive gaps, but completeness/adoption never follows from them.
+    if active_hits:
+        conclusion, conflict = "PRESENT", "CONFLICT"
+        basis = ["Observed active/classic expected-context requirement on a non-main-capable scope."]
+    elif unknown:
+        conclusion, conflict, basis = "UNKNOWN", "UNKNOWN", unknown[:]
     else:
-        non_main_conclusion = "NOT_PRESENT_IN_COMPLETE_EXPORT"
-        non_main_basis = [
-            "Complete paginated ruleset lists, each detail, and complete GraphQL branchProtectionRules "
-            "patterns were analyzed. No active ruleset or classic pattern that can match outside the "
-            "default branch required the expected context. This is not a claim about unread enterprise overlays."
-        ]
-
-    # PR #11 scope conflict
-    if non_main_conclusion == "UNKNOWN":
-        conflict = "UNKNOWN"
-        conflict_reason = (
-            "Cannot decide whether the main-only workflow trigger conflicts with non-main required "
-            f"context {expected!r} because coverage is incomplete."
-        )
-    elif non_main_conclusion == "PRESENT":
-        conflict = "CONFLICT"
-        conflict_reason = (
-            "A complete pattern analysis found the expected required context on a pattern that can "
-            "apply outside main. Restricting the trusted workflow trigger to main would leave those "
-            "non-main refs unable to produce the required check."
-        )
-    else:
-        conflict = "NO_CONFLICT_IN_COMPLETE_EXPORT"
-        conflict_reason = (
-            "Within the complete repository ruleset + classic pattern export, the expected context is "
-            "not required on non-default-capable patterns. Effective-rules endpoint evidence is listed "
-            "separately and does not replace classic protection. Enterprise overlays remain UNKNOWN."
-        )
-
-    owner_prereqs = []
-    if unknown_reasons:
-        owner_prereqs.append("Complete readable export of every protection source still UNKNOWN or incomplete.")
-    if details:
-        for item in details.items:
-            body = item.get("body") if isinstance(item.get("body"), dict) else None
-            if item.get("http_class") == "OK" and isinstance(body, dict) and "bypass_actors" not in body:
-                owner_prereqs.append(
-                    f"Ruleset {body.get('id')}: bypass_actors omitted; GitHub withholds this without write access to the ruleset."
-                )
-    if enterprise_unknown:
-        owner_prereqs.append("Enterprise inherited rulesets remain UNKNOWN.")
-    if bundle.drift.get("drift_detected"):
-        owner_prereqs.append("Identity drifted during collection; do not treat the run as a single snapshot.")
-    owner_prereqs.append("This packet is an adoption-prerequisite assessment only. ADOPTION is not performed.")
-
-    confirmed = []
-    for row in ruleset_rows:
-        if row.get("http_class") == "OK":
-            confirmed.append(
-                {
-                    "kind": "ruleset",
-                    "id": row.get("id"),
-                    "name": row.get("name"),
-                    "enforcement": row.get("enforcement"),
-                    "include": row.get("include"),
-                    "expected_context_bindings": row.get("expected_context_bindings"),
-                }
-            )
-    if bpr_complete:
-        confirmed.append(
-            {
-                "kind": "classic_branchProtectionRules_patterns",
-                "count": len(bpr_rows),
-                "patterns": [row.get("pattern") for row in bpr_rows],
-            }
-        )
-    if classic_rest:
-        for row in classic_rest.items:
-            if row.get("http_class") in {"OK", "CLASSIC_NOT_PROTECTED_MESSAGE"}:
-                confirmed.append(
-                    {
-                        "kind": "classic_rest_exact_name",
-                        "branch": row.get("branch"),
-                        "http_class": row.get("http_class"),
-                    }
-                )
-
-    unconfirmed = []
-    for gap in bundle.gaps:
-        unconfirmed.append(gap)
-    if enterprise_unknown:
-        unconfirmed.append({"source": "enterprise_inherited_rulesets", "status": "UNKNOWN"})
-    if not lists_complete:
-        unconfirmed.append({"source": "repository_rulesets_list", "status": "INCOMPLETE_OR_FAILED"})
-    if not bpr_complete:
-        unconfirmed.append({"source": "branchProtectionRules", "status": (bpr.status if bpr else "MISSING")})
-
-    coverage_status = "PARTIAL"
-    if unknown_reasons:
-        coverage_status = "PARTIAL"
-    elif non_main_conclusion == "NOT_PRESENT_IN_COMPLETE_EXPORT" and details_complete and lists_complete and bpr_complete:
-        coverage_status = "COMPLETE_FOR_REPOSITORY_SOURCES_ENTERPRISE_UNKNOWN"
-    else:
-        coverage_status = "PARTIAL"
-
-    same_context_different_apps = []
-    bindings = []
-    for row in ruleset_rows:
-        for binding in row.get("expected_context_bindings") or []:
-            bindings.append(("ruleset", row.get("id"), binding.get("integration_id")))
-    for row in bpr_rows:
-        for binding in row.get("expected_context_bindings") or []:
-            bindings.append(("classic", row.get("pattern"), binding.get("app_database_id")))
-    ids_for_context = {item[2] for item in bindings}
-    if len(ids_for_context) > 1:
-        same_context_different_apps = bindings
-
-    return {
-        "expected_context": expected,
-        "known_ruleset_id": config.known_ruleset_id,
-        "default_branch": default_branch,
-        "lists_complete": lists_complete,
-        "details_complete": details_complete,
-        "bpr_complete": bpr_complete,
-        "classic_rest_exact_names_interpretable": classic_rest_complete,
-        "rulesets": ruleset_rows,
-        "classic_patterns": bpr_rows,
-        "effective": effective_context,
-        "non_main_expected_context": {
-            "conclusion": non_main_conclusion,
-            "basis": non_main_basis,
-            "active_or_classic_hits": active_only_hits,
-            "evaluate_or_disabled_hits": evaluate_or_disabled_hits,
-            "method": (
-                "Full include/exclude and classic pattern analysis. Not inferred from a sample of branches."
-            ),
-        },
-        "pr11_main_only_trigger": {
-            "conflict": conflict,
-            "reason": conflict_reason,
-            "workflow_change": "PR #11 adds branches: [main] to pull_request_target on trusted-phase2d-freeze.yml",
-        },
-        "same_context_different_app_bindings": same_context_different_apps,
-        "confirmed": confirmed,
-        "unconfirmed": unconfirmed,
-        "owner_adoption_prerequisites_still_missing": owner_prereqs,
-        "coverage_status": coverage_status,
-        "has_repo_scope": has_repo_scope,
-        "has_admin_permission_header": has_admin_header,
-        "classic_not_protected_exact_names": [b for b in can_claim_classic_absence_for_exact_name if b],
-        "identity_match_before": bundle.identity_before.get("match"),
-        "identity_drift": bundle.drift,
-        "historical_collector_input_missing": "59d10c476de54be81b822d1eb592e7f76955c794",
-        "this_tool_is_not_that_publication": True,
-    }
+        conclusion, conflict = "NOT_PRESENT_IN_COMPLETE_EXPORT", "NO_CONFLICT_IN_COMPLETE_EXPORT"
+        basis = ["Complete applicable sources for verified identities contained no non-main expected-context requirement."]
+    unconfirmed = list(bundle.gaps) + [{"source": "coverage", "status": "UNKNOWN", "reason": r} for r in unknown]
+    prereqs = ["Resolve: " + r for r in unknown]
+    prereqs.extend(["Independent review of PR #11 exact head/base, trusted governance adoption order and context/app bindings is still required.",
+                    "Sequential observations are not an atomic settings snapshot; revalidate at adoption.",
+                    "ADOPTION is not performed. This tool has no inherited reviewer verdict."])
+    bindings = [("ruleset", r['id'], c.get('integration_id')) for r in rulesets for c in r['expected_context_bindings']]
+    bindings += [("classic", r['id'], c.get('app_database_id')) for r in patterns for c in r['expected_context_bindings']]
+    return {"expected_context": expected, "known_ruleset_id": config.known_ruleset_id, "default_branch": default,
+        "lists_complete": lists_complete, "details_complete": details_complete, "bpr_complete": bpr_complete,
+        "classic_rest_exact_names_interpretable": classic_complete, "effective_complete": effective_complete,
+        "rulesets": rulesets, "classic_patterns": patterns, "effective": effective_rows,
+        "non_main_expected_context": {"conclusion": conclusion, "basis": basis, "active_or_classic_hits": active_hits,
+            "evaluate_or_disabled_hits": inactive_hits, "method": "Full include/exclude and classic pattern analysis; conservative for complex patterns. Not inferred from a sample of branches."},
+        "pr11_main_only_trigger": {"conflict": conflict, "reason": basis[0]},
+        "same_context_different_app_bindings": bindings if len({b[2] for b in bindings}) > 1 else [],
+        "confirmed": confirmed, "unconfirmed": unconfirmed, "owner_adoption_prerequisites_still_missing": prereqs,
+        "coverage_status": "PARTIAL" if unknown else "COMPLETE_FOR_APPLICABLE_SOURCES",
+        "caller_repository_admin_observed": permission_observed,
+        "permission_basis": {"repository_admin_before_and_after": repo_admin,
+            "graphql_viewer_permission": bpr.extra.get("viewer_permission"),
+            "accepted_headers_are_endpoint_requirements_only": True, "oauth_scopes_alone_are_not_authorization": True},
+        "product_applicability": product.extra, "classic_not_protected_exact_names": exact_absent,
+        "identity_match_before": bundle.identity_before.get("match"), "identity_match_after": bundle.identity_after.get("match"),
+        "identity_drift": bundle.drift, "historical_collector_input_missing": "59d10c476de54be81b822d1eb592e7f76955c794",
+        "this_tool_is_not_that_publication": True}
 
 
 def render_coverage_md(bundle: CollectionBundle, analysis: dict[str, Any]) -> str:
@@ -494,7 +248,7 @@ def render_coverage_md(bundle: CollectionBundle, analysis: dict[str, Any]) -> st
         lines.append("")
     lines.extend(["## Unconfirmed sources or branches", ""])
     if not analysis["unconfirmed"]:
-        lines.append("Repository ruleset list/details and classic GraphQL patterns completed. Enterprise inherited rulesets remain UNKNOWN.")
+        lines.append("No remaining source gap in this sequential collection; product non-applicability evidence is recorded separately.")
         lines.append("")
     else:
         for row in analysis["unconfirmed"]:

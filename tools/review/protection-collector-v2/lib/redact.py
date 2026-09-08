@@ -9,7 +9,7 @@ from typing import Any
 from .constants import DROP_RESPONSE_HEADER_NAMES, SAFE_RESPONSE_HEADER_NAMES, TOKEN_PREFIXES
 
 _TOKEN_RE = re.compile(
-    r"(?:gho_|ghp_|github_pat_|ghu_|ghr_|Bearer\s+)[A-Za-z0-9_\-.=]+",
+    r"(?:gho_|ghp_|github_pat_|ghu_|ghr_|Bearer\s+)[A-Za-z0-9_\-.=*]+",
     re.IGNORECASE,
 )
 _SENSITIVE_KEY_RE = re.compile(

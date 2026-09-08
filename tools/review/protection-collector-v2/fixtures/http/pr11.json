@@ -1,0 +1,14 @@
+{
+  "number": 11,
+  "title": "fix(governance): restrict Phase 2D trusted trigger to supported main base",
+  "state": "open",
+  "draft": true,
+  "head": {
+    "ref": "fix/multi-trusted-base-scope-20260905",
+    "sha": "de2f5c0fd055e418d0b6d806f994b52baa743544"
+  },
+  "base": {
+    "ref": "main",
+    "sha": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+  }
+}

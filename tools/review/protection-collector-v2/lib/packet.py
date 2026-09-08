@@ -70,6 +70,8 @@ def ledger_from_transport(exchanges: list[HttpExchange]) -> list[dict[str, Any]]
 
 def write_packet(bundle: CollectionBundle, exchanges: list[HttpExchange], *, tests: dict[str, Any] | None = None) -> dict[str, Any]:
     out = Path(bundle.config.out_dir)
+    if out.exists() and any(out.iterdir()):
+        raise FileExistsError("refusing to overwrite an existing evidence packet")
     raw_dir = out / "raw"
     derived_dir = out / "derived"
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -122,7 +124,7 @@ def write_packet(bundle: CollectionBundle, exchanges: list[HttpExchange], *, tes
     (out / "request-ledger.json").write_text(_json(ledger), encoding="utf-8")
 
     live_status = classify_live(bundle, analysis)
-    owner_required = live_status in {"PARTIAL", "AUTH_FAILED", "FORBIDDEN", "NOT_RUN"} or analysis["coverage_status"] != "COMPLETE_FOR_REPOSITORY_SOURCES_ENTERPRISE_UNKNOWN"
+    owner_required = live_status in {"PARTIAL", "AUTH_FAILED", "FORBIDDEN", "NOT_RUN"} or analysis["coverage_status"] != "COMPLETE_FOR_APPLICABLE_SOURCES"
     # OWNER_STEP is for missing permissions, not for remaining enterprise UNKNOWN after a successful owner-scoped read.
     permission_blocked = any(
         source.status in {"AUTH_FAILED", "FORBIDDEN"} or any(code in {401, 403} for code in source.http_statuses)
@@ -135,7 +137,7 @@ def write_packet(bundle: CollectionBundle, exchanges: list[HttpExchange], *, tes
 
     status = {
         "schema": "protection-collector-v2-status/1",
-        "TOOL_IMPLEMENTATION": "COMPLETE",
+        "TOOL_IMPLEMENTATION": "CORRECTIVE_CANDIDATE_REQUIRES_INDEPENDENT_REVIEW",
         "TOOL_TESTS": (tests or {}).get("result", "NOT_RECORDED_IN_PACKET"),
         "LIVE_COLLECTION": live_status,
         "PROTECTION_COVERAGE": analysis["coverage_status"],
@@ -206,7 +208,7 @@ def classify_live(bundle: CollectionBundle, analysis: dict[str, Any]) -> str:
         return "AUTH_FAILED"
     if any(status in {"FORBIDDEN"} for status in classes):
         return "PARTIAL"
-    if analysis["lists_complete"] and analysis["details_complete"] and analysis["bpr_complete"]:
+    if analysis["coverage_status"] == "COMPLETE_FOR_APPLICABLE_SOURCES":
         return "COMPLETE"
     return "PARTIAL"
 

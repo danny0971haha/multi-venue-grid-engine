@@ -92,45 +92,21 @@ def pattern_scope(pattern: str, *, kind: str, default_branch: str) -> str:
             return "only_default"
         if pattern == f"refs/heads/{default_branch}":
             return "only_default"
-        if "*" in pattern or "?" in pattern or "[" in pattern:
-            exact_default = f"refs/heads/{default_branch}"
-            other = f"refs/heads/{default_branch}-other"
-            nested = f"refs/heads/{default_branch}/x"
-            sample_feature = "refs/heads/feature/sample"
-            matches = [
-                ruleset_pattern_matches_ref(pattern, exact_default, default_branch),
-                ruleset_pattern_matches_ref(pattern, other, default_branch),
-                ruleset_pattern_matches_ref(pattern, nested, default_branch),
-                ruleset_pattern_matches_ref(pattern, sample_feature, default_branch),
-            ]
-            if any(m is None for m in matches):
-                return "unknown"
-            if matches[0] and not any(matches[1:]):
-                return "only_default"
-            if any(matches[1:]):
-                return "can_match_non_default"
-            if matches[0]:
-                return "only_default"
-            return "can_match_non_default"
+        if pattern.startswith("~"):
+            return "unknown"
+        if any(ch in pattern for ch in "*?["):
+            return "unknown"
         return "can_match_non_default"
     if kind == "classic":
         if pattern == "*":
             return "can_match_non_default"
         if pattern == default_branch:
             return "only_default"
-        if "*" in pattern or "?" in pattern or "[" in pattern:
-            matches = [
-                classic_pattern_matches_branch(pattern, default_branch),
-                classic_pattern_matches_branch(pattern, f"{default_branch}-other"),
-                classic_pattern_matches_branch(pattern, "feature/sample"),
-            ]
-            if any(m is None for m in matches):
-                return "unknown"
-            if matches[0] and not any(matches[1:]):
-                return "only_default"
-            if any(matches[1:]):
-                return "can_match_non_default"
-            return "can_match_non_default"
+        if any(ch in pattern for ch in "*?["):
+            # A non-main literal prefix establishes a possible non-main scope.
+            # Otherwise no finite set of example branches proves main-only.
+            prefix = re.split(r"[*?\[]", pattern, maxsplit=1)[0]
+            return "can_match_non_default" if prefix and not default_branch.startswith(prefix) else "unknown"
         return "can_match_non_default"
     return "unknown"
 

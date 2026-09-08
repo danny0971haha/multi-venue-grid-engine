@@ -8,9 +8,6 @@ class SafetyError(ValueError):
     """Raised when a disallowed GitHub operation is requested."""
 
 
-_GQL_COMMENT_RE = re.compile(r"#[^\n]*")
-_GQL_STRING_RE = re.compile(r'"""[\s\S]*?"""|"([^"\\]|\\.)*"')
-
 
 def assert_rest_method(method: str) -> None:
     normalized = (method or "").strip().upper()
@@ -21,9 +18,33 @@ def assert_rest_method(method: str) -> None:
 
 
 def _strip_graphql_literals(document: str) -> str:
-    without_block = re.sub(r'"""[\s\S]*?"""', '""', document)
-    without_strings = _GQL_STRING_RE.sub('""', without_block)
-    return _GQL_COMMENT_RE.sub("", without_strings)
+    # Lex comments before strings. Quotes inside a comment must not hide a real operation.
+    out = []
+    i = 0
+    while i < len(document):
+        if document[i] == "#":
+            end = document.find("\n", i)
+            i = len(document) if end == -1 else end
+        elif document.startswith('"""', i):
+            i += 3
+            while i < len(document) and not document.startswith('"""', i):
+                i += 4 if document.startswith('\\"""', i) else 1
+            if i == len(document):
+                return ""
+            i += 3
+            out.append(" ")
+        elif document[i] == '"':
+            i += 1
+            while i < len(document) and document[i] != '"':
+                i += 2 if document[i] == "\\" else 1
+            if i >= len(document):
+                return ""
+            i += 1
+            out.append(" ")
+        else:
+            out.append(document[i])
+            i += 1
+    return "".join(out)
 
 
 def graphql_document_is_query(document: str) -> bool:

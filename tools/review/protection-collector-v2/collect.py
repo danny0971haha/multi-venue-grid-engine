@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--review-tree", required=True)
     parser.add_argument("--known-ruleset-id", required=True, type=int)
     parser.add_argument("--expected-context", required=True)
-    parser.add_argument("--frozen-ref", action="append", default=[])
+    parser.add_argument("--frozen-ref", action="append", default=[], help="NAME=EXPECTED_SHA; unbound NAME remains UNVERIFIED")
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--version", action="store_true")
     return parser
