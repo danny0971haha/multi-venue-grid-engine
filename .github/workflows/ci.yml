@@ -22,6 +22,11 @@ jobs:
     name: Clean install, static checks, tests, secret scan, and dry-run
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      CI_NATIVE_LOG_PACKET_ID: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-job-${{ github.job }}
+      SOURCE_HEAD: 4ead28400903ad6c62616835aa9459f67c6d8cd9
+      SOURCE_TREE: 3a10f7645b30a33f27ecde824c16e0e36cacae6c
+      HISTORICAL_ORIGINAL_LOG: NOT_OBTAINED
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,6 +50,9 @@ jobs:
           node --version
           npm --version
 
+      - name: CI native log retention tool tests
+        run: node --test --test-reporter=tap scripts/ci-native-log-retention/ci-native-log-retention.test.mjs
+
       - name: Clean install from lockfile
         run: npm ci
 
@@ -64,7 +72,7 @@ jobs:
         run: npm test
 
       - name: Offline integration and fresh-process reload
-        run: npm run test:offline-integration
+        run: node scripts/ci-native-log-retention/capture.mjs -- npm run test:offline-integration
 
       - name: Phase 2E halt and reload tests
         run: npm run test:phase2e
@@ -89,5 +97,18 @@ jobs:
         with:
           name: multi-venue-phase2d-c4-v2-${{ github.event.pull_request.head.sha || github.sha }}
           path: artifacts/phase2d-corrective4/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Finalize CI native log packet
+        if: always()
+        run: node scripts/ci-native-log-retention/finalize.mjs
+
+      - name: Upload CI native log packet
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-native-log-retention-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: artifacts/ci-native-log-retention/run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-job-${{ github.job }}/
           if-no-files-found: error
           retention-days: 90
