@@ -1,0 +1,62 @@
+{
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "draftPullRequest": "https://github.com/danny0971haha/multi-venue-grid-engine/pull/13",
+  "sourcePr": 12,
+  "sourceBranch": "fix/multi-evidence-byte-identity-20260905",
+  "sourceHead": "4ead28400903ad6c62616835aa9459f67c6d8cd9",
+  "sourceTree": "3a10f7645b30a33f27ecde824c16e0e36cacae6c",
+  "fixBranch": "fix/multi-ci-native-log-retention-20260908",
+  "testedCheckoutSha": "82105054f9aac595e767e5203d3e581ec3c10126",
+  "testedCheckoutTree": "fbeb1194203ad280587070416e2461114b1bcfb4",
+  "historical": {
+    "runId": "33967073453",
+    "jobId": "101308992804",
+    "attempt": 1,
+    "missingPath": "artifacts/offline-candidate/test/01.log",
+    "originalLog": "NOT_OBTAINED"
+  },
+  "fresh": {
+    "executionLog": "OBTAINED",
+    "packetVerification": "VERIFIED_FROM_DOWNLOAD",
+    "workflow": "Phase 0 CI",
+    "event": "push",
+    "runId": "34203992314",
+    "jobKey": "verify",
+    "jobDatabaseIdObservedFromGitHubApi": 101989088499,
+    "jobDatabaseIdInPacket": "UNKNOWN",
+    "attempt": 1,
+    "conclusion": "success",
+    "artifactId": 10047050163,
+    "artifactName": "ci-native-log-retention-34203992314-attempt-1"
+  },
+  "priorAlwaysRunDemonstration": {
+    "runId": "34194812274",
+    "jobDatabaseIdObservedFromGitHubApi": 101960124685,
+    "headSha": "b8fb38d1405a6b12fba585d7f97b73a8b76fe17f",
+    "conclusion": "failure",
+    "failedStep": "Generate Phase 2D Corrective 4 evidence",
+    "nativePacketUpload": "success",
+    "note": "Not the fresh success packet. Shows always-run upload after a later step failed."
+  },
+  "ordinaryCi": {
+    "workflow": "Phase 0 CI",
+    "runId": "34203992314",
+    "conclusion": "success"
+  },
+  "trustedGovernanceGate": {
+    "workflow": "Trusted Phase 2D freeze gate",
+    "runId": "34203994256",
+    "jobDatabaseIdObservedFromGitHubApi": 101989094337,
+    "conclusion": "failure",
+    "governanceSettingsChanged": false
+  },
+  "frozenRefsUntouched": {
+    "phase2d": "7f196d367e39640eee9517f742b0d61424f9d4cc",
+    "phase2eRuntime": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+    "governance": "52445f4c2b3eb65f13ae00dbef80f07b417a7d53"
+  },
+  "liveExchangeWrite": "NO",
+  "selfDeclaredPass": false,
+  "mergeAuthorized": false,
+  "liveAuthorized": false
+}

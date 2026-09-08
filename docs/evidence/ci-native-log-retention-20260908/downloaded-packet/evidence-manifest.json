@@ -1,0 +1,46 @@
+{
+  "repository": "danny0971haha/multi-venue-grid-engine",
+  "sourceHead": "4ead28400903ad6c62616835aa9459f67c6d8cd9",
+  "sourceTree": "3a10f7645b30a33f27ecde824c16e0e36cacae6c",
+  "testedCheckoutSha": "82105054f9aac595e767e5203d3e581ec3c10126",
+  "testedCheckoutTree": "fbeb1194203ad280587070416e2461114b1bcfb4",
+  "workflow": "Phase 0 CI",
+  "runId": "34203992314",
+  "jobId": "verify",
+  "jobDatabaseId": "UNKNOWN",
+  "attempt": "1",
+  "startedAtUtc": "2026-09-08T08:21:31.051Z",
+  "endedAtUtc": "2026-09-08T08:21:33.218Z",
+  "command": ["npm", "run", "test:offline-integration"],
+  "exitCode": 0,
+  "signal": null,
+  "historicalOriginalLog": "NOT_OBTAINED",
+  "freshExecutionLog": "OBTAINED",
+  "files": [
+    {
+      "path": "capture-result.json",
+      "bytes": 299,
+      "sha256": "464d1f097d23dc9ffd659a2b875b1dd28e3cce1142cc7213c2852333ef4985bd"
+    },
+    {
+      "path": "identity.json",
+      "bytes": 146,
+      "sha256": "c48c001e1a0b61ab635c439d2fa01ef9ef56f55d60981d7d24d97912bc896a58"
+    },
+    {
+      "path": "native/artifacts/offline-candidate/test/01.log",
+      "bytes": 2418,
+      "sha256": "8e377fa0b818364f0bc42afdb5b90fb5c999bddc8ba3800e96d6bf356c514849"
+    },
+    {
+      "path": "wrapper.stderr.log",
+      "bytes": 98,
+      "sha256": "2890c4e48fd963e0bf449f7bb16f3319f985c21b83e93daa43b377a4388ba5fe"
+    },
+    {
+      "path": "wrapper.stdout.log",
+      "bytes": 1148,
+      "sha256": "be4a3fc383b2c1fe3c1af386c735e30a9105e664be31e9b0eab57eb543af163b"
+    }
+  ]
+}
