@@ -1,0 +1,41 @@
+{
+  "id": "0042",
+  "kind": "rest",
+  "method": "GET",
+  "endpoint": "orgs/danny0971haha/rulesets?per_page=1&page=1",
+  "url": "https://api.github.com/orgs/danny0971haha/rulesets?per_page=1&page=1",
+  "requested_at": "2026-09-08T12:18:11Z",
+  "duration_ms": 435,
+  "status": 404,
+  "page": 1,
+  "parse_ok": true,
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning",
+    "Content-Security-Policy": "default-src 'none'",
+    "Content-Type": "application/json; charset=utf-8",
+    "Date": "Tue, 08 Sep 2026 12:18:11 GMT",
+    "Referrer-Policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+    "Server": "github.com",
+    "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+    "Vary": "Accept-Encoding, Accept, X-Requested-With",
+    "X-Accepted-Oauth-Scopes": "repo",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "deny",
+    "X-Github-Api-Version-Selected": "2026-03-10",
+    "X-Github-Edge-Region": "japaneast",
+    "X-Github-Media-Type": "github.v3; format=json",
+    "X-Github-Request-Id": "D7F6:145F76:43F81:55218:6A9FFD03",
+    "X-Oauth-Scopes": "gist, read:org, repo, workflow",
+    "X-Ratelimit-Limit": "5000",
+    "X-Ratelimit-Remaining": "4998",
+    "X-Ratelimit-Reset": "1788873344",
+    "X-Ratelimit-Resource": "core",
+    "X-Ratelimit-Used": "2",
+    "X-Xss-Protection": "0"
+  },
+  "extra": {
+    "gh_exit": 1,
+    "stderr_redacted": "gh: Not Found (HTTP 404)\n"
+  }
+}

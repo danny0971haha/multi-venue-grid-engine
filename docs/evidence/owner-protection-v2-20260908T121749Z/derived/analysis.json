@@ -1,0 +1,384 @@
+{
+  "expected_context": "trusted-phase2d-freeze-gate",
+  "known_ruleset_id": 21580900,
+  "default_branch": "main",
+  "lists_complete": true,
+  "details_complete": true,
+  "bpr_complete": true,
+  "classic_rest_exact_names_interpretable": true,
+  "rulesets": [
+    {
+      "id": 21580900,
+      "name": "main-solo-owner-bootstrap",
+      "enforcement": "active",
+      "source_type": "Repository",
+      "source": "danny0971haha/multi-venue-grid-engine",
+      "include": [
+        "refs/heads/main"
+      ],
+      "exclude": [],
+      "bypass_actors_present": true,
+      "bypass_actors": [],
+      "required_checks": [
+        {
+          "context": "trusted-phase2d-freeze-gate",
+          "integration_id": 15368,
+          "strict": false
+        },
+        {
+          "context": "Clean install, static checks, tests, secret scan, and dry-run",
+          "integration_id": 15368,
+          "strict": false
+        }
+      ],
+      "expected_context_bindings": [
+        {
+          "context": "trusted-phase2d-freeze-gate",
+          "integration_id": 15368,
+          "strict": false
+        }
+      ],
+      "non_default_scope": "only_default",
+      "applies_to_default": true,
+      "http_class": "OK"
+    }
+  ],
+  "classic_patterns": [
+    {
+      "id": "BPR_kwDOUAdvbc4E590T",
+      "database_id": 82304275,
+      "pattern": "main",
+      "scope": "only_default",
+      "requires_status_checks": true,
+      "required_checks": [
+        {
+          "context": "Clean install, static checks, tests, secret scan, and dry-run",
+          "app_database_id": 15368,
+          "app_slug": "github-actions",
+          "app_name": "GitHub Actions"
+        },
+        {
+          "context": "trusted-phase2d-freeze-gate",
+          "app_database_id": 15368,
+          "app_slug": "github-actions",
+          "app_name": "GitHub Actions"
+        }
+      ],
+      "expected_context_bindings": [
+        {
+          "context": "trusted-phase2d-freeze-gate",
+          "app_database_id": 15368,
+          "app_slug": "github-actions",
+          "app_name": "GitHub Actions"
+        }
+      ],
+      "is_admin_enforced": true,
+      "matching_refs_total": 1,
+      "matching_refs_not_fully_listed": true,
+      "allowances_truncated": false
+    }
+  ],
+  "effective": [
+    {
+      "branch": "main",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 4,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": false
+      },
+      "expected_context_hits": [
+        {
+          "context": "trusted-phase2d-freeze-gate",
+          "integration_id": 15368
+        }
+      ],
+      "rule_count": 4
+    },
+    {
+      "branch": "fix/multi-evidence-byte-identity-20260905",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "fix/multi-ci-native-log-retention-20260908",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "fix/multi-format-evidence-20260905",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "fix/multi-trusted-base-scope-20260905",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "docs/multi-agent-autonomy-20260905",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "chore/current-candidate-verification-20260905-dc6fcc",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "governance/phase2e-trusted-gate",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "experiment/v0.1-phase2",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    },
+    {
+      "branch": "experiment/v0.1-phase2e-halt-ack",
+      "http_class": "OK",
+      "pagination": {
+        "complete": true,
+        "pages_fetched": 1,
+        "last_status": 200,
+        "last_item_count": 0,
+        "next_page": null,
+        "per_page": 100,
+        "truncated_by_max_pages": false,
+        "interrupted": false,
+        "empty_page_is_not_absence": true
+      },
+      "expected_context_hits": [],
+      "rule_count": 0
+    }
+  ],
+  "non_main_expected_context": {
+    "conclusion": "NOT_PRESENT_IN_COMPLETE_EXPORT",
+    "basis": [
+      "Complete paginated ruleset lists, each detail, and complete GraphQL branchProtectionRules patterns were analyzed. No active ruleset or classic pattern that can match outside the default branch required the expected context. This is not a claim about unread enterprise overlays."
+    ],
+    "active_or_classic_hits": [],
+    "evaluate_or_disabled_hits": [],
+    "method": "Full include/exclude and classic pattern analysis. Not inferred from a sample of branches."
+  },
+  "pr11_main_only_trigger": {
+    "conflict": "NO_CONFLICT_IN_REPOSITORY_EXPORT",
+    "reason": "Within the complete repository ruleset list/details (includes_parents true and false) and complete GraphQL classic pattern list, the expected context is not required on non-default-capable active rulesets or classic patterns. Evaluate/disabled hits are listed separately. Effective-rules endpoint evidence is listed separately and does not replace classic protection. Enterprise overlays remain UNKNOWN.",
+    "workflow_change": "PR #11 adds branches: [main] to pull_request_target on trusted-phase2d-freeze.yml"
+  },
+  "same_context_different_app_bindings": [],
+  "confirmed": [
+    {
+      "kind": "ruleset",
+      "id": 21580900,
+      "name": "main-solo-owner-bootstrap",
+      "enforcement": "active",
+      "include": [
+        "refs/heads/main"
+      ],
+      "expected_context_bindings": [
+        {
+          "context": "trusted-phase2d-freeze-gate",
+          "integration_id": 15368,
+          "strict": false
+        }
+      ]
+    },
+    {
+      "kind": "classic_branchProtectionRules_patterns",
+      "count": 1,
+      "patterns": [
+        "main"
+      ]
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "main",
+      "http_class": "OK"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "fix/multi-evidence-byte-identity-20260905",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "fix/multi-ci-native-log-retention-20260908",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "fix/multi-format-evidence-20260905",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "fix/multi-trusted-base-scope-20260905",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "docs/multi-agent-autonomy-20260905",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "chore/current-candidate-verification-20260905-dc6fcc",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "governance/phase2e-trusted-gate",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "experiment/v0.1-phase2",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    },
+    {
+      "kind": "classic_rest_exact_name",
+      "branch": "experiment/v0.1-phase2e-halt-ack",
+      "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE"
+    }
+  ],
+  "unconfirmed": [
+    {
+      "source": "enterprise_inherited_rulesets",
+      "status": "UNKNOWN"
+    }
+  ],
+  "owner_adoption_prerequisites_still_missing": [
+    "Enterprise inherited rulesets remain UNKNOWN.",
+    "This packet is an adoption-prerequisite assessment only. ADOPTION is not performed."
+  ],
+  "coverage_status": "COMPLETE_FOR_REPOSITORY_SOURCES_ENTERPRISE_UNKNOWN",
+  "has_repo_scope": true,
+  "has_admin_permission_header": false,
+  "classic_not_protected_exact_names": [
+    "fix/multi-evidence-byte-identity-20260905",
+    "fix/multi-ci-native-log-retention-20260908",
+    "fix/multi-format-evidence-20260905",
+    "fix/multi-trusted-base-scope-20260905",
+    "docs/multi-agent-autonomy-20260905",
+    "chore/current-candidate-verification-20260905-dc6fcc",
+    "governance/phase2e-trusted-gate",
+    "experiment/v0.1-phase2",
+    "experiment/v0.1-phase2e-halt-ack"
+  ],
+  "identity_match_before": {
+    "head": true,
+    "tree": true,
+    "main": true
+  },
+  "identity_drift": {
+    "drift_detected": false,
+    "changed": [],
+    "note": "No identity field listed here changed between the two captures."
+  },
+  "historical_collector_input_missing": "59d10c476de54be81b822d1eb592e7f76955c794",
+  "this_tool_is_not_that_publication": true
+}

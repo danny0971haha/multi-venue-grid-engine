@@ -1,0 +1,970 @@
+{
+  "rulesets_includes_parents_true": {
+    "name": "repos/danny0971haha/multi-venue-grid-engine/rulesets",
+    "status": "OK",
+    "http_statuses": [
+      200
+    ],
+    "pagination": {
+      "complete": true,
+      "pages_fetched": 1,
+      "last_status": 200,
+      "last_item_count": 1,
+      "next_page": null,
+      "per_page": 100,
+      "truncated_by_max_pages": false,
+      "interrupted": false,
+      "empty_page_is_not_absence": false
+    },
+    "item_count": 1,
+    "duplicates": [],
+    "notes": [],
+    "exchange_ids": [
+      "0008"
+    ],
+    "extra": {
+      "raw_item_count": 1
+    },
+    "items": [
+      {
+        "id": 21580900,
+        "name": "main-solo-owner-bootstrap",
+        "target": "branch",
+        "source_type": "Repository",
+        "source": "danny0971haha/multi-venue-grid-engine",
+        "enforcement": "active",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5QB29tzgFJTGQ",
+        "_links": {
+          "self": {
+            "href": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/rulesets/21580900"
+          },
+          "html": {
+            "href": "https://github.com/danny0971haha/multi-venue-grid-engine/rules/21580900"
+          }
+        },
+        "created_at": "2026-08-27T01:20:37.074+08:00",
+        "updated_at": "2026-08-27T01:20:37.167+08:00"
+      }
+    ]
+  },
+  "rulesets_includes_parents_false": {
+    "name": "repos/danny0971haha/multi-venue-grid-engine/rulesets",
+    "status": "OK",
+    "http_statuses": [
+      200
+    ],
+    "pagination": {
+      "complete": true,
+      "pages_fetched": 1,
+      "last_status": 200,
+      "last_item_count": 1,
+      "next_page": null,
+      "per_page": 100,
+      "truncated_by_max_pages": false,
+      "interrupted": false,
+      "empty_page_is_not_absence": false
+    },
+    "item_count": 1,
+    "duplicates": [],
+    "notes": [],
+    "exchange_ids": [
+      "0009"
+    ],
+    "extra": {
+      "raw_item_count": 1
+    },
+    "items": [
+      {
+        "id": 21580900,
+        "name": "main-solo-owner-bootstrap",
+        "target": "branch",
+        "source_type": "Repository",
+        "source": "danny0971haha/multi-venue-grid-engine",
+        "enforcement": "active",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5QB29tzgFJTGQ",
+        "_links": {
+          "self": {
+            "href": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/rulesets/21580900"
+          },
+          "html": {
+            "href": "https://github.com/danny0971haha/multi-venue-grid-engine/rules/21580900"
+          }
+        },
+        "created_at": "2026-08-27T01:20:37.074+08:00",
+        "updated_at": "2026-08-27T01:20:37.167+08:00"
+      }
+    ]
+  },
+  "ruleset_details": {
+    "name": "ruleset_details",
+    "status": "OK",
+    "http_statuses": [
+      200
+    ],
+    "pagination": {},
+    "item_count": 1,
+    "duplicates": [],
+    "notes": [],
+    "exchange_ids": [
+      "0010"
+    ],
+    "extra": {
+      "requested_ids": [
+        21580900
+      ]
+    },
+    "items": [
+      {
+        "id": 21580900,
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0010",
+        "body": {
+          "id": 21580900,
+          "name": "main-solo-owner-bootstrap",
+          "target": "branch",
+          "source_type": "Repository",
+          "source": "danny0971haha/multi-venue-grid-engine",
+          "enforcement": "active",
+          "conditions": {
+            "ref_name": {
+              "exclude": [],
+              "include": [
+                "refs/heads/main"
+              ]
+            }
+          },
+          "rules": [
+            {
+              "type": "deletion"
+            },
+            {
+              "type": "non_fast_forward"
+            },
+            {
+              "type": "pull_request",
+              "parameters": {
+                "required_approving_review_count": 0,
+                "dismiss_stale_reviews_on_push": false,
+                "required_reviewers": [],
+                "require_code_owner_review": false,
+                "require_last_push_approval": false,
+                "required_review_thread_resolution": true,
+                "require_extra_approval_for_unattributed_changes": true,
+                "allowed_merge_methods": [
+                  "merge"
+                ]
+              }
+            },
+            {
+              "type": "required_status_checks",
+              "parameters": {
+                "strict_required_status_checks_policy": false,
+                "do_not_enforce_on_create": false,
+                "required_status_checks": [
+                  {
+                    "context": "trusted-phase2d-freeze-gate",
+                    "integration_id": 15368
+                  },
+                  {
+                    "context": "Clean install, static checks, tests, secret scan, and dry-run",
+                    "integration_id": 15368
+                  }
+                ]
+              }
+            }
+          ],
+          "node_id": "RRS_lACqUmVwb3NpdG9yec5QB29tzgFJTGQ",
+          "created_at": "2026-08-27T01:20:37.074+08:00",
+          "updated_at": "2026-08-27T01:20:37.167+08:00",
+          "bypass_actors": [],
+          "current_user_can_bypass": "never",
+          "_links": {
+            "self": {
+              "href": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/rulesets/21580900"
+            },
+            "html": {
+              "href": "https://github.com/danny0971haha/multi-venue-grid-engine/rules/21580900"
+            }
+          }
+        },
+        "bypass_actors_present": true,
+        "rules_present": true
+      }
+    ]
+  },
+  "branchProtectionRules": {
+    "name": "branchProtectionRules",
+    "status": "OK",
+    "http_statuses": [
+      200
+    ],
+    "pagination": {
+      "complete": true,
+      "pages_fetched": 1,
+      "has_next_page": false,
+      "truncated_by_max_pages": false,
+      "interrupted": false
+    },
+    "item_count": 1,
+    "duplicates": [],
+    "notes": [],
+    "exchange_ids": [
+      "0011"
+    ],
+    "extra": {
+      "graphql_page_size": 50,
+      "graphql_errors": [],
+      "total_count_last_page": 1
+    },
+    "items": [
+      {
+        "id": "BPR_kwDOUAdvbc4E590T",
+        "databaseId": 82304275,
+        "pattern": "main",
+        "isAdminEnforced": true,
+        "requiresStatusChecks": true,
+        "requiresStrictStatusChecks": true,
+        "requiredStatusCheckContexts": [
+          "Clean install, static checks, tests, secret scan, and dry-run",
+          "trusted-phase2d-freeze-gate"
+        ],
+        "requiredStatusChecks": [
+          {
+            "context": "Clean install, static checks, tests, secret scan, and dry-run",
+            "app": {
+              "databaseId": 15368,
+              "name": "GitHub Actions",
+              "slug": "github-actions"
+            }
+          },
+          {
+            "context": "trusted-phase2d-freeze-gate",
+            "app": {
+              "databaseId": 15368,
+              "name": "GitHub Actions",
+              "slug": "github-actions"
+            }
+          }
+        ],
+        "requiresApprovingReviews": true,
+        "requiredApprovingReviewCount": 0,
+        "requiresCodeOwnerReviews": false,
+        "requiresConversationResolution": true,
+        "requiresCommitSignatures": false,
+        "requiresLinearHistory": false,
+        "requireLastPushApproval": false,
+        "allowsForcePushes": false,
+        "allowsDeletions": false,
+        "lockBranch": false,
+        "lockAllowsFetchAndMerge": false,
+        "blocksCreations": false,
+        "restrictsPushes": false,
+        "restrictsReviewDismissals": false,
+        "dismissesStaleReviews": false,
+        "requiresDeployments": false,
+        "requiredDeploymentEnvironments": [],
+        "matchingRefs": {
+          "totalCount": 1,
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        },
+        "bypassForcePushAllowances": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": []
+        },
+        "bypassPullRequestAllowances": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": []
+        },
+        "pushAllowances": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": []
+        },
+        "reviewDismissalAllowances": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": []
+        }
+      }
+    ]
+  },
+  "classic_branch_protection_rest": {
+    "name": "classic_branch_protection_rest",
+    "status": "COLLECTED",
+    "http_statuses": [
+      200,
+      404,
+      404,
+      404,
+      404,
+      404,
+      404,
+      404,
+      404,
+      404
+    ],
+    "pagination": {},
+    "item_count": 10,
+    "duplicates": [],
+    "notes": [
+      "REST exact-name protection is separate from GraphQL pattern list."
+    ],
+    "exchange_ids": [
+      "0012",
+      "0015",
+      "0018",
+      "0021",
+      "0024",
+      "0027",
+      "0030",
+      "0033",
+      "0036",
+      "0039"
+    ],
+    "extra": {},
+    "items": [
+      {
+        "branch": "main",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0012",
+        "body": {
+          "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/main/protection",
+          "required_status_checks": {
+            "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/main/protection/required_status_checks",
+            "strict": true,
+            "contexts": [
+              "Clean install, static checks, tests, secret scan, and dry-run",
+              "trusted-phase2d-freeze-gate"
+            ],
+            "contexts_url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/main/protection/required_status_checks/contexts",
+            "checks": [
+              {
+                "context": "Clean install, static checks, tests, secret scan, and dry-run",
+                "app_id": 15368
+              },
+              {
+                "context": "trusted-phase2d-freeze-gate",
+                "app_id": 15368
+              }
+            ]
+          },
+          "required_pull_request_reviews": {
+            "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/main/protection/required_pull_request_reviews",
+            "dismiss_stale_reviews": false,
+            "require_code_owner_reviews": false,
+            "require_last_push_approval": false,
+            "required_approving_review_count": 0
+          },
+          "required_signatures": {
+            "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/main/protection/required_signatures",
+            "enabled": false
+          },
+          "enforce_admins": {
+            "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/main/protection/enforce_admins",
+            "enabled": true
+          },
+          "required_linear_history": {
+            "enabled": false
+          },
+          "allow_force_pushes": {
+            "enabled": false
+          },
+          "allow_deletions": {
+            "enabled": false
+          },
+          "block_creations": {
+            "enabled": false
+          },
+          "required_conversation_resolution": {
+            "enabled": true
+          },
+          "lock_branch": {
+            "enabled": false
+          },
+          "allow_fork_syncing": {
+            "enabled": false
+          }
+        },
+        "message": null
+      },
+      {
+        "branch": "fix/multi-evidence-byte-identity-20260905",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0015",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "fix/multi-ci-native-log-retention-20260908",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0018",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "fix/multi-format-evidence-20260905",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0021",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "fix/multi-trusted-base-scope-20260905",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0024",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "docs/multi-agent-autonomy-20260905",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0027",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "chore/current-candidate-verification-20260905-dc6fcc",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0030",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "governance/phase2e-trusted-gate",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0033",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "experiment/v0.1-phase2",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0036",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      },
+      {
+        "branch": "experiment/v0.1-phase2e-halt-ack",
+        "http_class": "CLASSIC_NOT_PROTECTED_MESSAGE",
+        "status": 404,
+        "exchange_id": "0039",
+        "body": {
+          "message": "Branch not protected",
+          "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+          "status": "404"
+        },
+        "message": "Branch not protected"
+      }
+    ]
+  },
+  "effective_ruleset_rules": {
+    "name": "effective_ruleset_rules",
+    "status": "COLLECTED",
+    "http_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "pagination": {},
+    "item_count": 10,
+    "duplicates": [],
+    "notes": [],
+    "exchange_ids": [
+      "0013",
+      "0016",
+      "0019",
+      "0022",
+      "0025",
+      "0028",
+      "0031",
+      "0034",
+      "0037",
+      "0040"
+    ],
+    "extra": {},
+    "items": [
+      {
+        "branch": "main",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0013"
+        ],
+        "rules": [
+          {
+            "type": "deletion",
+            "ruleset_source_type": "Repository",
+            "ruleset_source": "danny0971haha/multi-venue-grid-engine",
+            "ruleset_id": 21580900
+          },
+          {
+            "type": "non_fast_forward",
+            "ruleset_source_type": "Repository",
+            "ruleset_source": "danny0971haha/multi-venue-grid-engine",
+            "ruleset_id": 21580900
+          },
+          {
+            "type": "pull_request",
+            "parameters": {
+              "required_approving_review_count": 0,
+              "dismiss_stale_reviews_on_push": false,
+              "required_reviewers": [],
+              "require_code_owner_review": false,
+              "require_last_push_approval": false,
+              "required_review_thread_resolution": true,
+              "require_extra_approval_for_unattributed_changes": true,
+              "allowed_merge_methods": [
+                "merge"
+              ]
+            },
+            "ruleset_source_type": "Repository",
+            "ruleset_source": "danny0971haha/multi-venue-grid-engine",
+            "ruleset_id": 21580900
+          },
+          {
+            "type": "required_status_checks",
+            "parameters": {
+              "strict_required_status_checks_policy": false,
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "trusted-phase2d-freeze-gate",
+                  "integration_id": 15368
+                },
+                {
+                  "context": "Clean install, static checks, tests, secret scan, and dry-run",
+                  "integration_id": 15368
+                }
+              ]
+            },
+            "ruleset_source_type": "Repository",
+            "ruleset_source": "danny0971haha/multi-venue-grid-engine",
+            "ruleset_id": 21580900
+          }
+        ],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 4,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": false
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "fix/multi-evidence-byte-identity-20260905",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0016"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "fix/multi-ci-native-log-retention-20260908",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0019"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "fix/multi-format-evidence-20260905",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0022"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "fix/multi-trusted-base-scope-20260905",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0025"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "docs/multi-agent-autonomy-20260905",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0028"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "chore/current-candidate-verification-20260905-dc6fcc",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0031"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "governance/phase2e-trusted-gate",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0034"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "experiment/v0.1-phase2",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0037"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      },
+      {
+        "branch": "experiment/v0.1-phase2e-halt-ack",
+        "http_class": "OK",
+        "statuses": [
+          200
+        ],
+        "exchange_ids": [
+          "0040"
+        ],
+        "rules": [],
+        "pagination": {
+          "complete": true,
+          "pages_fetched": 1,
+          "last_status": 200,
+          "last_item_count": 0,
+          "next_page": null,
+          "per_page": 100,
+          "truncated_by_max_pages": false,
+          "interrupted": false,
+          "empty_page_is_not_absence": true
+        },
+        "note": "Effective rules endpoint returns active ruleset rules only. It is not a complete substitute for classic branch protection."
+      }
+    ]
+  },
+  "branch_metadata": {
+    "name": "branch_metadata",
+    "status": "COLLECTED",
+    "http_statuses": [
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "pagination": {},
+    "item_count": 10,
+    "duplicates": [],
+    "notes": [],
+    "exchange_ids": [
+      "0014",
+      "0017",
+      "0020",
+      "0023",
+      "0026",
+      "0029",
+      "0032",
+      "0035",
+      "0038",
+      "0041"
+    ],
+    "extra": {},
+    "items": [
+      {
+        "branch": "main",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0014",
+        "protected_flag": true,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "fix/multi-evidence-byte-identity-20260905",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0017",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "fix/multi-ci-native-log-retention-20260908",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0020",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "fix/multi-format-evidence-20260905",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0023",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "fix/multi-trusted-base-scope-20260905",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0026",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "docs/multi-agent-autonomy-20260905",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0029",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "chore/current-candidate-verification-20260905-dc6fcc",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0032",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "governance/phase2e-trusted-gate",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0035",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "experiment/v0.1-phase2",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0038",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      },
+      {
+        "branch": "experiment/v0.1-phase2e-halt-ack",
+        "http_class": "OK",
+        "status": 200,
+        "exchange_id": "0041",
+        "protected_flag": false,
+        "note": "Branch JSON 'protected' is auxiliary. It does not distinguish rulesets from classic protection and is not used as a complete absence proof."
+      }
+    ]
+  },
+  "org_or_enterprise_probe": {
+    "name": "org_or_enterprise_probe",
+    "status": "PROBED",
+    "http_statuses": [
+      404
+    ],
+    "pagination": {},
+    "item_count": 1,
+    "duplicates": [],
+    "notes": [
+      "User-owned repository: org ruleset product class probed once; enterprise remains UNKNOWN unless separately evidenced."
+    ],
+    "exchange_ids": [
+      "0042"
+    ],
+    "extra": {
+      "enterprise": "UNKNOWN_NOT_READ",
+      "owner_type": "User"
+    },
+    "items": [
+      {
+        "probe": "GET /orgs/danny0971haha/rulesets",
+        "http_class": "NOT_FOUND",
+        "status": 404,
+        "exchange_id": "0042",
+        "note": "Owner type is User. Organization rulesets are not applicable as an org product class if this probe is 404. This does not prove enterprise overlays are absent."
+      }
+    ]
+  }
+}

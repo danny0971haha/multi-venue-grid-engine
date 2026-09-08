@@ -1,0 +1,128 @@
+{
+  "schema": "protection-collector-v2-tool-manifest/1",
+  "tool_name": "protection-collector-v2",
+  "version": "2.0.0-independent",
+  "disclaimer": "Independent new collector. Not a restoration of collect-owner-protection.py, not the same bytes, and does not inherit any prior tool review.",
+  "source_commit": "355b83bd34ba99545ee3d084fe817ac4bb477dcf",
+  "source_tree": "e43833cf11699517d2c5ee972359fb841364e991",
+  "git_dirty": true,
+  "source_files_sha256": {
+    "README.md": "3552df9f28b3f4d7ef721c7baa8fbb2260117fa9f09d8010e0fe0f66ea6f0851",
+    "VERSION": "3c448a83336d06e470b50b30c3c0313eb81a1107ade287024e57ef00bfdcc1b3",
+    "collect.py": "92cabee0332ec083e7ce5bf6b50c180d73f484dabaf16858303f3e589604730c",
+    "fixtures/README.md": "8a79985cf62c8542ae2517d60de0f126adcecc800800d8e825bd6eb715154b75",
+    "fixtures/graphql/bpr-page1.json": "0c605581e2fe9f415e386d783740e86cb097697dea15ba1e8e605349849fd2d0",
+    "fixtures/graphql/bpr-page2.json": "89a83461c97311a1b5d084f7aae0cc066aef4f29deeeae2432ff693343d5354d",
+    "fixtures/http/401.json": "96fb2fba25bc8cc7e29d4d56d485b1f5e82594aea51c122aa2d5f13b5ada9daa",
+    "fixtures/http/403.json": "80190f8aaabb1d4ac9b44f6064ab4d533ee9edee9b8dd5990a3fbe66c56f05b5",
+    "fixtures/http/404-branch-not-protected.json": "f049b93f1acbc29fb3c0dd955093b48fed65b2b78efc4e5fe9939faab185bfd6",
+    "fixtures/http/404.json": "70a10211879470b15788a65caa3ed22eba0a776a4fc51baed42d989ba8cee8a4",
+    "fixtures/http/429.json": "3fd955395bf989c2049b1b82703b092636871d5f212f785d2bff2a3fbc231bcf",
+    "fixtures/http/malformed.txt": "2b3090123c26c509e8b822831d6cb119df5bd59dc9fba496bc01ab76c891929f",
+    "fixtures/http/open-prs.json": "8f3f23ec5757159dbfa4839a077c2700ae61b0ee256a4e25e1dfa9bba2437633",
+    "fixtures/http/pr11.json": "f91b1c5591f6bf6189e19655e38c9015d1d4f4c09531a0228d09a650979c93c6",
+    "fixtures/http/repo.json": "7797d431d30ac3c71a32b7d3e22de24f45da17f073fef9118b18f1bc093b7da8",
+    "fixtures/http/user.json": "359aae1e17142e57fc5e3b30c5b1e49e8615409814a2f250e01c6474312d9d2d",
+    "fixtures/identity/after-drift.json": "493248fbd55427052a543d27dc9a86f0a3e13b4043881be3c187830398359b3c",
+    "fixtures/rest/classic-non-main-200.json": "8b3ca6272ba7f05771c442df4b58058ab676af052f9f3ea8ef51a1c37f77a419",
+    "fixtures/rest/ruleset-active-main.json": "58e81d81a07d550d7992a7df501743786e987b82a90c3289c583b65c90391316",
+    "fixtures/rest/ruleset-disabled.json": "30e925d8ec82e1824766397ef26454d9d27ff999296bf2f60786aa3a7950a139",
+    "fixtures/rest/ruleset-evaluate.json": "cdade76220eeb6a04776c8bfa93c954478cde5e17a6c9df3b3308652c097b618",
+    "fixtures/rest/ruleset-inherited.json": "e31ad1fb715d6879ff1c0739906d5373e25eb436c075905e25dde1a3cb84d1d0",
+    "fixtures/rest/ruleset-same-context-app-a.json": "88583bef9bbe1c06c7a62fecb764d5d57641457ec806da82e4ca5bd6d306b4ad",
+    "fixtures/rest/ruleset-same-context-app-b.json": "305c21054af7dde1b16fd1f82353a12cafd25e3c8e439b28e61b1737af6c7f01",
+    "fixtures/rest/rulesets-page1.json": "7f50c90757663b2aa6bb5c044fad08fe51a44ed0d8e02f241349e89954eda472",
+    "fixtures/rest/rulesets-page2-duplicate.json": "bdb7da5d40f947f59b8c352040f037752926aa69e3fc8944e9a0058699f08bf9",
+    "fixtures/rest/rulesets-page2.json": "d92367bcae67b5f11a18d6c4a180377dc73707772451e2a271469f83b653a2d6",
+    "lib/__init__.py": "5725abffc170a5e498c48b56aa424a68c7140b353deb9cd67b5c096e9cae4ab4",
+    "lib/analyze.py": "8569f12e7f1b9ae574bc566d2b164a2690b0b9c2957a3629b0888287357581b4",
+    "lib/collect.py": "caa3450d846bd0d932affeec296ad6cb24242bd00024ec529a3f82d39b2bcb09",
+    "lib/constants.py": "932cd1ce9769e31a0613025b67a7a77229fefeaa9a868a65399b1e883aa7c17e",
+    "lib/packet.py": "26b1c729b0fd5349012172208b1ca9f679d43ccd416b78c4fa1532d4ae9a2760",
+    "lib/pagination.py": "5b293e2092b231e831e2ea3daf1224eb924ec2f69e9b1aca628e2da0dbe4d61e",
+    "lib/patterns.py": "504ec04f641ab2edeedd612d996ae16af32dcbf9eab1465b73dbf665e9dc0121",
+    "lib/redact.py": "ccbbc048a4bbf73e51902f70f810b2ae937e89b12d42ab57abc78e0ececdcbea",
+    "lib/safety.py": "183b1d2cab3bbb8f1349a02c8444baba772239147f9b2361af4280dbee74449d",
+    "lib/transport.py": "d34ac7ef0893a54b1cd8f7e942043213d1093d42cd1dff7ca1f4c5933dc55054",
+    "tests/__init__.py": "6209eb37a19c0a59ad5f8e4fc51993c7ff810e1d9ecbbddb2c6d8024eb681fcd",
+    "tests/scenario.py": "f7b5edbaca5231de1936873ee9accecda98db3e93e1521182a7bff8fa52252f0",
+    "tests/test_collect_offline.py": "1e71f5ce345822117f77a6abf75be84f37e4ffb74b4bab3f641bb7318097cd2a",
+    "tests/test_pagination.py": "f4bd35f9a83a81948273186f96cd16488625f30bbbab2d7eadd151a428781ad7",
+    "tests/test_patterns.py": "1c7dc3443fdd7a446c2fa2be9f4061563c6a1d11bd93ac40a3736a0989356718",
+    "tests/test_redact.py": "749f8a381402daaa3d0a5f4aad2679acdf4d344aea48ef812ab0c098515fd239",
+    "tests/test_safety.py": "a910a2fb4b19a1cd248ba5c1e0b9d06bcd6456d895202f2d49e6c635aba41aed"
+  },
+  "environment": {
+    "python": "3.13.14",
+    "python_implementation": "CPython",
+    "platform": "Darwin 25.3.0 arm64",
+    "gh": "gh version 2.95.0 (2026-06-17)\nhttps://github.com/cli/cli/releases/tag/v2.95.0",
+    "git": "git version 2.50.1 (Apple Git-155)",
+    "github_api_version_header": "2026-03-10",
+    "collector_version": "2.0.0-independent",
+    "tool_name": "protection-collector-v2",
+    "identity_disclaimer": "Independent new collector. Not a restoration of collect-owner-protection.py, not the same bytes, and does not inherit any prior tool review."
+  },
+  "actor": {
+    "login": "danny0971haha",
+    "id": 202909309,
+    "type": "User",
+    "permissions": {
+      "oauth_scopes": [
+        "gist",
+        "read:org",
+        "repo",
+        "workflow"
+      ],
+      "accepted_oauth_scopes": [],
+      "accepted_github_permissions": null,
+      "token_not_recorded": true
+    },
+    "token_recorded": false
+  },
+  "gh_auth_status": {
+    "command": [
+      "gh",
+      "auth",
+      "status"
+    ],
+    "ran": true,
+    "exit": 0,
+    "text": "github.com\n  \u2713 Logged in to github.com account danny0971haha (keyring)\n  - Active account: true\n  - Git operations protocol: https\n  - Token: [REDACTED_TOKEN]\n  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'"
+  },
+  "documentation_basis": [
+    {
+      "title": "REST API endpoints for rules",
+      "url": "https://docs.github.com/en/rest/repos/rules",
+      "notes": "GET /repos/{owner}/{repo}/rulesets with includes_parents (default true), per_page max 100, page. GET /repos/{owner}/{repo}/rulesets/{id} also accepts includes_parents. bypass_actors omitted unless the caller has write access to the ruleset. GET /repos/{owner}/{repo}/rules/branches/{branch} returns active ruleset rules only; evaluate/disabled are omitted; classic branch protection is not this endpoint."
+    },
+    {
+      "title": "REST API endpoints for protected branches",
+      "url": "https://docs.github.com/en/rest/branches/branch-protection",
+      "notes": "GET /repos/{owner}/{repo}/branches/{branch}/protection. Fine-grained: Administration repository permissions (read). 404 is not automatically absence of protection; GitHub may also use 404 when unauthorized. Message 'Branch not protected' is recorded separately from generic Not Found."
+    },
+    {
+      "title": "Permissions required for fine-grained personal access tokens",
+      "url": "https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens",
+      "notes": "GET rulesets and GET rulesets/{id}: Metadata read. GET rules/branches/{branch}: Metadata read. GET branches/{branch}/protection: Administration read. GET org rulesets: Organization Administration write. GET ruleset history: Administration write."
+    },
+    {
+      "title": "GraphQL BranchProtectionRule",
+      "url": "https://docs.github.com/en/graphql/reference/objects#branchprotectionrule",
+      "notes": "Complete classic-protection pattern list via repository.branchProtectionRules cursor pagination. requiredStatusChecks { context app { databaseId slug name } } preserves app identity. REST exact-name protection is not a substitute."
+    },
+    {
+      "title": "Creating rulesets for a repository (fnmatch)",
+      "url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository",
+      "notes": "fnmatch with FNM_PATHNAME: * does not match /. ** crosses directories. ~ALL and ~DEFAULT_BRANCH are documented include tokens."
+    },
+    {
+      "title": "Using pagination in the REST API",
+      "url": "https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api",
+      "notes": "Link rel=next/last; per_page max 100."
+    }
+  ],
+  "collection_started_at": "2026-09-08T12:17:49Z",
+  "collection_finished_at": "2026-09-08T12:18:15Z",
+  "out_dir": "docs/evidence/owner-protection-v2-20260908T121749Z"
+}

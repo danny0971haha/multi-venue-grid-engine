@@ -1,0 +1,42 @@
+{
+  "id": "0048",
+  "kind": "rest",
+  "method": "GET",
+  "endpoint": "rate_limit",
+  "url": "https://api.github.com/rate_limit",
+  "requested_at": "2026-09-08T12:18:14Z",
+  "duration_ms": 508,
+  "status": 200,
+  "page": null,
+  "parse_ok": true,
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning",
+    "Cache-Control": "no-cache",
+    "Content-Security-Policy": "default-src 'none'",
+    "Content-Type": "application/json; charset=utf-8",
+    "Date": "Tue, 08 Sep 2026 12:18:15 GMT",
+    "Referrer-Policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+    "Server": "github.com",
+    "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+    "Vary": "Accept-Encoding, Accept, X-Requested-With",
+    "X-Accepted-Oauth-Scopes": "",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "deny",
+    "X-Github-Api-Version-Selected": "2026-03-10",
+    "X-Github-Edge-Region": "japaneast",
+    "X-Github-Media-Type": "github.v3; format=json",
+    "X-Github-Request-Id": "D7FC:17C248:460BD:57406:6A9FFD07",
+    "X-Oauth-Scopes": "gist, read:org, repo, workflow",
+    "X-Ratelimit-Limit": "5000",
+    "X-Ratelimit-Remaining": "5000",
+    "X-Ratelimit-Reset": "1788873495",
+    "X-Ratelimit-Resource": "core",
+    "X-Ratelimit-Used": "0",
+    "X-Xss-Protection": "0"
+  },
+  "extra": {
+    "gh_exit": 0,
+    "stderr_redacted": ""
+  }
+}

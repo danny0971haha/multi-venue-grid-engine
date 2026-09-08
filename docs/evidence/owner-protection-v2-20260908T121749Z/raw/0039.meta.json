@@ -1,0 +1,41 @@
+{
+  "id": "0039",
+  "kind": "rest",
+  "method": "GET",
+  "endpoint": "repos/danny0971haha/multi-venue-grid-engine/branches/experiment%2Fv0.1-phase2e-halt-ack/protection",
+  "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/experiment%2Fv0.1-phase2e-halt-ack/protection",
+  "requested_at": "2026-09-08T12:18:09Z",
+  "duration_ms": 513,
+  "status": 404,
+  "page": null,
+  "parse_ok": true,
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning",
+    "Content-Security-Policy": "default-src 'none'",
+    "Content-Type": "application/json; charset=utf-8",
+    "Date": "Tue, 08 Sep 2026 12:18:10 GMT",
+    "Referrer-Policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+    "Server": "github.com",
+    "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+    "Vary": "Accept-Encoding, Accept, X-Requested-With",
+    "X-Accepted-Oauth-Scopes": "",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "deny",
+    "X-Github-Api-Version-Selected": "2026-03-10",
+    "X-Github-Edge-Region": "japaneast",
+    "X-Github-Media-Type": "github.v3; format=json",
+    "X-Github-Request-Id": "D7F2:29D1A0:4C4CE:5D499:6A9FFD02",
+    "X-Oauth-Scopes": "gist, read:org, repo, workflow",
+    "X-Ratelimit-Limit": "5000",
+    "X-Ratelimit-Remaining": "4889",
+    "X-Ratelimit-Reset": "1788870722",
+    "X-Ratelimit-Resource": "core",
+    "X-Ratelimit-Used": "111",
+    "X-Xss-Protection": "0"
+  },
+  "extra": {
+    "gh_exit": 1,
+    "stderr_redacted": "gh: Branch not protected (HTTP 404)\n"
+  }
+}

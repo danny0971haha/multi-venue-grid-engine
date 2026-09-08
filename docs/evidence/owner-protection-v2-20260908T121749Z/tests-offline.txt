@@ -1,0 +1,35 @@
+test_classic_protection_on_non_main_and_pattern_conflict (tests.test_collect_offline.OfflineCollectionTests.test_classic_protection_on_non_main_and_pattern_conflict) ... ok
+test_credentials_never_enter_packet (tests.test_collect_offline.OfflineCollectionTests.test_credentials_never_enter_packet) ... ok
+test_drift_is_recorded_separately (tests.test_collect_offline.OfflineCollectionTests.test_drift_is_recorded_separately) ... ok
+test_http_errors_are_gaps_not_absence (tests.test_collect_offline.OfflineCollectionTests.test_http_errors_are_gaps_not_absence) ... ok
+test_main_only_complete_export_is_limited_not_sampled (tests.test_collect_offline.OfflineCollectionTests.test_main_only_complete_export_is_limited_not_sampled) ... ok
+test_malformed_effective_is_not_empty_rules (tests.test_collect_offline.OfflineCollectionTests.test_malformed_effective_is_not_empty_rules) ... ok
+test_rest_write_and_graphql_mutation_still_blocked_on_scripted_transport (tests.test_collect_offline.OfflineCollectionTests.test_rest_write_and_graphql_mutation_still_blocked_on_scripted_transport) ... ok
+test_same_context_different_integration_ids (tests.test_collect_offline.OfflineCollectionTests.test_same_context_different_integration_ids) ... ok
+test_single_and_multi_page_duplicate_and_enforcement_kinds (tests.test_collect_offline.OfflineCollectionTests.test_single_and_multi_page_duplicate_and_enforcement_kinds) ... ok
+test_duplicate_items_recorded (tests.test_pagination.PaginationTests.test_duplicate_items_recorded) ... ok
+test_graphql_incomplete_when_has_next (tests.test_pagination.PaginationTests.test_graphql_incomplete_when_has_next) ... ok
+test_interrupted_pagination_not_complete (tests.test_pagination.PaginationTests.test_interrupted_pagination_not_complete) ... ok
+test_multi_page_then_complete (tests.test_pagination.PaginationTests.test_multi_page_then_complete) ... ok
+test_single_page_complete (tests.test_pagination.PaginationTests.test_single_page_complete) ... ok
+test_classic_star_matches_all_branches (tests.test_patterns.PatternTests.test_classic_star_matches_all_branches) ... ok
+test_default_and_all_tokens (tests.test_patterns.PatternTests.test_default_and_all_tokens) ... ok
+test_exclude (tests.test_patterns.PatternTests.test_exclude) ... ok
+test_fnmatch_star_does_not_cross_slash (tests.test_patterns.PatternTests.test_fnmatch_star_does_not_cross_slash) ... ok
+test_headers_drop_authorization (tests.test_redact.RedactTests.test_headers_drop_authorization) ... ok
+test_json_token_fields_redacted (tests.test_redact.RedactTests.test_json_token_fields_redacted) ... ok
+test_masked_gh_status_token_is_redacted (tests.test_redact.RedactTests.test_masked_gh_status_token_is_redacted) ... ok
+test_token_prefixes_redacted (tests.test_redact.RedactTests.test_token_prefixes_redacted) ... ok
+test_fake_transport_rejects_graphql_mutation (tests.test_safety.SafetyTests.test_fake_transport_rejects_graphql_mutation) ... ok
+test_fake_transport_rejects_rest_write (tests.test_safety.SafetyTests.test_fake_transport_rejects_rest_write) ... ok
+test_graphql_mutation_forbidden (tests.test_safety.SafetyTests.test_graphql_mutation_forbidden) ... ok
+test_graphql_mutation_hidden_in_comment_still_query (tests.test_safety.SafetyTests.test_graphql_mutation_hidden_in_comment_still_query) ... ok
+test_graphql_query_allowed (tests.test_safety.SafetyTests.test_graphql_query_allowed) ... ok
+test_graphql_string_named_mutation_is_still_query (tests.test_safety.SafetyTests.test_graphql_string_named_mutation_is_still_query) ... ok
+test_rest_get_allowed (tests.test_safety.SafetyTests.test_rest_get_allowed) ... ok
+test_rest_writes_forbidden (tests.test_safety.SafetyTests.test_rest_writes_forbidden) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 2.093s
+
+OK

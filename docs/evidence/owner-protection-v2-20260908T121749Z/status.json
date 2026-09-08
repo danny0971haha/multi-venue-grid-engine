@@ -1,0 +1,35 @@
+{
+  "schema": "protection-collector-v2-status/1",
+  "TOOL_IMPLEMENTATION": "COMPLETE",
+  "TOOL_TESTS": "PASS",
+  "TOOL_TESTS_COMMAND": "python3 -m unittest discover -s tools/review/protection-collector-v2/tests -t tools/review/protection-collector-v2 -v",
+  "TOOL_TESTS_TOTAL": 30,
+  "TOOL_TESTS_FAIL": 0,
+  "TOOL_TESTS_EXIT": 0,
+  "TOOL_TESTS_LOG": "tests-offline.txt",
+  "LIVE_COLLECTION": "COMPLETE",
+  "PROTECTION_COVERAGE": "COMPLETE_FOR_REPOSITORY_SOURCES_ENTERPRISE_UNKNOWN",
+  "OWNER_ACTION_REQUIRED": false,
+  "ADOPTION": "NOT_PERFORMED",
+  "NOT_DECLARED": [
+    "PASS",
+    "ACCEPT",
+    "MERGE AUTHORIZED",
+    "LIVE AUTHORIZED"
+  ],
+  "started_at": "2026-09-08T12:17:49Z",
+  "finished_at": "2026-09-08T12:18:15Z",
+  "identity_match_before": {
+    "head": true,
+    "tree": true,
+    "main": true
+  },
+  "identity_drift": {
+    "drift_detected": false,
+    "changed": [],
+    "note": "No identity field listed here changed between the two captures."
+  },
+  "gaps": [],
+  "historical_COLLECTOR_INPUT_MISSING": "59d10c476de54be81b822d1eb592e7f76955c794",
+  "disclaimer": "Independent new collector. Not a restoration of collect-owner-protection.py, not the same bytes, and does not inherit any prior tool review."
+}

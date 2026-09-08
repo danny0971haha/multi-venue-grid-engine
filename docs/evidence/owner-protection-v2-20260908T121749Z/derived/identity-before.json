@@ -1,0 +1,128 @@
+{
+  "label": "before",
+  "captured_at": "2026-09-08T12:17:53Z",
+  "exchange_ids": [
+    "0002",
+    "0003",
+    "0004",
+    "0005",
+    "0006",
+    "0007"
+  ],
+  "http_classes": {
+    "repo": "OK",
+    "pr": "OK",
+    "open_prs": "OK",
+    "expected_main_commit": "OK",
+    "review_head_commit": "OK",
+    "rate_limit": "OK"
+  },
+  "owner_login": "danny0971haha",
+  "owner_type": "User",
+  "default_branch": "main",
+  "visibility": "public",
+  "review_pr": {
+    "number": 11,
+    "state": "open",
+    "draft": true,
+    "head_ref": "fix/multi-trusted-base-scope-20260905",
+    "head_sha": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "head_tree": "1b443a620670216968b95cc43de96397550c24f2",
+    "base_ref": "main",
+    "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+  },
+  "main": {
+    "sha": "22665d7fa9274dfc05de043c8e9663e24e75087e",
+    "tree": "6981c1124524895273fb09b53d769ca9dbb722bc"
+  },
+  "open_prs": [
+    {
+      "number": 13,
+      "title": "Retain native offline-integration logs in CI artifacts",
+      "draft": true,
+      "head_ref": "fix/multi-ci-native-log-retention-20260908",
+      "head_sha": "d85478a7e1edbf85fa95f7ad3091ad1561a8d61d",
+      "base_ref": "fix/multi-evidence-byte-identity-20260905",
+      "base_sha": "4ead28400903ad6c62616835aa9459f67c6d8cd9"
+    },
+    {
+      "number": 12,
+      "title": "Restore current-candidate evidence byte identity and verify manifest paths",
+      "draft": true,
+      "head_ref": "fix/multi-evidence-byte-identity-20260905",
+      "head_sha": "4ead28400903ad6c62616835aa9459f67c6d8cd9",
+      "base_ref": "fix/multi-format-evidence-20260905",
+      "base_sha": "9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690"
+    },
+    {
+      "number": 11,
+      "title": "fix(governance): restrict Phase 2D trusted trigger to supported main base",
+      "draft": true,
+      "head_ref": "fix/multi-trusted-base-scope-20260905",
+      "head_sha": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+      "base_ref": "main",
+      "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+    },
+    {
+      "number": 10,
+      "title": "style: correct candidate formatting and preserve original evidence",
+      "draft": true,
+      "head_ref": "fix/multi-format-evidence-20260905",
+      "head_sha": "9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690",
+      "base_ref": "docs/multi-agent-autonomy-20260905",
+      "base_sha": "a8402fd552d6e2fcf0436d8f2872b7618cb92412"
+    },
+    {
+      "number": 9,
+      "title": "docs: enable bounded agent autonomy and impact-based reading",
+      "draft": true,
+      "head_ref": "docs/multi-agent-autonomy-20260905",
+      "head_sha": "a8402fd552d6e2fcf0436d8f2872b7618cb92412",
+      "base_ref": "chore/current-candidate-verification-20260905-dc6fcc",
+      "base_sha": "968ea3b201cd5be58f54df64a02ae29d4ed9ab75"
+    },
+    {
+      "number": 8,
+      "title": "feat(governance): trusted Phase 2E gate for Runtime Corrective 3",
+      "draft": true,
+      "head_ref": "governance/phase2e-trusted-gate",
+      "head_sha": "52445f4c2b3eb65f13ae00dbef80f07b417a7d53",
+      "base_ref": "main",
+      "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+    },
+    {
+      "number": 7,
+      "title": "Phase 2E: durable halt, kill-switch, and acknowledgement",
+      "draft": true,
+      "head_ref": "experiment/v0.1-phase2e-halt-ack",
+      "head_sha": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+      "base_ref": "experiment/v0.1-phase2",
+      "base_sha": "7f196d367e39640eee9517f742b0d61424f9d4cc"
+    },
+    {
+      "number": 3,
+      "title": "Draft: cumulative Phase 2 baseline with 2D Corrective 4 evidence closure",
+      "draft": true,
+      "head_ref": "experiment/v0.1-phase2",
+      "head_sha": "7f196d367e39640eee9517f742b0d61424f9d4cc",
+      "base_ref": "main",
+      "base_sha": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+    }
+  ],
+  "open_prs_pagination": {
+    "page": 1,
+    "count": 8,
+    "next_page": null,
+    "complete": true
+  },
+  "expected": {
+    "review_head": "de2f5c0fd055e418d0b6d806f994b52baa743544",
+    "review_tree": "1b443a620670216968b95cc43de96397550c24f2",
+    "expected_main": "22665d7fa9274dfc05de043c8e9663e24e75087e"
+  },
+  "match": {
+    "head": true,
+    "tree": true,
+    "main": true
+  }
+}

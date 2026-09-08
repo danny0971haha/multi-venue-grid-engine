@@ -1,0 +1,43 @@
+{
+  "id": "0017",
+  "kind": "rest",
+  "method": "GET",
+  "endpoint": "repos/danny0971haha/multi-venue-grid-engine/branches/fix%2Fmulti-evidence-byte-identity-20260905",
+  "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/fix%2Fmulti-evidence-byte-identity-20260905",
+  "requested_at": "2026-09-08T12:17:58Z",
+  "duration_ms": 507,
+  "status": 200,
+  "page": null,
+  "parse_ok": true,
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning",
+    "Cache-Control": "private, max-age=60, s-maxage=60",
+    "Content-Security-Policy": "default-src 'none'",
+    "Content-Type": "application/json; charset=utf-8",
+    "Date": "Tue, 08 Sep 2026 12:17:59 GMT",
+    "Etag": "W/\"f912af5c4c0bf730c324813d431a43f38ed3d17568b47ecac12afb0737ba9a89\"",
+    "Referrer-Policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+    "Server": "github.com",
+    "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+    "Vary": "Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With",
+    "X-Accepted-Oauth-Scopes": "",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "deny",
+    "X-Github-Api-Version-Selected": "2026-03-10",
+    "X-Github-Edge-Region": "japaneast",
+    "X-Github-Media-Type": "github.v3; format=json",
+    "X-Github-Request-Id": "D7D7:1CAF7B:44651:5570D:6A9FFCF6",
+    "X-Oauth-Scopes": "gist, read:org, repo, workflow",
+    "X-Ratelimit-Limit": "5000",
+    "X-Ratelimit-Remaining": "4911",
+    "X-Ratelimit-Reset": "1788870722",
+    "X-Ratelimit-Resource": "core",
+    "X-Ratelimit-Used": "89",
+    "X-Xss-Protection": "0"
+  },
+  "extra": {
+    "gh_exit": 0,
+    "stderr_redacted": ""
+  }
+}
