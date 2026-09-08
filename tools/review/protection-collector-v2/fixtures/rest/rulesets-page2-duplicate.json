@@ -1,0 +1,26 @@
+[
+  {
+    "id": 10000002,
+    "name": "disabled overlay",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "danny0971haha/multi-venue-grid-engine",
+    "enforcement": "disabled"
+  },
+  {
+    "id": 30000001,
+    "name": "inherited org ruleset",
+    "target": "branch",
+    "source_type": "Organization",
+    "source": "example-org",
+    "enforcement": "active"
+  },
+  {
+    "id": 21580900,
+    "name": "duplicate of page1 id",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "danny0971haha/multi-venue-grid-engine",
+    "enforcement": "active"
+  }
+]

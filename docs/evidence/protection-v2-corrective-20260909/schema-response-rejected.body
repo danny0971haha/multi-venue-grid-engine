@@ -1,0 +1,1 @@
+{"errors":[{"type":"INTROSPECTION_LIMIT_EXCEEDED","message":"Introspection fields may only be used 2 times, but some fields were used more than that: __Type.fields (22), __Field.args (22), __Type.possibleTypes (22)"}]}

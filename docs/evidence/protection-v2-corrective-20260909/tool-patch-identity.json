@@ -1,0 +1,7 @@
+{
+  "base": "b2ea605d5ed507b634f9a2ee5907db39bf129d13",
+  "sha256": "bba18990e17cb439491bea9f403f50d92376afa3aa043e22c9e44a223868df9f",
+  "bytes": 172926,
+  "LF_count": 3635,
+  "scope": "tools/review/protection-collector-v2 only; documentation publication has its own final diff"
+}

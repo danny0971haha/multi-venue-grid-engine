@@ -1,0 +1,122 @@
+{
+  "recorded_at": "2026-09-08T17:33:50.415693+00:00",
+  "cwd": "/Users/apple/multi-protection-collector-v2-corrective",
+  "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+  "initial_source_cwd": "/Users/apple/multi-venue-grid-engine-starter",
+  "initial_source_branch": "tooling/protection-collector-v2-20260908",
+  "initial_source_head": "3a59255bd9cb3b6608d717b0b9835dd5047f8880",
+  "initial_source_tree": "54d81ed45c73432a1517461d34a013b6c4aed016",
+  "initial_source_untracked": [
+    ".omo/",
+    "tools/review/protection-collector-v2/lib/__pycache__/",
+    "tools/review/protection-collector-v2/tests/__pycache__/"
+  ],
+  "baseline_tool_head": "b2ea605d5ed507b634f9a2ee5907db39bf129d13",
+  "baseline_tool_tree": "71df4986a5d8afd7504b26fa0aeba20328b665b4",
+  "baseline_test_command_exit": 1,
+  "baseline_test_command_error": "ImportError: Start directory is not importable: tools/review/protection-collector-v2/tests",
+  "source_existing_suite": {
+    "source_head": "3a59255bd9cb3b6608d717b0b9835dd5047f8880",
+    "count": 30,
+    "exit": 0,
+    "note": "Tests on later local v2 bytes; environment capture invoked gh auth status. Corrective tests stub environment to guarantee offline operation."
+  },
+  "commands": [
+    {
+      "argv": ["git", "branch", "--show-current"],
+      "exit": 0,
+      "stdout": "fix/multi-protection-collector-v2-20260909\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["git", "rev-parse", "HEAD", "HEAD^{tree}", "main"],
+      "exit": 0,
+      "stdout": "b2ea605d5ed507b634f9a2ee5907db39bf129d13\n71df4986a5d8afd7504b26fa0aeba20328b665b4\nb1e035d07d94364138feedd34bda730dba70fb93\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["git", "status", "--short"],
+      "exit": 0,
+      "stdout": " M tools/review/protection-collector-v2/README.md\n M tools/review/protection-collector-v2/VERSION\n M tools/review/protection-collector-v2/collect.py\n M tools/review/protection-collector-v2/lib/analyze.py\n M tools/review/protection-collector-v2/lib/collect.py\n M tools/review/protection-collector-v2/lib/constants.py\n M tools/review/protection-collector-v2/lib/packet.py\n M tools/review/protection-collector-v2/lib/pagination.py\n M tools/review/protection-collector-v2/lib/patterns.py\n M tools/review/protection-collector-v2/lib/redact.py\n M tools/review/protection-collector-v2/lib/safety.py\n M tools/review/protection-collector-v2/lib/transport.py\n?? docs/evidence/\n?? tools/review/protection-collector-v2/.gitignore\n?? tools/review/protection-collector-v2/fixtures/\n?? tools/review/protection-collector-v2/lib/validation.py\n?? tools/review/protection-collector-v2/tests/\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["git", "ls-remote", "origin"],
+      "exit": 0,
+      "stdout": "22665d7fa9274dfc05de043c8e9663e24e75087e\tHEAD\n968ea3b201cd5be58f54df64a02ae29d4ed9ab75\trefs/heads/chore/current-candidate-verification-20260905-dc6fcc\na8402fd552d6e2fcf0436d8f2872b7618cb92412\trefs/heads/docs/multi-agent-autonomy-20260905\n59d10c476de54be81b822d1eb592e7f76955c794\trefs/heads/evidence/multi-pr11-collector-input-missing-20260908-691d7f\nc448e2a1b21c7e3cbcb9785478caa3919aec1fad\trefs/heads/evidence/multi-pr11-review-upload-20260907-bf4a1c\nf9b48bb9bc39f4db67519ee7ef86ba17db4be4e7\trefs/heads/evidence/multi-pr12-review-upload-20260907-c9bf41\nee0c25664f14ea8ef7e68d070d46e544c3c93ee4\trefs/heads/experiment/v0.1-phase0\n057732cee021889d17573425ee4f24e2065df1e9\trefs/heads/experiment/v0.1-phase1\n7f196d367e39640eee9517f742b0d61424f9d4cc\trefs/heads/experiment/v0.1-phase2\n704afa2dd858c52dad06aa22941d463aa5ce4d69\trefs/heads/experiment/v0.1-phase2e-halt-ack\nd85478a7e1edbf85fa95f7ad3091ad1561a8d61d\trefs/heads/fix/multi-ci-native-log-retention-20260908\n4ead28400903ad6c62616835aa9459f67c6d8cd9\trefs/heads/fix/multi-evidence-byte-identity-20260905\n9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690\trefs/heads/fix/multi-format-evidence-20260905\nde2f5c0fd055e418d0b6d806f994b52baa743544\trefs/heads/fix/multi-trusted-base-scope-20260905\n35e5c18ad81f8932f93038129dec26955673f8b4\trefs/heads/governance/phase2d-trusted-review-boundary\n52445f4c2b3eb65f13ae00dbef80f07b417a7d53\trefs/heads/governance/phase2e-trusted-gate\n0cfb5f76900e637951959a45387b2991e9061f2f\trefs/heads/governance/post-bootstrap-format-corrective\n22665d7fa9274dfc05de043c8e9663e24e75087e\trefs/heads/main\nb2ea605d5ed507b634f9a2ee5907db39bf129d13\trefs/heads/tooling/protection-collector-v2-20260908\nee0c25664f14ea8ef7e68d070d46e544c3c93ee4\trefs/pull/1/head\n9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690\trefs/pull/10/head\n8b16e4f79fd9366335345199cbf3c0e5774c68c4\trefs/pull/10/merge\nde2f5c0fd055e418d0b6d806f994b52baa743544\trefs/pull/11/head\na61b1f87ecb7d14fd7dc2a73f68e7db4921f0160\trefs/pull/11/merge\n4ead28400903ad6c62616835aa9459f67c6d8cd9\trefs/pull/12/head\ndfa25c31a659b8e2a3f4ad197cfe0123b8b5fbda\trefs/pull/12/merge\nd85478a7e1edbf85fa95f7ad3091ad1561a8d61d\trefs/pull/13/head\n326ad17b10d79b364bc5ca7da49c9262542ea144\trefs/pull/13/merge\n057732cee021889d17573425ee4f24e2065df1e9\trefs/pull/2/head\n7f196d367e39640eee9517f742b0d61424f9d4cc\trefs/pull/3/head\n5531be0bd6c4941a6bb0852e301b1cdbe4812d94\trefs/pull/3/merge\n35e5c18ad81f8932f93038129dec26955673f8b4\trefs/pull/4/head\n0cfb5f76900e637951959a45387b2991e9061f2f\trefs/pull/5/head\n447a36e4c49e6a1eacd176245bedd110e81e7c27\trefs/pull/6/head\n704afa2dd858c52dad06aa22941d463aa5ce4d69\trefs/pull/7/head\n392deb4d5cae618a949f817d492dcf8a115ba7da\trefs/pull/7/merge\n52445f4c2b3eb65f13ae00dbef80f07b417a7d53\trefs/pull/8/head\na9aec941f7b1acde1a0a60d6c565cab42912b752\trefs/pull/8/merge\na8402fd552d6e2fcf0436d8f2872b7618cb92412\trefs/pull/9/head\n96613e280206209801c17c256a3227713ec1ccb3\trefs/pull/9/merge\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["git", "log", "--format=%H %s", "b2ea605..3a59255"],
+      "exit": 0,
+      "stdout": "3a59255bd9cb3b6608d717b0b9835dd5047f8880 docs: pin collector v2 evidence commit in the handoff\n83283260f390de6cdbe47d094e45bac109a01d1a docs: add protection collector v2 live read packet for PR #11\n355b83bd34ba99545ee3d084fe817ac4bb477dcf fix: correct GraphQL RateLimit field and redact masked gh tokens\n55e83dbd735b82afe1f8d31abfbd5e09b7c3df75 test: add offline fixtures and tests for protection collector v2\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["git", "diff", "--name-status", "b2ea605..3a59255"],
+      "exit": 0,
+      "stdout": "A\tdocs/evidence/owner-protection-v2-20260908T121749Z/SHA256SUMS\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/coverage.md\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/derived/analysis.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/derived/coverage.md\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/derived/drift.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/derived/identity-after.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/derived/identity-before.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/derived/sources.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/github-sha-pinned-index.md\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0001.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0001.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0002.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0002.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0003.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0003.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0004.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0004.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0005.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0005.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0006.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0006.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0007.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0007.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0008.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0008.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0009.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0009.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0010.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0010.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0011.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0011.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0012.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0012.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0013.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0013.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0014.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0014.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0015.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0015.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0016.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0016.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0017.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0017.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0018.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0018.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0019.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0019.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0020.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0020.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0021.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0021.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0022.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0022.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0023.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0023.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0024.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0024.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0025.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0025.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0026.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0026.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0027.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0027.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0028.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0028.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0029.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0029.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0030.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0030.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0031.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0031.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0032.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0032.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0033.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0033.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0034.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0034.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0035.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0035.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0036.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0036.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0037.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0037.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0038.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0038.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0039.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0039.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0040.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0040.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0041.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0041.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0042.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0042.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0043.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0043.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0044.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0044.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0045.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0045.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0046.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0046.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0047.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0047.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0048.body\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/raw/0048.meta.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/request-ledger.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/status.json\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/tests-offline.txt\nA\tdocs/evidence/owner-protection-v2-20260908T121749Z/tool-manifest.json\nA\tdocs/multi-owner-protection-v2-handoff.md\nA\ttools/review/protection-collector-v2/fixtures/README.md\nA\ttools/review/protection-collector-v2/fixtures/graphql/bpr-page1.json\nA\ttools/review/protection-collector-v2/fixtures/graphql/bpr-page2.json\nA\ttools/review/protection-collector-v2/fixtures/http/401.json\nA\ttools/review/protection-collector-v2/fixtures/http/403.json\nA\ttools/review/protection-collector-v2/fixtures/http/404-branch-not-protected.json\nA\ttools/review/protection-collector-v2/fixtures/http/404.json\nA\ttools/review/protection-collector-v2/fixtures/http/429.json\nA\ttools/review/protection-collector-v2/fixtures/http/malformed.txt\nA\ttools/review/protection-collector-v2/fixtures/http/open-prs.json\nA\ttools/review/protection-collector-v2/fixtures/http/pr11.json\nA\ttools/review/protection-collector-v2/fixtures/http/repo.json\nA\ttools/review/protection-collector-v2/fixtures/http/user.json\nA\ttools/review/protection-collector-v2/fixtures/identity/after-drift.json\nA\ttools/review/protection-collector-v2/fixtures/rest/classic-non-main-200.json\nA\ttools/review/protection-collector-v2/fixtures/rest/ruleset-active-main.json\nA\ttools/review/protection-collector-v2/fixtures/rest/ruleset-disabled.json\nA\ttools/review/protection-collector-v2/fixtures/rest/ruleset-evaluate.json\nA\ttools/review/protection-collector-v2/fixtures/rest/ruleset-inherited.json\nA\ttools/review/protection-collector-v2/fixtures/rest/ruleset-same-context-app-a.json\nA\ttools/review/protection-collector-v2/fixtures/rest/ruleset-same-context-app-b.json\nA\ttools/review/protection-collector-v2/fixtures/rest/rulesets-page1.json\nA\ttools/review/protection-collector-v2/fixtures/rest/rulesets-page2-duplicate.json\nA\ttools/review/protection-collector-v2/fixtures/rest/rulesets-page2.json\nM\ttools/review/protection-collector-v2/lib/analyze.py\nM\ttools/review/protection-collector-v2/lib/collect.py\nM\ttools/review/protection-collector-v2/lib/packet.py\nM\ttools/review/protection-collector-v2/lib/redact.py\nA\ttools/review/protection-collector-v2/tests/__init__.py\nA\ttools/review/protection-collector-v2/tests/scenario.py\nA\ttools/review/protection-collector-v2/tests/test_collect_offline.py\nA\ttools/review/protection-collector-v2/tests/test_pagination.py\nA\ttools/review/protection-collector-v2/tests/test_patterns.py\nA\ttools/review/protection-collector-v2/tests/test_redact.py\nA\ttools/review/protection-collector-v2/tests/test_safety.py\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["git", "--version"],
+      "exit": 0,
+      "stdout": "git version 2.50.1 (Apple Git-155)\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["python3", "--version"],
+      "exit": 0,
+      "stdout": "Python 3.13.14\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["node", "--version"],
+      "exit": 0,
+      "stdout": "v26.5.0\n",
+      "stderr": ""
+    },
+    {
+      "argv": ["npm", "--version"],
+      "exit": 0,
+      "stdout": "11.17.0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/danny0971haha/multi-venue-grid-engine/pulls/11",
+        "--jq",
+        "{number,state,draft,head:{ref:.head.ref,sha:.head.sha},base:{ref:.base.ref,sha:.base.sha},html_url}"
+      ],
+      "exit": 0,
+      "stdout": "{\"base\":{\"ref\":\"main\",\"sha\":\"22665d7fa9274dfc05de043c8e9663e24e75087e\"},\"draft\":true,\"head\":{\"ref\":\"fix/multi-trusted-base-scope-20260905\",\"sha\":\"de2f5c0fd055e418d0b6d806f994b52baa743544\"},\"html_url\":\"https://github.com/danny0971haha/multi-venue-grid-engine/pull/11\",\"number\":11,\"state\":\"open\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/danny0971haha/multi-venue-grid-engine/pulls/12",
+        "--jq",
+        "{number,state,draft,head:{ref:.head.ref,sha:.head.sha},base:{ref:.base.ref,sha:.base.sha},html_url}"
+      ],
+      "exit": 0,
+      "stdout": "{\"base\":{\"ref\":\"fix/multi-format-evidence-20260905\",\"sha\":\"9c0f63b1ab0e8c58796f63a1e4f86a9cae12d690\"},\"draft\":true,\"head\":{\"ref\":\"fix/multi-evidence-byte-identity-20260905\",\"sha\":\"4ead28400903ad6c62616835aa9459f67c6d8cd9\"},\"html_url\":\"https://github.com/danny0971haha/multi-venue-grid-engine/pull/12\",\"number\":12,\"state\":\"open\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gh",
+        "api",
+        "repos/danny0971haha/multi-venue-grid-engine/pulls/13",
+        "--jq",
+        "{number,state,draft,head:{ref:.head.ref,sha:.head.sha},base:{ref:.base.ref,sha:.base.sha},html_url}"
+      ],
+      "exit": 0,
+      "stdout": "{\"base\":{\"ref\":\"fix/multi-evidence-byte-identity-20260905\",\"sha\":\"4ead28400903ad6c62616835aa9459f67c6d8cd9\"},\"draft\":true,\"head\":{\"ref\":\"fix/multi-ci-native-log-retention-20260908\",\"sha\":\"d85478a7e1edbf85fa95f7ad3091ad1561a8d61d\"},\"html_url\":\"https://github.com/danny0971haha/multi-venue-grid-engine/pull/13\",\"number\":13,\"state\":\"open\"}\n",
+      "stderr": ""
+    }
+  ]
+}

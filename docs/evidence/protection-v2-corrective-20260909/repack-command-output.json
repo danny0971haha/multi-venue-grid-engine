@@ -1,0 +1,20 @@
+{
+  "network_requests": 0,
+  "saved_requests_verified": 67,
+  "body_changes": [
+    {
+      "path": "raw/0012.body",
+      "before_sha256": "16ef89167d4ae9ec543d1fa29fc894072ab3aaacbc0ae50351fa07df36e9c3f7",
+      "after_sha256": "dda109d685b40064a53d4974f038c7d0b0339ecc17442f4472e31ab13b980a8d",
+      "reason": "redact a bare credential prefix in public synthetic test code"
+    },
+    {
+      "path": "raw/0062.body",
+      "before_sha256": "16ef89167d4ae9ec543d1fa29fc894072ab3aaacbc0ae50351fa07df36e9c3f7",
+      "after_sha256": "dda109d685b40064a53d4974f038c7d0b0339ecc17442f4472e31ab13b980a8d",
+      "reason": "redact a bare credential prefix in public synthetic test code"
+    }
+  ],
+  "output": "/Users/apple/.codex/artifacts/protection-v2-corrective-20260909/collection-repacked",
+  "packaging_head": "43e9a371492bf807db23b3046824807c52beeefe"
+}

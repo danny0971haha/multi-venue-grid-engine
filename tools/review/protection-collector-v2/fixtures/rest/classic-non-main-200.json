@@ -1,0 +1,24 @@
+{
+  "required_status_checks": {
+    "strict": false,
+    "contexts": ["trusted-phase2d-freeze-gate"],
+    "checks": [
+      {
+        "context": "trusted-phase2d-freeze-gate",
+        "app_id": 15368
+      }
+    ]
+  },
+  "enforce_admins": {
+    "enabled": true
+  },
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": {
+    "enabled": false
+  },
+  "allow_deletions": {
+    "enabled": false
+  },
+  "url": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/branches/fix%2Fmulti-format-evidence-20260905/protection"
+}

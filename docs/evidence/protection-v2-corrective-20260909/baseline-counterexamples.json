@@ -1,0 +1,63 @@
+{
+  "baseline": "b2ea605d5ed507b634f9a2ee5907db39bf129d13",
+  "identity": {
+    "label": "before",
+    "captured_at": "2026-09-08T17:33:46Z",
+    "exchange_ids": ["0001", "0002", "0003", "0004", "0005", "0006"],
+    "http_classes": {
+      "repo": "OK",
+      "pr": "OK",
+      "open_prs": "OK",
+      "expected_main_commit": "OK",
+      "review_head_commit": "OK",
+      "rate_limit": "OK"
+    },
+    "owner_login": null,
+    "owner_type": "User",
+    "default_branch": "main",
+    "visibility": null,
+    "review_pr": {
+      "number": 11,
+      "state": null,
+      "draft": null,
+      "head_ref": null,
+      "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "head_tree": "3333333333333333333333333333333333333333",
+      "base_ref": "main",
+      "base_sha": "1111111111111111111111111111111111111111"
+    },
+    "main": {
+      "sha": "1111111111111111111111111111111111111111",
+      "tree": "4444444444444444444444444444444444444444"
+    },
+    "open_prs": [],
+    "open_prs_pagination": {
+      "page": 1,
+      "count": 0,
+      "next_page": null,
+      "complete": true
+    },
+    "expected": {
+      "review_head": "2222222222222222222222222222222222222222",
+      "review_tree": "3333333333333333333333333333333333333333",
+      "expected_main": "1111111111111111111111111111111111111111"
+    },
+    "match": {
+      "head": false,
+      "tree": true,
+      "main": true
+    }
+  },
+  "actual_main_ref_requested": false,
+  "missing_graphql_connection": {
+    "status": "OK",
+    "complete": true,
+    "items": []
+  },
+  "ruleset_200_empty_object": "OK",
+  "rest_200_object_instead_of_array": {
+    "status": "OK",
+    "complete": true
+  },
+  "required_header_only_absence_claim": ["main"]
+}

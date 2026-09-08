@@ -1,0 +1,110 @@
+{
+  "data": {
+    "viewer": {
+      "login": "danny0971haha",
+      "databaseId": 202909309
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4989,
+      "used": 11,
+      "resetAt": "2026-09-09T00:00:00Z"
+    },
+    "repository": {
+      "nameWithOwner": "danny0971haha/multi-venue-grid-engine",
+      "databaseId": 1,
+      "isPrivate": false,
+      "owner": {
+        "login": "danny0971haha",
+        "__typename": "User"
+      },
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "branchProtectionRules": {
+        "totalCount": 2,
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "cursor-2"
+        },
+        "nodes": [
+          {
+            "id": "BPR_RELEASE",
+            "databaseId": 22,
+            "pattern": "release/*",
+            "isAdminEnforced": true,
+            "requiresStatusChecks": true,
+            "requiresStrictStatusChecks": false,
+            "requiredStatusCheckContexts": ["trusted-phase2d-freeze-gate"],
+            "requiredStatusChecks": [
+              {
+                "context": "trusted-phase2d-freeze-gate",
+                "app": {
+                  "databaseId": 15368,
+                  "name": "GitHub Actions",
+                  "slug": "github-actions"
+                }
+              }
+            ],
+            "requiresApprovingReviews": false,
+            "requiredApprovingReviewCount": 0,
+            "requiresCodeOwnerReviews": false,
+            "requiresConversationResolution": false,
+            "requiresCommitSignatures": false,
+            "requiresLinearHistory": false,
+            "requireLastPushApproval": false,
+            "allowsForcePushes": false,
+            "allowsDeletions": false,
+            "lockBranch": false,
+            "lockAllowsFetchAndMerge": false,
+            "blocksCreations": false,
+            "restrictsPushes": false,
+            "restrictsReviewDismissals": false,
+            "dismissesStaleReviews": false,
+            "requiresDeployments": false,
+            "requiredDeploymentEnvironments": [],
+            "matchingRefs": {
+              "totalCount": 3,
+              "pageInfo": {
+                "hasNextPage": true
+              }
+            },
+            "bypassForcePushAllowances": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [],
+              "totalCount": 0
+            },
+            "bypassPullRequestAllowances": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [],
+              "totalCount": 0
+            },
+            "pushAllowances": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [],
+              "totalCount": 0
+            },
+            "reviewDismissalAllowances": {
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [],
+              "totalCount": 0
+            }
+          }
+        ]
+      },
+      "viewerPermission": "ADMIN"
+    }
+  }
+}
