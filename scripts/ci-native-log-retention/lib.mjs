@@ -128,8 +128,15 @@ function envOrUnknown(env, key) {
   return typeof value === "string" && value.length > 0 ? value : "UNKNOWN";
 }
 
-function writeJson(filePath, value) {
+function writeJson(repoRoot, filePath, value) {
   writeFileSync(filePath, `${JSON.stringify(value, null, JSON_INDENT)}\n`);
+  const biome = path.join(repoRoot, "node_modules", "@biomejs", "biome", "bin", "biome");
+  if (existsSync(biome)) {
+    execFileSync(process.execPath, [biome, "format", "--write", filePath], {
+      cwd: repoRoot,
+      stdio: "ignore",
+    });
+  }
 }
 
 function readJson(filePath) {
@@ -495,12 +502,12 @@ export function writeNotRunPacket({ repoRoot, packetRoot, packetId, env, intende
   mkdirSync(packetRoot, { recursive: true });
   const git = observedGitIdentity(repoRoot);
   const now = new Date().toISOString();
-  writeJson(path.join(packetRoot, IDENTITY_REL), {
+  writeJson(repoRoot, path.join(packetRoot, IDENTITY_REL), {
     packetId,
     createdAtUtc: now,
     historicalOriginalLog: HISTORICAL_ORIGINAL_LOG,
   });
-  writeJson(path.join(packetRoot, CAPTURE_RESULT_REL), {
+  writeJson(repoRoot, path.join(packetRoot, CAPTURE_RESULT_REL), {
     integrationStatus: "NOT_RUN",
     command: intendedCommand ?? [...DEFAULT_COMMAND],
     exitCode: "UNKNOWN",
@@ -509,7 +516,7 @@ export function writeNotRunPacket({ repoRoot, packetRoot, packetId, env, intende
     endedAtUtc: now,
     freshExecutionLog: "NOT_RUN",
   });
-  writeJson(path.join(packetRoot, MANIFEST_REL), {
+  writeJson(repoRoot, path.join(packetRoot, MANIFEST_REL), {
     repository: envOrUnknown(env, "GITHUB_REPOSITORY"),
     sourceHead: envOrUnknown(env, "SOURCE_HEAD"),
     sourceTree: envOrUnknown(env, "SOURCE_TREE"),
@@ -531,7 +538,7 @@ export function writeNotRunPacket({ repoRoot, packetRoot, packetId, env, intende
   });
   const manifest = readJson(path.join(packetRoot, MANIFEST_REL));
   manifest.files = collectFileRecords(packetRoot);
-  writeJson(path.join(packetRoot, MANIFEST_REL), manifest);
+  writeJson(repoRoot, path.join(packetRoot, MANIFEST_REL), manifest);
   writeSha256Sums(packetRoot);
 }
 
@@ -553,7 +560,7 @@ export async function captureIntegration({
   }
   mkdirSync(packetRoot, { recursive: true });
   const startedAtUtc = now();
-  writeJson(path.join(packetRoot, IDENTITY_REL), {
+  writeJson(repoRoot, path.join(packetRoot, IDENTITY_REL), {
     packetId,
     createdAtUtc: startedAtUtc,
     historicalOriginalLog: HISTORICAL_ORIGINAL_LOG,
@@ -579,7 +586,7 @@ export async function captureIntegration({
   }
 
   const endedAtUtc = now();
-  writeJson(path.join(packetRoot, CAPTURE_RESULT_REL), {
+  writeJson(repoRoot, path.join(packetRoot, CAPTURE_RESULT_REL), {
     integrationStatus: "RAN",
     command,
     exitCode: observed.exitCode,
@@ -600,9 +607,9 @@ export async function captureIntegration({
     startedAtUtc,
     endedAtUtc,
   });
-  writeJson(path.join(packetRoot, MANIFEST_REL), manifest);
+  writeJson(repoRoot, path.join(packetRoot, MANIFEST_REL), manifest);
   manifest.files = collectFileRecords(packetRoot);
-  writeJson(path.join(packetRoot, MANIFEST_REL), manifest);
+  writeJson(repoRoot, path.join(packetRoot, MANIFEST_REL), manifest);
   writeSha256Sums(packetRoot);
 
   const verification = verifyPacket(packetRoot, {
@@ -640,7 +647,7 @@ export function finalizePacket({ repoRoot, env, intendedCommand }) {
       existsSync(path.join(packetRoot, WRAPPER_STDERR_REL)) ||
       existsSync(path.join(packetRoot, NATIVE_COPY_REL));
     if (started) {
-      writeJson(path.join(packetRoot, CAPTURE_RESULT_REL), {
+      writeJson(repoRoot, path.join(packetRoot, CAPTURE_RESULT_REL), {
         integrationStatus: "RAN",
         command: intendedCommand ?? [...DEFAULT_COMMAND],
         exitCode: "UNKNOWN",
@@ -670,7 +677,7 @@ export function finalizePacket({ repoRoot, env, intendedCommand }) {
     if (existsSync(manifestPath)) {
       const manifest = readJson(manifestPath);
       manifest.files = collectFileRecords(packetRoot);
-      writeJson(manifestPath, manifest);
+      writeJson(repoRoot, manifestPath, manifest);
     }
     writeSha256Sums(packetRoot);
   }
