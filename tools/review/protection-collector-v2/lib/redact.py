@@ -9,7 +9,7 @@ from typing import Any
 from .constants import DROP_RESPONSE_HEADER_NAMES, SAFE_RESPONSE_HEADER_NAMES, TOKEN_PREFIXES
 
 _TOKEN_RE = re.compile(
-    r"(?:gho_|ghp_|github_pat_|ghu_|ghr_|Bearer\s+)[A-Za-z0-9_\-.=]+",
+    r"(?:gho_|ghp_|github_pat_|ghu_|ghr_|Bearer\s+)[A-Za-z0-9_\-.=*]+",
     re.IGNORECASE,
 )
 _SENSITIVE_KEY_RE = re.compile(
@@ -78,4 +78,19 @@ def maybe_parse_and_redact_body(body: str) -> tuple[Any | None, str]:
 
 
 def evidence_contains_secret(text: str) -> bool:
-    return any(prefix in text for prefix in TOKEN_PREFIXES) or "Bearer " in text
+    """True only for unmasked token material. Masked gho_**** values are not secrets."""
+    if not text:
+        return False
+    for match in _TOKEN_RE.finditer(text):
+        token = match.group(0)
+        payload = re.sub(
+            r"^(?:gho_|ghp_|github_pat_|ghu_|ghr_|Bearer\s+)",
+            "",
+            token,
+            flags=re.IGNORECASE,
+        )
+        if re.fullmatch(r"\*+", payload or ""):
+            continue
+        if payload:
+            return True
+    return False

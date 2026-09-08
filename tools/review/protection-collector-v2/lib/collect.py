@@ -26,7 +26,7 @@ from .transport import HttpExchange, Transport, utc_now
 BRANCH_PROTECTION_RULES_QUERY = """
 query ProtectionCollectorV2BranchProtectionRules($owner: String!, $name: String!, $cursor: String) {
   viewer { login databaseId }
-  rateLimit { limit remaining reset used }
+  rateLimit { limit remaining used resetAt cost }
   repository(owner: $owner, name: $name) {
     nameWithOwner
     databaseId

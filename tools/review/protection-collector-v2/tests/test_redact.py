@@ -26,6 +26,13 @@ class RedactTests(unittest.TestCase):
         dumped = json.dumps(headers)
         self.assertFalse(evidence_contains_secret(dumped))
 
+    def test_masked_gh_status_token_is_redacted(self) -> None:
+        text = "Token: gho_************************************"
+        redacted = redact_text(text)
+        self.assertIn("[REDACTED_TOKEN]", redacted)
+        self.assertNotIn("gho_", redacted)
+        self.assertFalse(evidence_contains_secret(redacted))
+
     def test_json_token_fields_redacted(self) -> None:
         payload = {"token": "gho_ABCDEFG1234567890", "login": "danny0971haha"}
         redacted = redact_json_value(payload)
