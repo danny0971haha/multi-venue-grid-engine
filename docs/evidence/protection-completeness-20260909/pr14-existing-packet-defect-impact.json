@@ -1,0 +1,96 @@
+{
+  "classic_http200": [
+    {
+      "id": "0022",
+      "enabled_boolean": true
+    }
+  ],
+  "rest_paginated_requests": [
+    {
+      "id": "0004",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/pulls?state=open&per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0018",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rulesets?per_page=100&includes_parents=true&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0019",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rulesets?per_page=100&includes_parents=false&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0023",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/main?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0026",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/fix%2Fmulti-evidence-byte-identity-20260905?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0029",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/fix%2Fmulti-ci-native-log-retention-20260908?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0032",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/fix%2Fmulti-format-evidence-20260905?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0035",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/fix%2Fmulti-trusted-base-scope-20260905?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0038",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/docs%2Fmulti-agent-autonomy-20260905?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0041",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/chore%2Fcurrent-candidate-verification-20260905-dc6fcc?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0044",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/governance%2Fphase2e-trusted-gate?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0047",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/experiment%2Fv0.1-phase2?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0050",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/rules/branches/experiment%2Fv0.1-phase2e-halt-ack?per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    },
+    {
+      "id": "0054",
+      "endpoint": "repos/danny0971haha/multi-venue-grid-engine/pulls?state=open&per_page=100&page=1",
+      "page": 1,
+      "status": 200
+    }
+  ],
+  "all_rest_pages_are_first_page": true,
+  "statement": "No skipped REST page or missing admin-enforcement boolean is present in these saved responses. This does not erase the general tool defects."
+}

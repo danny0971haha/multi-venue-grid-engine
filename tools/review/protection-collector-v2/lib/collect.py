@@ -511,8 +511,8 @@ def paginate_rest_list(transport: Transport, path: str, params: dict[str, Any], 
         if link and not rels:
             notes.append("malformed Link header")
             break
-        if "next" in rels and (next_page is None or next_page <= page):
-            notes.append("invalid/repeated/non-forward next page")
+        if "next" in rels and next_page != page + 1:
+            notes.append("invalid/repeated/non-contiguous next page")
             break
         if next_page is None and 'last' in rels and (page_from_url(rels['last']) is None or page_from_url(rels['last']) > page):
             notes.append("last page indicates missing next link")
@@ -670,7 +670,9 @@ def collect_classic_and_effective(
         classic_ex.append(classic)
         http_class = classify_http(classic)
         parsed = classic.parsed
-        if http_class == "OK" and (not isinstance(parsed, dict) or not isinstance(parsed.get("url"), str) or not isinstance(parsed.get("enforce_admins"), dict)):
+        if http_class == "OK" and (not isinstance(parsed, dict) or
+                not isinstance(parsed.get("url"), str) or not parsed.get("url") or
+                type(obj(parsed.get("enforce_admins")).get("enabled")) is not bool):
             http_class = "MALFORMED"
         classic_items.append(
             {
