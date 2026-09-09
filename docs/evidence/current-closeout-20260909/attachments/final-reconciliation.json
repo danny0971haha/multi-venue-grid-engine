@@ -1,0 +1,9 @@
+{
+  "utc": "2026-09-09T06:35:39.645730+00:00",
+  "existing_remote_refs_changed": {},
+  "new_remote_refs": {
+    "refs/heads/codex/multi-protection-completeness-20260909": "26e19416585d173ac1ba3b53d338c52c646f983f"
+  },
+  "original_worktree_head": "3a59255bd9cb3b6608d717b0b9835dd5047f8880",
+  "original_worktree_status": "?? .omo/\n?? tools/review/protection-collector-v2/lib/__pycache__/\n?? tools/review/protection-collector-v2/tests/__pycache__/\n"
+}

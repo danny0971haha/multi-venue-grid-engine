@@ -1,0 +1,30 @@
+{
+  "utc": "2026-09-09T06:37:08.285056+00:00",
+  "base": "12d04d82d0a2b02240619633b3264c77eb1754c9",
+  "result_sha": "26e19416585d173ac1ba3b53d338c52c646f983f",
+  "result_tree": "b91528e8626f13b38d0b1f5f69a3df61d937a7a9",
+  "patch_sha256": "a3618836d01043ab7be8e3ac0598f5434a88d141904a847547f93ae23f8cce4f",
+  "patch_bytes": 45853,
+  "patch_lf_count": 668,
+  "lockfile_sha256": "a20cb9ac4dffb6cd9f19b594c6e9755dff5067a29bc0391a6ba99a80b5741b51",
+  "paths": [
+    "docs/evidence/protection-completeness-20260909/EVIDENCE.md",
+    "docs/evidence/protection-completeness-20260909/SHA256SUMS",
+    "docs/evidence/protection-completeness-20260909/corrective-checkpoint-tests.stderr",
+    "docs/evidence/protection-completeness-20260909/corrective-checkpoint-tests.stdout",
+    "docs/evidence/protection-completeness-20260909/corrective-checkpoint-validation.json",
+    "docs/evidence/protection-completeness-20260909/corrective-regressions-before.stderr.gz",
+    "docs/evidence/protection-completeness-20260909/corrective-regressions-before.stdout",
+    "docs/evidence/protection-completeness-20260909/corrective.patch",
+    "docs/evidence/protection-completeness-20260909/patch-identity.json",
+    "docs/evidence/protection-completeness-20260909/pr14-additional-counterexamples-before.json",
+    "docs/evidence/protection-completeness-20260909/pr14-existing-packet-defect-impact.json",
+    "docs/evidence/protection-completeness-20260909/publication-validation.md",
+    "tools/review/protection-collector-v2/lib/collect.py",
+    "tools/review/protection-collector-v2/tests/test_closeout_completeness.py"
+  ],
+  "diff_stat": " .../protection-completeness-20260909/EVIDENCE.md   | 137 +++++++++++++++++++++\n .../protection-completeness-20260909/SHA256SUMS    |  11 ++\n .../corrective-checkpoint-tests.stderr             |  68 ++++++++++\n .../corrective-checkpoint-tests.stdout             |   0\n .../corrective-checkpoint-validation.json          |  71 +++++++++++\n .../corrective-regressions-before.stderr.gz        | Bin 0 -> 597 bytes\n .../corrective-regressions-before.stdout           |   0\n .../corrective.patch                               |  87 +++++++++++++\n .../patch-identity.json                            |   7 ++\n .../pr14-additional-counterexamples-before.json    |  18 +++\n .../pr14-existing-packet-defect-impact.json        |  96 +++++++++++++++\n .../publication-validation.md                      |   5 +\n .../review/protection-collector-v2/lib/collect.py  |   8 +-\n .../tests/test_closeout_completeness.py            |  55 +++++++++\n 14 files changed, 560 insertions(+), 3 deletions(-)\n",
+  "diff_numstat": "137\t0\tdocs/evidence/protection-completeness-20260909/EVIDENCE.md\n11\t0\tdocs/evidence/protection-completeness-20260909/SHA256SUMS\n68\t0\tdocs/evidence/protection-completeness-20260909/corrective-checkpoint-tests.stderr\n0\t0\tdocs/evidence/protection-completeness-20260909/corrective-checkpoint-tests.stdout\n71\t0\tdocs/evidence/protection-completeness-20260909/corrective-checkpoint-validation.json\n-\t-\tdocs/evidence/protection-completeness-20260909/corrective-regressions-before.stderr.gz\n0\t0\tdocs/evidence/protection-completeness-20260909/corrective-regressions-before.stdout\n87\t0\tdocs/evidence/protection-completeness-20260909/corrective.patch\n7\t0\tdocs/evidence/protection-completeness-20260909/patch-identity.json\n18\t0\tdocs/evidence/protection-completeness-20260909/pr14-additional-counterexamples-before.json\n96\t0\tdocs/evidence/protection-completeness-20260909/pr14-existing-packet-defect-impact.json\n5\t0\tdocs/evidence/protection-completeness-20260909/publication-validation.md\n5\t3\ttools/review/protection-collector-v2/lib/collect.py\n55\t0\ttools/review/protection-collector-v2/tests/test_closeout_completeness.py\n",
+  "scope_valid": true,
+  "runtime_and_governance_diff": ""
+}

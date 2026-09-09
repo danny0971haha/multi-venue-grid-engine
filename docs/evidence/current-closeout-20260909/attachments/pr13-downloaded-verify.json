@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "errors": [],
+  "integrationStatus": "RAN",
+  "freshExecutionLog": "OBTAINED",
+  "historicalOriginalLog": "NOT_OBTAINED",
+  "testedCheckoutSha": "d85478a7e1edbf85fa95f7ad3091ad1561a8d61d",
+  "runId": "34205089339"
+}

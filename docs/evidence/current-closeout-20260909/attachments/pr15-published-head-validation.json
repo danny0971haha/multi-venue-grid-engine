@@ -1,0 +1,25 @@
+{
+  "head": "26e19416585d173ac1ba3b53d338c52c646f983f",
+  "tree": "b91528e8626f13b38d0b1f5f69a3df61d937a7a9",
+  "tool_tree": "4ad772c4948f0da07a77d64be83224dcfef4aff4",
+  "command": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tools/review/protection-collector-v2/tests",
+    "-t",
+    "tools/review/protection-collector-v2",
+    "-v"
+  ],
+  "cwd": "/Users/apple/multi-protection-completeness-20260909",
+  "start_utc": "2026-09-09T06:26:15.460957+00:00",
+  "end_utc": "2026-09-09T06:26:15.924510+00:00",
+  "exit": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "a76f97b077b7e54688bc37f6aa8bbaa9fe433d6bee5aeaeeaf525bd23ae298f0",
+  "status": "",
+  "network_collection": "NOT_RUN"
+}

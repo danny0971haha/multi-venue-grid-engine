@@ -1,0 +1,19 @@
+{
+  "workflow_only_main_filter_added": true,
+  "baseline_changes": [
+    {
+      "path": "/trustedGovernanceFiles/3/sha256",
+      "before": "b7885a047ee563d921100f05f9a906aae9bc0df3366fd36cfa8cb9751c557cc2",
+      "after": "5c1de94e41c3cc1927f53941067ee4220b97cc38305886dff3427052a44ef5bb"
+    },
+    {
+      "path": "/trustedGovernanceFiles/3/blobSha",
+      "before": "3bc1bd6cb8444d7a116c494f26c1b64aa4934997",
+      "after": "9134b62cbd3e202c175bbc24a9819b2260c09498"
+    }
+  ],
+  "new_workflow_sha256": "5c1de94e41c3cc1927f53941067ee4220b97cc38305886dff3427052a44ef5bb",
+  "new_workflow_blob": "9134b62cbd3e202c175bbc24a9819b2260c09498",
+  "pr13_base_classifier_exists": false,
+  "pr7_to_pr13_runtime_diff": ""
+}

@@ -1,0 +1,774 @@
+{
+  "utc": "2026-09-09T06:21:08.960074+00:00",
+  "original_packet_exists": true,
+  "original_files": [
+    {
+      "path": "coverage.md",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "derived/analysis.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "derived/coverage.md",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "derived/drift.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "derived/identity-after.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "derived/identity-before.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "derived/sources.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0001.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0001.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0002.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0002.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0003.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0003.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0004.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0004.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0005.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0005.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0006.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0006.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0007.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0007.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0008.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0008.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0009.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0009.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0010.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0010.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0011.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0011.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0012.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0012.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0013.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0013.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0014.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0014.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0015.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0015.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0016.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0016.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0017.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0017.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0018.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0018.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0019.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0019.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0020.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0020.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0021.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0021.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0022.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0022.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0023.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0023.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0024.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0024.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0025.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0025.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0026.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0026.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0027.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0027.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0028.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0028.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0029.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0029.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0030.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0030.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0031.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0031.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0032.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0032.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0033.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0033.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0034.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0034.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0035.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0035.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0036.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0036.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0037.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0037.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0038.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0038.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0039.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0039.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0040.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0040.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0041.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0041.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0042.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0042.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0043.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0043.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0044.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0044.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0045.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0045.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0046.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0046.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0047.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0047.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0048.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0048.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0049.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0049.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0050.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0050.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0051.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0051.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0052.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0052.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0053.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0053.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0054.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0054.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0055.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0055.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0056.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0056.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0057.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0057.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0058.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0058.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0059.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0059.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0060.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0060.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0061.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0061.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0062.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0062.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0063.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0063.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0064.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0064.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0065.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0065.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0066.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0066.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0067.body",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "raw/0067.meta.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "request-ledger.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "status.json",
+      "present": true,
+      "matches": true
+    },
+    {
+      "path": "tool-manifest.json",
+      "present": true,
+      "matches": true
+    }
+  ],
+  "changed_files": [
+    {
+      "path": "raw/0012.body",
+      "before_sha256": "16ef89167d4ae9ec543d1fa29fc894072ab3aaacbc0ae50351fa07df36e9c3f7",
+      "after_sha256": "dda109d685b40064a53d4974f038c7d0b0339ecc17442f4472e31ab13b980a8d",
+      "reason": "redact a bare credential prefix in public synthetic test code",
+      "original_matches": true,
+      "repacked_matches": true
+    },
+    {
+      "path": "raw/0062.body",
+      "before_sha256": "16ef89167d4ae9ec543d1fa29fc894072ab3aaacbc0ae50351fa07df36e9c3f7",
+      "after_sha256": "dda109d685b40064a53d4974f038c7d0b0339ecc17442f4472e31ab13b980a8d",
+      "reason": "redact a bare credential prefix in public synthetic test code",
+      "original_matches": true,
+      "repacked_matches": true
+    }
+  ],
+  "source_commits": {
+    "9b13a7fd3c0d7b354d6a5bf8ceefab4c838d112b": {
+      "tree": "92420dbc44da482c3328fad10658018128f38f26",
+      "collector_tree": "24676d4b48467b8b5842972f99a595767ab90ac3"
+    },
+    "43e9a371492bf807db23b3046824807c52beeefe": {
+      "tree": "d4954aa9348d0886948fa3ac8857900af9f04acf",
+      "collector_tree": "991e4a32ba6c49303785615f00257dc6a7ea9907"
+    },
+    "cc7614195661ffb18da44d9c5ba6e31c100281b2": {
+      "tree": "16000a1c6a643862fd1bb077c62053f6731cc1e3",
+      "collector_tree": "171f65447e9413f60e461abe0bc2bd04d7b44461"
+    },
+    "12d04d82d0a2b02240619633b3264c77eb1754c9": {
+      "tree": "1b176e67b4a398450f26bbf1544ebb7757846dcb",
+      "collector_tree": "171f65447e9413f60e461abe0bc2bd04d7b44461"
+    }
+  },
+  "ledger": {
+    "requests": 67,
+    "methods": {
+      "GET": 66,
+      "POST": 1
+    },
+    "body_hashes": true
+  },
+  "acquisition_source_files_matches": true,
+  "acquisition_source_files_count": 48,
+  "sanitizer_matches_packaging": true,
+  "derived_unchanged": true
+}

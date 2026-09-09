@@ -1,0 +1,11 @@
+{
+  "integrationStatus": "RAN",
+  "command": ["npm", "run", "test:offline-integration"],
+  "exitCode": 0,
+  "signal": null,
+  "spawnError": null,
+  "startedAtUtc": "2026-09-08T08:33:46.316Z",
+  "endedAtUtc": "2026-09-08T08:33:47.974Z",
+  "freshExecutionLog": "OBTAINED",
+  "nativeCopyError": null
+}

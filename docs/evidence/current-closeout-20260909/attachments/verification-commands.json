@@ -1,0 +1,93 @@
+[
+  {
+    "name": "artifact-10047503719.zip",
+    "command": [
+      "gh",
+      "api",
+      "repos/danny0971haha/multi-venue-grid-engine/actions/artifacts/10047503719/zip"
+    ],
+    "cwd": null,
+    "start_utc": "2026-09-09T06:16:14.980569+00:00",
+    "end_utc": "2026-09-09T06:16:16.299777+00:00",
+    "exit": 0
+  },
+  {
+    "name": "artifact-10047503229.zip",
+    "command": [
+      "gh",
+      "api",
+      "repos/danny0971haha/multi-venue-grid-engine/actions/artifacts/10047503229/zip"
+    ],
+    "cwd": null,
+    "start_utc": "2026-09-09T06:16:14.982418+00:00",
+    "end_utc": "2026-09-09T06:16:16.581772+00:00",
+    "exit": 0
+  },
+  {
+    "name": "job-101992604185.log",
+    "command": [
+      "gh",
+      "api",
+      "repos/danny0971haha/multi-venue-grid-engine/actions/jobs/101992604185/logs"
+    ],
+    "cwd": null,
+    "start_utc": "2026-09-09T06:16:14.984576+00:00",
+    "end_utc": "2026-09-09T06:16:16.897731+00:00",
+    "exit": 0
+  },
+  {
+    "name": "job-101992611101.log",
+    "command": [
+      "gh",
+      "api",
+      "repos/danny0971haha/multi-venue-grid-engine/actions/jobs/101992611101/logs"
+    ],
+    "cwd": null,
+    "start_utc": "2026-09-09T06:16:14.984721+00:00",
+    "end_utc": "2026-09-09T06:16:16.369962+00:00",
+    "exit": 0
+  },
+  {
+    "name": "job-102173671620.log",
+    "command": [
+      "gh",
+      "api",
+      "repos/danny0971haha/multi-venue-grid-engine/actions/jobs/102173671620/logs"
+    ],
+    "cwd": null,
+    "start_utc": "2026-09-09T06:16:14.987607+00:00",
+    "end_utc": "2026-09-09T06:16:16.737755+00:00",
+    "exit": 0
+  },
+  {
+    "name": "pr14-python-tests.log",
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools/review/protection-collector-v2/tests",
+      "-t",
+      "tools/review/protection-collector-v2",
+      "-v"
+    ],
+    "cwd": "/Users/apple/multi-closeout-20260909/snapshots/pr14",
+    "start_utc": "2026-09-09T06:16:16.299836+00:00",
+    "end_utc": "2026-09-09T06:16:16.765847+00:00",
+    "exit": 0
+  },
+  {
+    "name": "pr13-retention-tests.log",
+    "command": [
+      "node",
+      "--test",
+      "scripts/ci-native-log-retention/ci-native-log-retention.test.mjs"
+    ],
+    "cwd": "/Users/apple/multi-closeout-20260909/snapshots/pr13",
+    "start_utc": "2026-09-09T06:16:16.370021+00:00",
+    "end_utc": "2026-09-09T06:16:18.451697+00:00",
+    "exit": 0
+  }
+]

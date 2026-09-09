@@ -1,0 +1,42 @@
+{
+  "utc": "2026-09-09T06:18:30.913859+00:00",
+  "os": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+  "commands": [
+    {
+      "argv": ["git", "status", "--short"],
+      "stdout": "?? .omo/\n?? tools/review/protection-collector-v2/lib/__pycache__/\n?? tools/review/protection-collector-v2/tests/__pycache__/\n"
+    },
+    {
+      "argv": ["git", "branch", "--show-current"],
+      "stdout": "tooling/protection-collector-v2-20260908\n"
+    },
+    {
+      "argv": ["git", "rev-parse", "HEAD", "HEAD^{tree}", "main"],
+      "stdout": "3a59255bd9cb3b6608d717b0b9835dd5047f8880\n54d81ed45c73432a1517461d34a013b6c4aed016\nb1e035d07d94364138feedd34bda730dba70fb93\n"
+    },
+    {
+      "argv": ["git", "worktree", "list", "--porcelain"],
+      "stdout": "worktree /Users/apple/multi-venue-grid-engine-starter\nHEAD 3a59255bd9cb3b6608d717b0b9835dd5047f8880\nbranch refs/heads/tooling/protection-collector-v2-20260908\n\nworktree /Users/apple/.cursor/worktrees/default/6mpb\nHEAD 52445f4c2b3eb65f13ae00dbef80f07b417a7d53\ndetached\n\nworktree /Users/apple/multi-pr12-historical-log-delta-20260908T044647Z\nHEAD f9b48bb9bc39f4db67519ee7ef86ba17db4be4e7\nbranch refs/heads/evidence/multi-pr12-historical-log-delta-20260908\n\nworktree /Users/apple/multi-protection-collector-v2-corrective\nHEAD 12d04d82d0a2b02240619633b3264c77eb1754c9\nbranch refs/heads/fix/multi-protection-collector-v2-20260909\n\nworktree /Users/apple/multi-protection-completeness-20260909\nHEAD 12d04d82d0a2b02240619633b3264c77eb1754c9\nbranch refs/heads/codex/multi-protection-completeness-20260909\n\n"
+    },
+    {
+      "argv": ["git", "--version"],
+      "stdout": "git version 2.50.1 (Apple Git-155)\n"
+    },
+    {
+      "argv": ["gh", "--version"],
+      "stdout": "gh version 2.95.0 (2026-06-17)\nhttps://github.com/cli/cli/releases/tag/v2.95.0\n"
+    },
+    {
+      "argv": ["node", "--version"],
+      "stdout": "v26.5.0\n"
+    },
+    {
+      "argv": ["npm", "--version"],
+      "stdout": "11.17.0\n"
+    },
+    {
+      "argv": ["python3", "--version"],
+      "stdout": "Python 3.13.14\n"
+    }
+  ]
+}

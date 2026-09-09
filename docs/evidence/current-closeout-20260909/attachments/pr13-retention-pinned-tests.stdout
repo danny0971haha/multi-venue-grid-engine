@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: workflow keeps original job name, pins, and always-run packet upload without masking
+ok 1 - workflow keeps original job name, pins, and always-run packet upload without masking
+  ---
+  duration_ms: 1.931834
+  type: 'test'
+  ...
+# Subtest: successful capture copies native log bytes and records tested HEAD not SOURCE_HEAD
+ok 2 - successful capture copies native log bytes and records tested HEAD not SOURCE_HEAD
+  ---
+  duration_ms: 313.62475
+  type: 'test'
+  ...
+# Subtest: child command non-zero exit preserves failure output and does not become success
+ok 3 - child command non-zero exit preserves failure output and does not become success
+  ---
+  duration_ms: 216.493792
+  type: 'test'
+  ...
+# Subtest: missing native log after successful child is verification failure and does not create a fake file
+ok 4 - missing native log after successful child is verification failure and does not create a fake file
+  ---
+  duration_ms: 209.367959
+  type: 'test'
+  ...
+# Subtest: log bytes that disagree with the manifest hash fail verification
+ok 5 - log bytes that disagree with the manifest hash fail verification
+  ---
+  duration_ms: 229.126334
+  type: 'test'
+  ...
+# Subtest: upload-success analogue: packet verifies after child test failure
+ok 6 - upload-success analogue: packet verifies after child test failure
+  ---
+  duration_ms: 270.308083
+  type: 'test'
+  ...
+# Subtest: install/pre-step failure analogue records NOT_RUN without a fake native log
+ok 7 - install/pre-step failure analogue records NOT_RUN without a fake native log
+  ---
+  duration_ms: 170.221167
+  type: 'test'
+  ...
+# Subtest: TAP missing totals fail parse
+ok 8 - TAP missing totals fail parse
+  ---
+  duration_ms: 0.33275
+  type: 'test'
+  ...
+# Subtest: TAP duplicate totals fail parse
+ok 9 - TAP duplicate totals fail parse
+  ---
+  duration_ms: 0.336833
+  type: 'test'
+  ...
+# Subtest: TAP totals that are not the required 13/13 fail successful-run verification
+ok 10 - TAP totals that are not the required 13/13 fail successful-run verification
+  ---
+  duration_ms: 224.874792
+  type: 'test'
+  ...
+# Subtest: old packet identity or wrong tested SHA is rejected
+ok 11 - old packet identity or wrong tested SHA is rejected
+  ---
+  duration_ms: 249.133917
+  type: 'test'
+  ...
+# Subtest: finalize does not convert a captured packet into NOT_RUN
+ok 12 - finalize does not convert a captured packet into NOT_RUN
+  ---
+  duration_ms: 275.066792
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2236.399584
