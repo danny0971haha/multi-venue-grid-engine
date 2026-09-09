@@ -1,0 +1,18 @@
+[
+  {
+    "case": "REST protection truncated to url and empty enforce_admins",
+    "expected": "PARTIAL",
+    "actual": "COMPLETE_FOR_APPLICABLE_SOURCES",
+    "classic_interpretable": true,
+    "conclusion": "NOT_PRESENT_IN_COMPLETE_EXPORT"
+  },
+  {
+    "case": "REST next skips page 2",
+    "expected_complete": false,
+    "actual_complete": true,
+    "calls": [
+      "repos/danny0971haha/multi-venue-grid-engine/rulesets?page=1",
+      "repos/danny0971haha/multi-venue-grid-engine/rulesets?page=3"
+    ]
+  }
+]
