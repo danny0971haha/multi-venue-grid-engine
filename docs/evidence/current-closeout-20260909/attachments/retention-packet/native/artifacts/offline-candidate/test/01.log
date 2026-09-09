@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: offline normal grid/risk/execution/persist/reload/reconciliation
+ok 1 - offline normal grid/risk/execution/persist/reload/reconciliation
+  ---
+  duration_ms: 156.341523
+  type: 'test'
+  ...
+# Subtest: duplicate observation, intent and execution have one economic effect
+ok 2 - duplicate observation, intent and execution have one economic effect
+  ---
+  duration_ms: 32.127289
+  type: 'test'
+  ...
+# Subtest: ambiguous write remains unresolved after reload
+ok 3 - ambiguous write remains unresolved after reload
+  ---
+  duration_ms: 68.106102
+  type: 'test'
+  ...
+# Subtest: stale market and risk observations fail closed
+ok 4 - stale market and risk observations fail closed
+  ---
+  duration_ms: 74.375222
+  type: 'test'
+  ...
+# Subtest: process fence blocks risk-increasing submission
+ok 5 - process fence blocks risk-increasing submission
+  ---
+  duration_ms: 30.284376
+  type: 'test'
+  ...
+# Subtest: expired lease blocks fake adapter callback
+ok 6 - expired lease blocks fake adapter callback
+  ---
+  duration_ms: 32.679298
+  type: 'test'
+  ...
+# Subtest: mismatched lease blocks fake adapter callback
+ok 7 - mismatched lease blocks fake adapter callback
+  ---
+  duration_ms: 30.188305
+  type: 'test'
+  ...
+# Subtest: persistence uncertainty blocks risk increase
+ok 8 - persistence uncertainty blocks risk increase
+  ---
+  duration_ms: 21.686053
+  type: 'test'
+  ...
+# Subtest: unresolved durable exposure blocks CONTINUE
+ok 9 - unresolved durable exposure blocks CONTINUE
+  ---
+  duration_ms: 30.665857
+  type: 'test'
+  ...
+# Subtest: HALT survives fresh process and requires durable current ACK
+ok 10 - HALT survives fresh process and requires durable current ACK
+  ---
+  duration_ms: 333.976342
+  type: 'test'
+  ...
+# Subtest: wrong ID and stale authority cannot ACK; safe exact pair can
+ok 11 - wrong ID and stale authority cannot ACK; safe exact pair can
+  ---
+  duration_ms: 106.524538
+  type: 'test'
+  ...
+# Subtest: replay produces identical canonical final state hash
+ok 12 - replay produces identical canonical final state hash
+  ---
+  duration_ms: 105.684472
+  type: 'test'
+  ...
+# Subtest: canonical evidence hash changes when economic state changes
+ok 13 - canonical evidence hash changes when economic state changes
+  ---
+  duration_ms: 0.220119
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1369.052528

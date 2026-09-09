@@ -16,3 +16,5 @@ Repository: `danny0971haha/multi-venue-grid-engine`. Date: 2026-09-09. This evid
 The immutable publication commit is supplied by the PR comment URL containing this index. It is distinct from all tested candidate/acquisition/repack commits. Native ZIP/logs and API .body files are unmodified; derived JSON receipts were formatted only for publication. Original packet SHA256SUMS retain their original bytes and names. No implementation self-check is an independent reviewer verdict.
 
 No merge, deployment, protection-setting write, exchange credential/network access, exchange write, or new runtime phase occurred.
+
+Publication packaging correction: the intermediate evidence commit `1a594fbbd18e465981e4c8f5270758ce1bab8a9c` included both complete original ZIPs, but repository ignore patterns omitted three extracted `.log` mirrors from Git. The final publication explicitly tracks those same unmodified native/wrapper logs, so every SHA256SUMS row is downloadable. This corrects evidence publication only; it changes no candidate HEAD, original artifact bytes, or test result.

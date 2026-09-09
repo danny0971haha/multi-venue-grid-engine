@@ -1,0 +1,1 @@
+node --import tsx --test --test-reporter=tap test/offline-integration/integration.test.ts: exit 0

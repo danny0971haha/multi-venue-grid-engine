@@ -1,0 +1,42 @@
+
+> multi-venue-grid-engine@0.1.0 test:offline-integration
+> python3 scripts/offline-candidate.py test
+
+{
+  "repository": "multi-venue-grid-engine",
+  "mode": "test",
+  "liveExchangeWrites": false,
+  "networkAccessRequired": false,
+  "authorizationGranted": false,
+  "validationCompleted": true,
+  "checks": [
+    {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "test/offline-integration/integration.test.ts"
+      ],
+      "exitCode": 0,
+      "log": "artifacts/offline-candidate/test/01.log",
+      "logSha256": "d56ca029b7fb003bc0ec4e20fd5032e46b689a97150e783512c5bf17c2fd0629",
+      "tap": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "blockers": [],
+  "networkIsolation": "LINUX_SECCOMP_UNIX_SOCKETS_ONLY",
+  "candidate": "d85478a7e1edbf85fa95f7ad3091ad1561a8d61d",
+  "candidateTree": "e3ce65b47ff9659132cb7211ecb5dcc8510ae152",
+  "workingTreeStatus": "",
+  "frozenBaselineTree": "1b0afe805269972cf7af40f7fbf0e4e6b3e35894",
+  "frozenIdentityPreserved": true
+}
