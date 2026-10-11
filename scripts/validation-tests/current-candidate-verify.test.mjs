@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { verifyCandidateEvidence } from "../evidence/current-candidate-verify.mjs";
 
 function fixture(t) {
-  const root = mkdtempSync(path.join(tmpdir(), "multi-candidate-manifest-"));
+  // The verifier rejects non-canonical roots; macOS tmpdir() sits under the /var symlink.
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "multi-candidate-manifest-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const bytes = Buffer.from('{"value":1}\n');
   const entry = {

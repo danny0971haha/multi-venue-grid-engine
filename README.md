@@ -4,7 +4,7 @@ Independent, from-scratch multi-exchange perpetual-grid trading engine.
 
 ## Current status
 
-**Frozen Phase 2D baseline; separate Phase 2E runtime and governance review candidates.** Read [CURRENT_STATUS.md](docs/CURRENT_STATUS.md) for exact identities and review limitations. Live/testnet exchange writes, deployment and merge remain unauthorized.
+**Phases 0-2E implemented on one integration line; Phase 2E independent review not performed.** Read [CURRENT_STATUS.md](docs/CURRENT_STATUS.md) for identities, the 2026-10-11 process reset and review limitations. Live/testnet exchange writes, deployment and merge remain unauthorized.
 
 Agent work starts with [AGENTS.md](AGENTS.md) and the impact-based reading map in [AI_START_HERE.md](AI_START_HERE.md). Complete authorized objectives end to end without treating historical phase instructions as new authorization.
 

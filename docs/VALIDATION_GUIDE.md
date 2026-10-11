@@ -1,50 +1,32 @@
-# Candidate validation guide
+# Validation guide
 
 These are distinct evidence classes. Success in one never implies success in another.
 
-| Evidence class | Entrypoint / authority | Meaning and limit |
+| Evidence class | Entrypoint | Meaning and limit |
 | --- | --- | --- |
-| Frozen regression | `npm test` | Exact historical expansion; bound runtime baseline expects 474 pass, 0 fail/cancelled/skip/todo. No halt-suite substitution. |
-| Phase 2E runtime | `npm run test:phase2e` | Existing dedicated halt/ACK/crash suite; expects 79 pass, 0 fail/cancelled/skip/todo. Does not establish Phase 2E acceptance. |
-| Developer umbrella | `npm run validate:phase2e-candidate` | Sequential local reproduction of the nine existing commands; first mandatory failure stops execution. Never a trusted gate. |
-| Trusted governance | Exact governance commit and live `.github/trusted/phase2e-corrective3-baseline.json` | Candidate classification, exact SHA/tree and protected-path checks, followed by trusted commands and exact counts. Remains bound to runtime `704afa2dd858c52dad06aa22941d463aa5ce4d69`. |
-| Offline integration | `npm run simulate:offline-integration`; `npm run test:offline-integration` | Deterministic fake-only wiring of existing modules, new assertions and real fresh-process reload. Not production orchestration or a new phase. |
-| Testnet/live authorization | Separate operator/reviewer decision | Absent. No command here grants it. |
+| Full local/CI validation | `npm run ci` | Format check, lint, typecheck, `npm test`, secret scan, build, dry-run. The same steps run in `.github/workflows/ci.yml`. |
+| Product tests | `npm test` | Every product suite: bootstrap, math, domain, strategy, simulator, persistence, risk, halt/ACK/crash, offline integration. Expects 0 fail/cancelled/skip/todo. |
+| Focused suites | `npm run test:phase2e`, `npm run test:offline-integration`, `npm run test:phase2d*` | Subsets of `npm test` for faster iteration. |
+| Offline simulation | `npm run simulate:offline-integration` | Deterministic fake-only wiring of existing modules with replay hashes. Not production orchestration or a new phase. |
+| Historical evidence bytes | `npm run verify:candidate-evidence`, `npm run test:candidate-evidence` | Optional. Verifies the retained `docs/evidence/current-candidate/` packet is byte-intact. |
+| Testnet/live authorization | Separate owner/reviewer decision | Absent. No command here grants it. |
 
-## Environment and umbrella
+## Environment
 
-Use the repository pins, Node **22.23.2**, npm **10.9.8**, and the unmodified package-lock.json. New wrappers additionally require Linux, Python 3 and `libseccomp.so.2`. They fail before executing workloads when kernel network isolation is unavailable. Only AF_UNIX sockets are allowed; inherited filtering covers child processes/native modules as well as JavaScript. No network or credential fallback exists. A credential-free checkout without `.env*` files other than `.env.example` is required. Caller environment is allowlisted to PATH; child HOME is temporary.
+Use the repository pins, Node **22.23.2** and npm **10.9.8** (`.node-version`, `.npmrc` `engine-strict`), and the unmodified `package-lock.json`. A pinned-toolchain mismatch is a failure, not permission to upgrade or loosen checks. Report results from any other toolchain as diagnostic only.
 
 ```sh
-npm run validate:phase2e-candidate
-```
-
-The exact order remains:
-
-```text
 npm ci
-npm run typecheck
-npm run lint
-npm run format:check
-npm test
-npm run test:phase2e
-npm run build
-npm run scan:secrets
-npm run dry-run
+npm run ci
 ```
 
-Installation uses npm's offline mode, no registry audit/funding requests, and does not disable engine-strict or alter versions/lifecycle scripts. Populate a trusted local dependency cache separately if needed and pass `-- --cache /absolute/path/to/cache`; this task cannot download packages through the offline wrapper. Missing dependencies or pinned toolchain mismatch are failures, not permission to upgrade or loosen checks. Logs, real exit codes, log hashes, candidate HEAD/tree and working-tree status are emitted in JSON. A dirty checkout is working-tree evidence, not proof of HEAD alone. Logs live under `artifacts/offline-candidate/`.
-
-The wrapper validates the 474/79 totals without changing either command, trusted baseline, or count policy. New integration tests live in `test/offline-integration/`, outside both historical globs. Existing `npm run dry-run` still only checks bootstrap/runtime-mode behavior.
-
-The implementation environment supplied Node 24.19.0/npm 11.9.0: the pinned `npm ci` failed with `EBADENGINE`. Any supplementary execution using available tooling must be reported as diagnostic evidence, not the pinned validation result.
+Tests are fake-only: no credentials, no `.env*` files other than `.env.example`, and no exchange networking. Test counts change as tests are added; record the observed totals in evidence rather than pinning them.
 
 ## Offline integration coverage
 
 ```sh
 npm run simulate:offline-integration
 npm run test:offline-integration
-npm run test:validation-tooling
 ```
 
 The fixed fixture in `test/offline-integration/scenarios.ts` flows through the existing grid geometry and intent generator, risk evaluator, Phase 2E continuation authority, lease-fenced fake execution, execution observation, checksummed exact-pair persistence, reload and ownership/execution reconciliation. It reports the full simulator snapshot plus continuation-decision canonical hash and repeats the fixture to compare hashes. Host-local process IDs, lease nonces and temporary directories are excluded from this explicitly named economic-state hash; no persisted economic fields are dropped.
@@ -57,6 +39,4 @@ Simulation output includes `mode=OFFLINE_INTEGRATION`, `liveExchangeWrites=false
 
 ## Independent review boundary
 
-Governance remains on its separate branch; no trusted files or protected runtime bytes are modified here. New package script keys and new paths create a different candidate from the exact trusted runtime pin. The current trusted gate is expected not to accept arbitrary new tooling bytes under that pin. A separately reviewed future governance decision is required before binding another candidate; do not weaken SHA/tree/path/count checks to make this branch green.
-
-Retain historical documents. Read [CURRENT_STATUS.md](CURRENT_STATUS.md) for the timeline, and distinguish recorded historical acceptance, current engineering evidence, independent review, and operator authorization. Stop after implementation/evidence; do not begin another phase.
+Green validation is engineering evidence, not independent acceptance, deployment, merge or live authority. Retain historical documents. Read [CURRENT_STATUS.md](CURRENT_STATUS.md) for the timeline, and distinguish recorded historical acceptance, current engineering evidence, independent review, and operator authorization.
