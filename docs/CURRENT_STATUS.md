@@ -16,11 +16,11 @@ Historical identities, unchanged and retained for reference:
 
 ## Implemented vs reviewed
 
-Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); a fake-only offline integration harness.
+Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F and Phase 3A independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A and Phase 3B independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
-Not implemented: runtime wiring of telemetry, Phase 3B-3E (cancel, ownership/duplicates/batch/budget, execution cursor/replay, fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
+Not implemented: runtime wiring of telemetry, Phase 3C-3E (ownership/duplicates/batch/budget, execution cursor/replay, fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
 
 ## Phase 2F telemetry and manifest
 
@@ -55,7 +55,7 @@ Known limitations:
 - Any `PREPARED`/`UNKNOWN` intent blocks every risk-increasing intent and every new intent in the same slot. Only venue evidence for the same client ID (the order, or executions covering the full quantity) resolves it; absence of evidence never does.
 - A journal write failure latches the coordinator: no further submit or reconcile.
 - Registry import is strict (exact keys, sorted records, fingerprints, cross-record uniqueness) and never repairs.
-- The Phase 0 bootstrap guard (`test/bootstrap/runtimeMode.test.ts`) previously forbade the token `placeOrder` anywhere in `src/`. It now allows it only in `src/execution/coordinator.ts`, `src/execution/ports.ts` and `src/simulator/venue.ts`, and additionally requires that no module statically reachable from `src/index.ts` names it. `cancelOrder` and network imports remain forbidden everywhere. This is a guard change for reviewer attention.
+- The Phase 0 bootstrap guard (`test/bootstrap/runtimeMode.test.ts`) previously forbade the token `placeOrder` anywhere in `src/`. It now allows it only in `src/execution/coordinator.ts`, `src/execution/ports.ts` and `src/simulator/venue.ts`, and additionally requires that no module statically reachable from `src/index.ts` names it. Phase 3B extends the same allowlist and reachability check to `cancelOrder` (see below). Network imports remain forbidden everywhere. This is a guard change for reviewer attention.
 
 Known limitations:
 
@@ -66,6 +66,30 @@ Known limitations:
 5. Not wired into the simulator level state, `src/index.ts`, telemetry or `gateRiskIncreaseOnEvidence`.
 6. If the fence itself throws, the intent stays `PREPARED` and the exception propagates (3E fatal matrix).
 7. `SimulatedVenue` (`src/simulator/venue.ts`) is a test double that lives in `src/` beside the existing simulator.
+
+## Phase 3B execution coordinator (cancel path)
+
+`ExecutionCoordinator.cancel` implements the cancel half of IMPLEMENTATION_CONTRACT §6.1 and VENUE_ADAPTER_CONTRACT §9.1/§16; tests cover TEST_FAULT_MATRIX P3-E06..P3-E08, including the §4.2 script `PLACE -> ACK -> PARTIAL_FILL -> CANCEL_RACE -> FILL` (`test/execution/p3-cancel.test.ts`).
+
+- Only a `LINKED` order of this coordinator's experiment, run and scope with executed quantity below the intent quantity is cancellable. Anything else is refused with no venue call.
+- Each cancel is written ahead as `CANCEL_PREPARED`, then sent through the same `MutationFence`. A fence, write-ahead or venue `NOT_SENT` restores `LINKED`.
+- Every sent or possibly sent cancel becomes `CANCEL_UNVERIFIED`: an ACK, a rejection, an unknown, a thrown call and an unrecognized result alike. A cancel ACK is never treated as a cancel, and a rejection is never treated as "still open".
+- `CANCEL_PREPARED`/`CANCEL_UNVERIFIED` are unresolved: they block risk increase and new intents in the same slot, exactly like `PREPARED`/`UNKNOWN`.
+- Reconciliation resolves a pending cancel only from a lookup by client order ID whose order matches the intent and exchange order ID, and whose executions include every recorded execution unchanged and sum to the order's executed quantity. `CANCELLED` below full quantity -> `CANCELLED`; `FILLED` at full quantity, or executions covering the full quantity even with no order -> `FILLED`; `OPEN` below full quantity -> back to `LINKED`. Anything else, including a vanished order without full execution evidence, stays `CANCEL_UNVERIFIED`. Execution evidence wins a cancel/fill race; disappearance is never a fill.
+- `CANCELLED` and `FILLED` are terminal. The registry checks status against executed quantity on every transition and on import (`IMPORT_STATUS_QUANTITY_MISMATCH`).
+- `SimulatedVenue` gains scripted cancel outcomes (`ACK`, `REJECT`, `UNKNOWN_APPLIED`, `UNKNOWN_DROPPED`, `THROW_APPLIED`); a cancel of an order that is not open is rejected.
+- Guard change for reviewer attention: the Phase 0 bootstrap guard now treats `cancelOrder` like `placeOrder` (allowed only in the same three files and not reachable from `src/index.ts`); previously `cancelOrder` was forbidden everywhere.
+
+Known limitations:
+
+1. The adapter must normalize order status to `OPEN`, `FILLED` or `CANCELLED`; any other status proves nothing. There is no freshness timestamp check; the adapter must return fresh evidence (VENUE_ADAPTER_CONTRACT §16).
+2. If a queued cancel applies after the venue reported the order `OPEN`, the record is already back to `LINKED` and stays there until a later lookup; LINKED records do not track fills until 3D (execution cursor).
+3. Place reconciliation (3A) still links an order regardless of its observed status; a later cancel then resolves it.
+4. `PREPARED`/`UNKNOWN` intents cannot be cancelled by client order ID; only linked orders can. Cancelling another run's orders is 3C/3E.
+5. A reverted cancel replaces the `LINKED` record's previous reason codes.
+6. The registry schema version is unchanged (`phase3-intent-registry-1`); the status set and import checks grew. There is no durable journal yet (3E).
+7. Not wired into `src/index.ts`, telemetry, the risk gate or halt flatten paths.
+8. If the fence itself throws, the record stays `CANCEL_PREPARED` and the exception propagates (3E fatal matrix).
 
 ## Process reset (2026-10-11)
 

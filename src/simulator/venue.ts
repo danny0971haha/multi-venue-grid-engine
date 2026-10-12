@@ -1,5 +1,7 @@
 import type { ClientOrderId, ExchangeOrderId, IntentId, MarketId, VenueId } from "../domain/ids.js";
 import type {
+  CancelAck,
+  CancelRequest,
   ExchangeOrderObservation,
   ExecutionObservation,
   ObservationMeta,
@@ -22,6 +24,17 @@ export type SimulatedPlaceBehavior =
   | "UNKNOWN_DROPPED"
   | "THROW_ACCEPTED";
 
+// ACK: cancelled and acknowledged. REJECT: refused, the order stays open.
+// UNKNOWN_APPLIED / THROW_APPLIED: cancelled, but the caller gets UNKNOWN / an exception.
+// UNKNOWN_DROPPED: never applied, and the caller gets UNKNOWN.
+// A cancel of an order that is not open (cancelled or fully filled) is always rejected.
+export type SimulatedCancelBehavior =
+  | "ACK"
+  | "REJECT"
+  | "UNKNOWN_APPLIED"
+  | "UNKNOWN_DROPPED"
+  | "THROW_APPLIED";
+
 type SimulatedOrder = {
   exchangeOrderId: ExchangeOrderId;
   clientOrderId: ClientOrderId | null;
@@ -33,16 +46,18 @@ type SimulatedOrder = {
   executedQuantity: DecimalString;
   reduceOnly: boolean;
   forgotten: boolean;
+  cancelled: boolean;
 };
 
-// Deterministic fake venue with scripted place outcomes and fault injection. It holds venue
-// truth only; it never decides intent state.
+// Deterministic fake venue with scripted place/cancel outcomes and fault injection. It holds
+// venue truth only; it never decides intent state.
 export class SimulatedVenue implements ExecutionVenuePort {
-  readonly calls = { place: 0, lookup: 0 };
+  readonly calls = { place: 0, cancel: 0, lookup: 0 };
   private readonly venue: VenueId;
   private readonly market: MarketId;
   private readonly observedAt: string;
   private readonly script: SimulatedPlaceBehavior[] = [];
+  private readonly cancelScript: SimulatedCancelBehavior[] = [];
   private readonly orders = new Map<ExchangeOrderId, SimulatedOrder>();
   private readonly byClientOrderId = new Map<ClientOrderId, ExchangeOrderId>();
   private readonly executions: ExecutionObservation[] = [];
@@ -60,6 +75,10 @@ export class SimulatedVenue implements ExecutionVenuePort {
     this.script.push(...behaviors);
   }
 
+  scriptCancel(...behaviors: SimulatedCancelBehavior[]): void {
+    this.cancelScript.push(...behaviors);
+  }
+
   failNextLookups(count: number): void {
     this.failingLookups = count;
   }
@@ -68,17 +87,18 @@ export class SimulatedVenue implements ExecutionVenuePort {
     this.calls.place += 1;
     const behavior = this.script.shift() ?? "ACK";
     if (behavior === "REJECT") {
-      return this.rejected("SIM_REJECTED");
+      return this.rejected("SIM_REJECTED", "place");
     }
     if (intent.clientOrderId !== null && this.byClientOrderId.has(intent.clientOrderId)) {
-      return this.rejected(DUPLICATE_CLIENT_ORDER_ID_CODE);
+      return this.rejected(DUPLICATE_CLIENT_ORDER_ID_CODE, "place");
     }
+    const fingerprint = requestFingerprint(this.venue, this.market, intent);
     if (behavior === "UNKNOWN_DROPPED") {
-      return this.unknown(intent);
+      return this.unknown(fingerprint);
     }
     const order = this.accept(intent);
     if (behavior === "UNKNOWN_ACCEPTED") {
-      return this.unknown(intent);
+      return this.unknown(fingerprint);
     }
     if (behavior === "THROW_ACCEPTED") {
       throw new Error("SIM_TRANSPORT_TIMEOUT");
@@ -91,6 +111,34 @@ export class SimulatedVenue implements ExecutionVenuePort {
         intentId: intent.intentId,
       },
       meta: this.meta("place"),
+    };
+  }
+
+  async cancelOrder(request: CancelRequest): Promise<VenueWriteResult<CancelAck>> {
+    this.calls.cancel += 1;
+    const behavior = this.cancelScript.shift() ?? "ACK";
+    const order = this.orders.get(request.exchangeOrderId);
+    if (order === undefined || !isOpen(order)) {
+      return this.rejected("SIM_ORDER_NOT_OPEN", "cancel");
+    }
+    if (behavior === "REJECT") {
+      return this.rejected("SIM_REJECTED", "cancel");
+    }
+    const fingerprint = `cancel:${order.exchangeOrderId}`;
+    if (behavior === "UNKNOWN_DROPPED") {
+      return this.unknown(fingerprint);
+    }
+    order.cancelled = true;
+    if (behavior === "UNKNOWN_APPLIED") {
+      return this.unknown(fingerprint);
+    }
+    if (behavior === "THROW_APPLIED") {
+      throw new Error("SIM_TRANSPORT_TIMEOUT");
+    }
+    return {
+      kind: "ACK",
+      ack: { exchangeOrderId: order.exchangeOrderId, cancelled: true },
+      meta: this.meta("cancel"),
     };
   }
 
@@ -121,6 +169,7 @@ export class SimulatedVenue implements ExecutionVenuePort {
     const order = this.requireOrder(exchangeOrderId);
     const executedQuantity = decimalAdd(order.executedQuantity, quantity);
     if (
+      order.cancelled ||
       decimalCmp(quantity, "0") <= 0 ||
       decimalCmp(executedQuantity, order.originalQuantity) > 0
     ) {
@@ -168,6 +217,7 @@ export class SimulatedVenue implements ExecutionVenuePort {
       executedQuantity: "0",
       reduceOnly: intent.reduceOnly,
       forgotten: false,
+      cancelled: false,
     };
     this.nextOrder += 1;
     this.orders.set(order.exchangeOrderId, order);
@@ -190,7 +240,11 @@ export class SimulatedVenue implements ExecutionVenuePort {
       originalQuantity: order.originalQuantity,
       executedQuantity: order.executedQuantity,
       remainingQuantity,
-      status: decimalCmp(remainingQuantity, "0") === 0 ? "FILLED" : "OPEN",
+      status: order.cancelled
+        ? "CANCELLED"
+        : decimalCmp(remainingQuantity, "0") === 0
+          ? "FILLED"
+          : "OPEN",
       reduceOnly: order.reduceOnly,
       // Ownership classification belongs to the coordinator, not the venue.
       ownership: "AMBIGUOUS",
@@ -206,20 +260,23 @@ export class SimulatedVenue implements ExecutionVenuePort {
     return order;
   }
 
-  private rejected(code: string): VenueWriteResult<OrderAck> {
+  private rejected<TAck>(code: string, source: "place" | "cancel"): VenueWriteResult<TAck> {
     return {
       kind: "REJECTED",
       code,
-      message: "Simulated venue rejected placement",
-      meta: this.meta("place"),
+      message:
+        source === "place"
+          ? "Simulated venue rejected placement"
+          : "Simulated venue rejected cancel",
+      meta: this.meta(source),
     };
   }
 
-  private unknown(intent: OrderIntent): VenueWriteResult<OrderAck> {
+  private unknown<TAck>(fingerprint: string): VenueWriteResult<TAck> {
     return {
       kind: "UNKNOWN",
       reason: "SIM_RESPONSE_LOST",
-      requestFingerprint: requestFingerprint(this.venue, this.market, intent),
+      requestFingerprint: fingerprint,
       lastKnownMeta: null,
     };
   }
@@ -235,4 +292,8 @@ export class SimulatedVenue implements ExecutionVenuePort {
       sequence: null,
     };
   }
+}
+
+function isOpen(order: SimulatedOrder): boolean {
+  return !order.cancelled && decimalCmp(order.executedQuantity, order.originalQuantity) < 0;
 }

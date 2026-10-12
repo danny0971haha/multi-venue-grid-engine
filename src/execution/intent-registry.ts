@@ -15,7 +15,18 @@ export const INTENT_REGISTRY_SCHEMA_VERSION = "phase3-intent-registry-1";
 
 // PREPARED: durable write-ahead record exists; the send may or may not have happened.
 // UNKNOWN: the send may have reached the venue. Both block until reconciled with evidence.
-export type IntentStatus = "PREPARED" | "NOT_SENT" | "REJECTED" | "UNKNOWN" | "LINKED";
+// CANCEL_PREPARED / CANCEL_UNVERIFIED: a cancel of a linked order is written ahead / was
+// attempted. Both block until fresh venue evidence shows the order active, cancelled or filled.
+export type IntentStatus =
+  | "PREPARED"
+  | "NOT_SENT"
+  | "REJECTED"
+  | "UNKNOWN"
+  | "LINKED"
+  | "CANCEL_PREPARED"
+  | "CANCEL_UNVERIFIED"
+  | "CANCELLED"
+  | "FILLED";
 
 export type IntentAuthority = {
   source: OrderAuthoritySource;
@@ -52,6 +63,14 @@ export type IntentLink = {
   reasonCodes: string[];
 };
 
+// Venue evidence for a pending cancel. Executions are every execution observed for the
+// order, so they must include all executions already recorded.
+export type CancelResolution = {
+  status: "LINKED" | "CANCELLED" | "FILLED";
+  executions: RecordedExecution[];
+  reasonCodes: string[];
+};
+
 export class IntentRegistryError extends Error {
   readonly reasonCode: string;
 
@@ -62,14 +81,47 @@ export class IntentRegistryError extends Error {
   }
 }
 
-const STATUSES = new Set<string>(["PREPARED", "NOT_SENT", "REJECTED", "UNKNOWN", "LINKED"]);
-const UNRESOLVED_STATUSES = new Set<IntentStatus>(["PREPARED", "UNKNOWN"]);
+const STATUSES = new Set<string>([
+  "PREPARED",
+  "NOT_SENT",
+  "REJECTED",
+  "UNKNOWN",
+  "LINKED",
+  "CANCEL_PREPARED",
+  "CANCEL_UNVERIFIED",
+  "CANCELLED",
+  "FILLED",
+]);
+const UNRESOLVED_STATUSES = new Set<IntentStatus>([
+  "PREPARED",
+  "UNKNOWN",
+  "CANCEL_PREPARED",
+  "CANCEL_UNVERIFIED",
+]);
+// Statuses bound to one exchange order ID.
+const LINKED_STATUSES = new Set<IntentStatus>([
+  "LINKED",
+  "CANCEL_PREPARED",
+  "CANCEL_UNVERIFIED",
+  "CANCELLED",
+  "FILLED",
+]);
+// A cancel can only be pending or verified for an order that is not fully executed.
+const PARTIAL_QUANTITY_STATUSES = new Set<IntentStatus>([
+  "CANCEL_PREPARED",
+  "CANCEL_UNVERIFIED",
+  "CANCELLED",
+]);
 const ALLOWED_TRANSITIONS: Record<IntentStatus, readonly IntentStatus[]> = {
   PREPARED: ["NOT_SENT", "REJECTED", "UNKNOWN", "LINKED"],
   UNKNOWN: ["LINKED"],
   NOT_SENT: [],
   REJECTED: [],
-  LINKED: [],
+  LINKED: ["CANCEL_PREPARED"],
+  CANCEL_PREPARED: ["CANCEL_UNVERIFIED", "LINKED", "CANCELLED", "FILLED"],
+  CANCEL_UNVERIFIED: ["LINKED", "CANCELLED", "FILLED"],
+  CANCELLED: [],
+  FILLED: [],
 };
 const PURPOSES = new Set<string>([
   "GRID_ENTRY",
@@ -262,6 +314,9 @@ export class IntentRegistry {
   // Links an intent to one exchange order. Every check runs before any state changes.
   link(intentId: IntentId, link: IntentLink): IntentRecord {
     const record = this.require(intentId);
+    if (record.exchangeOrderId !== null) {
+      throw new IntentRegistryError(`INVALID_TRANSITION:${record.status}->LINKED`);
+    }
     assertTransition(record.status, "LINKED");
     if (!isNonEmptyString(link.exchangeOrderId)) {
       throw new IntentRegistryError("INVALID_EXCHANGE_ORDER_ID");
@@ -288,6 +343,61 @@ export class IntentRegistry {
     record.executedQuantity = executedQuantity;
     record.reasonCodes = [...link.reasonCodes];
     this.byExchangeOrderId.set(link.exchangeOrderId, intentId);
+    for (const execution of executions) {
+      this.byExecutionId.set(execution.executionId, intentId);
+    }
+    return structuredClone(record);
+  }
+
+  markCancelPrepared(intentId: IntentId, reasonCodes: readonly string[]): IntentRecord {
+    const record = this.require(intentId);
+    if (decimalCmp(record.executedQuantity, record.intent.quantity) >= 0) {
+      throw new IntentRegistryError("ORDER_FULLY_EXECUTED");
+    }
+    return this.transition(intentId, "CANCEL_PREPARED", reasonCodes);
+  }
+
+  markCancelUnverified(intentId: IntentId, reasonCodes: readonly string[]): IntentRecord {
+    return this.transition(intentId, "CANCEL_UNVERIFIED", reasonCodes);
+  }
+
+  // Ends a pending cancel from venue evidence. Recorded executions are never dropped or
+  // changed. Every check runs before any state changes.
+  resolveCancel(intentId: IntentId, resolution: CancelResolution): IntentRecord {
+    const record = this.require(intentId);
+    const exchangeOrderId = record.exchangeOrderId;
+    if (exchangeOrderId === null) {
+      throw new IntentRegistryError(`INVALID_TRANSITION:${record.status}->${resolution.status}`);
+    }
+    assertTransition(record.status, resolution.status);
+    const executions = normalizeExecutions(resolution.executions, exchangeOrderId);
+    for (const recorded of record.executions) {
+      const observed = executions.find((item) => item.executionId === recorded.executionId);
+      if (
+        observed === undefined ||
+        canonicalSerializeToUtf8(observed) !== canonicalSerializeToUtf8(recorded)
+      ) {
+        throw new IntentRegistryError("EXECUTION_EVIDENCE_MISSING");
+      }
+    }
+    for (const execution of executions) {
+      const owner = this.byExecutionId.get(execution.executionId);
+      if (owner !== undefined && owner !== intentId) {
+        throw new IntentRegistryError("EXECUTION_ID_COLLISION");
+      }
+    }
+    const executedQuantity = sumExecutions(executions);
+    if (decimalCmp(executedQuantity, record.intent.quantity) > 0) {
+      throw new IntentRegistryError("EXECUTION_OVERFILL");
+    }
+    if (!quantityMatchesStatus(resolution.status, executedQuantity, record.intent.quantity)) {
+      throw new IntentRegistryError("STATUS_QUANTITY_MISMATCH");
+    }
+
+    record.status = resolution.status;
+    record.executions = executions;
+    record.executedQuantity = executedQuantity;
+    record.reasonCodes = [...resolution.reasonCodes];
     for (const execution of executions) {
       this.byExecutionId.set(execution.executionId, intentId);
     }
@@ -347,7 +457,7 @@ export class IntentRegistry {
 
   private transition(
     intentId: IntentId,
-    next: Exclude<IntentStatus, "LINKED" | "PREPARED">,
+    next: "NOT_SENT" | "REJECTED" | "UNKNOWN" | "CANCEL_PREPARED" | "CANCEL_UNVERIFIED",
     reasonCodes: readonly string[],
   ): IntentRecord {
     const record = this.require(intentId);
@@ -404,6 +514,19 @@ function sumExecutions(executions: readonly RecordedExecution[]): DecimalString 
   return executions.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
 }
 
+// FILLED means fully executed; other statuses only forbid overfill.
+function quantityMatchesStatus(
+  status: IntentStatus,
+  executedQuantity: DecimalString,
+  quantity: DecimalString,
+): boolean {
+  const compared = decimalCmp(executedQuantity, quantity);
+  if (status === "FILLED") {
+    return compared === 0;
+  }
+  return PARTIAL_QUANTITY_STATUSES.has(status) ? compared < 0 : compared <= 0;
+}
+
 function parseRecord(raw: unknown): IntentRecord {
   if (!isPlainObject(raw) || !hasExactKeys(raw, RECORD_KEYS)) {
     throw new IntentRegistryError("IMPORT_INVALID_RECORD");
@@ -424,7 +547,7 @@ function parseRecord(raw: unknown): IntentRecord {
     throw new IntentRegistryError("IMPORT_INVALID_RECORD");
   }
 
-  const linked = status === "LINKED";
+  const linked = LINKED_STATUSES.has(status);
   if (
     linked !== isNonEmptyString(raw.exchangeOrderId) ||
     (!linked && raw.exchangeOrderId !== null)
@@ -459,6 +582,9 @@ function parseRecord(raw: unknown): IntentRecord {
   }
   if (decimalCmp(executedQuantity, intent.quantity) > 0) {
     throw new IntentRegistryError("IMPORT_EXECUTION_OVERFILL");
+  }
+  if (!quantityMatchesStatus(status, executedQuantity, intent.quantity)) {
+    throw new IntentRegistryError("IMPORT_STATUS_QUANTITY_MISMATCH");
   }
 
   return {
