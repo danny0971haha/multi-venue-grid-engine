@@ -284,6 +284,7 @@ describe("P3-E05 no definitive evidence", () => {
         const lookup = await h.venue.lookupClientOrder(clientOrderId);
         return { ...lookup, order: lookup.order && { ...lookup.order, side: "SELL" } };
       },
+      listOpenOrders: () => h.venue.listOpenOrders(),
     };
     const restarted = createHarness({
       venue: h.venue,
@@ -434,6 +435,7 @@ describe("P3 write-ahead journal", () => {
       },
       cancelOrder: (request) => base.venue.cancelOrder(request),
       lookupClientOrder: (clientOrderId) => base.venue.lookupClientOrder(clientOrderId),
+      listOpenOrders: () => base.venue.listOpenOrders(),
     };
     const h = createHarness({ venue: base.venue, port, journal });
     await h.coordinator.submit(buildIntent());

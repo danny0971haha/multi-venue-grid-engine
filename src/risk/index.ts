@@ -34,7 +34,8 @@ export {
   MAX_RISK_STRING_CHARS,
   PHASE_2D_REASON_CODE_CATALOG,
 } from "./risk-types.js";
-export { computeExposure } from "./exposure.js";
+export type { PlannedExposureDecision } from "./exposure.js";
+export { computeExposure, plannedExposureDecision } from "./exposure.js";
 export { freshnessFailures } from "./freshness.js";
 export {
   diagnosticContainsSecretLike,

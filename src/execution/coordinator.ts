@@ -1,5 +1,8 @@
+import type { Ownership } from "../domain/enums.js";
 import type {
+  AnchorEpoch,
   ClientOrderId,
+  ExchangeOrderId,
   ExperimentId,
   IntentId,
   MarketId,
@@ -7,7 +10,14 @@ import type {
   ScopeKey,
   VenueId,
 } from "../domain/ids.js";
-import { parseScopeKey } from "../domain/ids.js";
+import { isEngineClientOrderId, parseScopeKey } from "../domain/ids.js";
+import {
+  type DuplicateCleanupPlan,
+  type OrderAuthorityLink,
+  type OwnershipEvidence,
+  classifyOwnership,
+  planOwnedDuplicateCleanup,
+} from "../domain/ownership.js";
 import type {
   CancelAck,
   CancelRequest,
@@ -17,7 +27,13 @@ import type {
   OrderIntent,
   VenueWriteResult,
 } from "../domain/types.js";
-import { decimalAdd, decimalCmp, isCanonicalDecimalString } from "../math/decimal.js";
+import { decimalAdd, decimalCmp, decimalSub, isCanonicalDecimalString } from "../math/decimal.js";
+import { plannedExposureDecision } from "../risk/exposure.js";
+import type {
+  RiskProposedIntent,
+  RiskUnknownReservation,
+  RiskWorkingOrder,
+} from "../risk/risk-types.js";
 import {
   type CancelResolution,
   type IntentLink,
@@ -31,6 +47,8 @@ import {
 import type {
   ClientOrderLookup,
   ExecutionVenuePort,
+  ExposureInputSource,
+  ExposureInputs,
   FenceResult,
   IntentJournal,
   MutationFence,
@@ -40,6 +58,8 @@ export type ExecutionCoordinatorConfig = {
   experimentId: ExperimentId;
   runId: RunId;
   scopeKey: ScopeKey;
+  // Maximum venue writes (places and cancels) between two startCycle calls.
+  writeBudgetPerCycle: number;
 };
 
 export type ExecutionCoordinatorDeps = {
@@ -48,6 +68,7 @@ export type ExecutionCoordinatorDeps = {
   venue: ExecutionVenuePort;
   fence: MutationFence;
   journal: IntentJournal;
+  exposure: ExposureInputSource;
 };
 
 export type SubmitDisposition = "REFUSED" | "ALREADY_RECORDED" | "RECORDED";
@@ -69,6 +90,49 @@ export type ReconcileResult = {
   items: ReconcileItem[];
 };
 
+export type BatchItem = {
+  intentId: IntentId;
+  status: IntentStatus;
+  reasonCodes: string[];
+};
+
+export type BatchResult = {
+  disposition: "REFUSED" | "SUBMITTED";
+  reasonCodes: string[];
+  items: BatchItem[];
+};
+
+export type OpenOrderClassification = {
+  exchangeOrderId: ExchangeOrderId;
+  clientOrderId: ClientOrderId | null;
+  ownership: Ownership;
+  intentId: IntentId | null;
+};
+
+export type OpenOrderScan = {
+  reasonCodes: string[];
+  orders: OpenOrderClassification[];
+  duplicates: DuplicateCleanupPlan[];
+};
+
+export type CleanupCancel = {
+  intentId: IntentId;
+  exchangeOrderId: ExchangeOrderId;
+  status: IntentStatus;
+  reasonCodes: string[];
+};
+
+export type DuplicateCleanupResult = {
+  scan: OpenOrderScan;
+  cancels: CleanupCancel[];
+  reasonCodes: string[];
+};
+
+export type ExposureReservation = {
+  ownedActiveOrders: RiskWorkingOrder[];
+  unknownReservations: RiskUnknownReservation[];
+};
+
 // Venue adapters must normalize a duplicate-client-order-ID rejection to this code. It proves
 // an order with this intent's client ID already exists, so it is never a plain rejection.
 export const DUPLICATE_CLIENT_ORDER_ID_CODE = "DUPLICATE_CLIENT_ORDER_ID";
@@ -78,6 +142,10 @@ const RISK_REDUCING_PURPOSES = new Set<string>([
   "RISK_REDUCTION",
   "EMERGENCY_FLATTEN",
 ]);
+// Records whose linked order may still be working at the venue.
+const WORKING_STATUSES = new Set<IntentStatus>(["LINKED", "CANCEL_PREPARED", "CANCEL_UNVERIFIED"]);
+// Records whose send may have reached the venue without a linked order.
+const POSSIBLY_LIVE_STATUSES = new Set<IntentStatus>(["PREPARED", "UNKNOWN"]);
 
 type LookupDecision =
   | { kind: "UNRESOLVED"; reasonCode: string }
@@ -87,26 +155,48 @@ type LookupDecision =
 type ExecutionFacts = Pick<RecordedExecution, "exchangeOrderId" | "quantity" | "price">;
 
 // Owns intent identity and place/cancel outcomes for one experiment scope. One operation runs
-// at a time; any unresolved intent or journal failure blocks risk increase.
+// at a time; any unresolved intent, journal failure or open-order scan blocker blocks risk
+// increase.
 export class ExecutionCoordinator {
   private readonly config: ExecutionCoordinatorConfig;
   private readonly registry: IntentRegistry;
   private readonly venue: ExecutionVenuePort;
   private readonly fence: MutationFence;
   private readonly journal: IntentJournal;
+  private readonly exposure: ExposureInputSource;
   private busy = false;
   private journalFailed = false;
+  private openOrderBlockers: string[] = [];
+  private writesThisCycle = 0;
 
   constructor(deps: ExecutionCoordinatorDeps) {
+    const budget = deps.config.writeBudgetPerCycle;
+    if (!Number.isSafeInteger(budget) || budget <= 0) {
+      throw new Error("INVALID_WRITE_BUDGET");
+    }
     this.config = { ...deps.config };
     this.registry = deps.registry;
     this.venue = deps.venue;
     this.fence = deps.fence;
     this.journal = deps.journal;
+    this.exposure = deps.exposure;
   }
 
   canIncreaseRisk(): boolean {
-    return !this.journalFailed && this.registry.unresolved().length === 0;
+    return (
+      !this.journalFailed &&
+      this.registry.unresolved().length === 0 &&
+      this.openOrderBlockers.length === 0
+    );
+  }
+
+  // Starts a new write-budget cycle. Refused while an operation is in flight.
+  startCycle(): boolean {
+    if (this.busy) {
+      return false;
+    }
+    this.writesThisCycle = 0;
+    return true;
   }
 
   isJournalLatched(): boolean {
@@ -151,6 +241,88 @@ export class ExecutionCoordinator {
     }
   }
 
+  // Checks every intent and the whole batch's exposure before the first send. Sends then run
+  // in order; after one is not sent, the rest are neither attempted nor recorded.
+  async submitBatch(intents: readonly OrderIntent[]): Promise<BatchResult> {
+    if (this.busy) {
+      return batchRefused(["COORDINATOR_BUSY"]);
+    }
+    this.busy = true;
+    try {
+      return await this.submitBatchExclusive(intents);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // Classifies every open order of the market from a fresh snapshot. Any order that is not
+  // provably owned, and any owned duplicate, blocks risk increase until a later clean scan.
+  async scanOpenOrders(anchorEpoch: AnchorEpoch): Promise<OpenOrderScan> {
+    if (this.busy) {
+      return { reasonCodes: ["COORDINATOR_BUSY"], orders: [], duplicates: [] };
+    }
+    this.busy = true;
+    try {
+      return await this.scanExclusive(anchorEpoch);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // Cancels owned duplicates found by a fresh scan, keeping each slot's survivor. Unowned and
+  // ambiguous orders are never candidates. A cancelled duplicate stays reserved and unresolved
+  // until reconciliation proves it closed.
+  async cleanupOwnedDuplicates(anchorEpoch: AnchorEpoch): Promise<DuplicateCleanupResult> {
+    if (this.busy) {
+      return {
+        scan: { reasonCodes: ["COORDINATOR_BUSY"], orders: [], duplicates: [] },
+        cancels: [],
+        reasonCodes: ["COORDINATOR_BUSY"],
+      };
+    }
+    this.busy = true;
+    try {
+      return await this.cleanupExclusive(anchorEpoch);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // Exposure this coordinator's records still reserve: every risk-increasing order that may
+  // still work at the venue. A cancel is never assumed to have worked before it is resolved.
+  exposureReservation(): ExposureReservation {
+    const ownedActiveOrders: RiskWorkingOrder[] = [];
+    const unknownReservations: RiskUnknownReservation[] = [];
+    for (const record of this.registry.list()) {
+      const intent = record.intent;
+      // Reduce-only exits cannot add exposure, as in computeExposure.
+      if (!isRiskIncreasing(intent)) {
+        continue;
+      }
+      if (WORKING_STATUSES.has(record.status)) {
+        const remaining = decimalSub(intent.quantity, record.executedQuantity);
+        if (intent.price === null) {
+          unknownReservations.push({ side: intent.side, price: null, quantity: remaining });
+        } else {
+          ownedActiveOrders.push({
+            side: intent.side,
+            price: intent.price,
+            remainingQuantity: remaining,
+            reduceOnly: false,
+            owned: true,
+          });
+        }
+      } else if (POSSIBLY_LIVE_STATUSES.has(record.status)) {
+        unknownReservations.push({
+          side: intent.side,
+          price: intent.price,
+          quantity: intent.quantity,
+        });
+      }
+    }
+    return { ownedActiveOrders, unknownReservations };
+  }
+
   private async submitExclusive(intent: OrderIntent): Promise<SubmitResult> {
     if (this.journalFailed) {
       return refused("JOURNAL_LATCHED");
@@ -174,19 +346,125 @@ export class ExecutionCoordinator {
     if (admission !== null) {
       return refused(admission);
     }
+    if (!this.budgetAllows(1)) {
+      return refused("WRITE_BUDGET_EXHAUSTED");
+    }
+    const denied = await this.exposureProblem([intent]);
+    if (denied !== null) {
+      return { disposition: "REFUSED", record: null, reasonCodes: denied };
+    }
+    const sent = await this.sendPlace(intent);
+    return { disposition: "RECORDED", ...sent };
+  }
 
+  private async submitBatchExclusive(intents: readonly OrderIntent[]): Promise<BatchResult> {
+    if (this.journalFailed) {
+      return batchRefused(["JOURNAL_LATCHED"]);
+    }
+    if (!Array.isArray(intents) || intents.length === 0) {
+      return batchRefused(["EMPTY_BATCH"]);
+    }
+    const identities = new Set<string>();
+    const slots = new Set<string>();
+    for (const intent of intents) {
+      const problem =
+        placeIntentProblem(intent) ??
+        (this.registry.get(intent.intentId) !== null
+          ? "INTENT_ALREADY_RECORDED"
+          : this.admissionProblem(intent));
+      if (problem !== null) {
+        return batchRefused([problem]);
+      }
+      const clientOrderId = intent.clientOrderId as ClientOrderId;
+      if (identities.has(intent.intentId) || identities.has(clientOrderId)) {
+        return batchRefused(["BATCH_IDENTITY_CONFLICT"]);
+      }
+      // One intent per slot, as admission enforces against unresolved records.
+      if (slots.has(slotKey(intent))) {
+        return batchRefused(["BATCH_SLOT_CONFLICT"]);
+      }
+      identities.add(intent.intentId).add(clientOrderId);
+      slots.add(slotKey(intent));
+    }
+    if (!this.budgetAllows(intents.length)) {
+      return batchRefused(["WRITE_BUDGET_EXHAUSTED"]);
+    }
+    const denied = await this.exposureProblem(intents);
+    if (denied !== null) {
+      return batchRefused(denied);
+    }
+
+    const items: BatchItem[] = [];
+    let stoppedBy: string | null = null;
+    for (const intent of intents) {
+      stoppedBy ??= this.journalFailed ? "JOURNAL_LATCHED" : this.admissionProblem(intent);
+      if (stoppedBy !== null) {
+        items.push({
+          intentId: intent.intentId,
+          status: "NOT_SENT",
+          reasonCodes: ["BATCH_STOPPED_BEFORE_SEND", stoppedBy],
+        });
+        continue;
+      }
+      const { record, reasonCodes } = await this.sendPlace(intent);
+      items.push({ intentId: intent.intentId, status: record.status, reasonCodes });
+      if (record.status === "NOT_SENT") {
+        stoppedBy = "PRIOR_MUTATION_NOT_SENT";
+      }
+    }
+    return {
+      disposition: "SUBMITTED",
+      reasonCodes: stoppedBy === null ? [] : ["BATCH_INCOMPLETE"],
+      items,
+    };
+  }
+
+  // Writes the intent ahead, then sends it through the fence. Callers have already admitted
+  // the intent and gated its exposure and write budget.
+  private async sendPlace(
+    intent: OrderIntent,
+  ): Promise<{ record: IntentRecord; reasonCodes: string[] }> {
     this.registry.prepare(intent);
     if (!(await this.persist())) {
       const record = this.registry.markNotSent(intent.intentId, ["JOURNAL_WRITE_FAILED"]);
-      return { disposition: "RECORDED", record, reasonCodes: ["JOURNAL_WRITE_FAILED"] };
+      return { record, reasonCodes: ["JOURNAL_WRITE_FAILED"] };
     }
 
+    this.writesThisCycle += 1;
     const fenced = await this.fence.run(() => this.venue.placeOrder(structuredClone(intent)));
     const reasonCodes = this.applyPlaceOutcome(intent, fenced);
     if (!(await this.persist())) {
       reasonCodes.push("JOURNAL_WRITE_FAILED");
     }
-    return { disposition: "RECORDED", record: this.registry.get(intent.intentId), reasonCodes };
+    return { record: this.registry.get(intent.intentId) as IntentRecord, reasonCodes };
+  }
+
+  // Gates risk-increasing intents before any send: the position, every owned working order,
+  // every possibly-live submission and all intents together, without netting.
+  private async exposureProblem(intents: readonly OrderIntent[]): Promise<string[] | null> {
+    if (!intents.some(isRiskIncreasing)) {
+      return null;
+    }
+    let inputs: ExposureInputs;
+    try {
+      inputs = await this.exposure.read();
+    } catch {
+      return ["PLANNED_EXPOSURE_DENIED", "EXPOSURE_INPUT_UNAVAILABLE"];
+    }
+    if (typeof inputs !== "object" || inputs === null) {
+      return ["PLANNED_EXPOSURE_DENIED", "EXPOSURE_INPUT_UNAVAILABLE"];
+    }
+    const decision = plannedExposureDecision({
+      signedPosition: inputs.signedPosition,
+      markOrMidPrice: inputs.markOrMidPrice,
+      ...this.exposureReservation(),
+      proposedBatch: intents.map(toProposedIntent),
+    });
+    return decision.allowed ? null : ["PLANNED_EXPOSURE_DENIED", ...decision.reasonCodes];
+  }
+
+  private budgetAllows(writes: number): boolean {
+    return this.writesThisCycle + writes <= this.config.writeBudgetPerCycle;
   }
 
   private admissionProblem(intent: OrderIntent): string | null {
@@ -205,6 +483,9 @@ export class ExecutionCoordinator {
     }
     if (unresolved.length > 0 && isRiskIncreasing(intent)) {
       return "UNRESOLVED_INTENT_BLOCKS_RISK_INCREASE";
+    }
+    if (this.openOrderBlockers.length > 0 && isRiskIncreasing(intent)) {
+      return "OPEN_ORDER_SCAN_BLOCKS_RISK_INCREASE";
     }
     return null;
   }
@@ -279,6 +560,9 @@ export class ExecutionCoordinator {
     if (problem !== null || record.exchangeOrderId === null) {
       return refused(problem ?? "CANCEL_REQUIRES_LINKED_ORDER");
     }
+    if (!this.budgetAllows(1)) {
+      return refused("WRITE_BUDGET_EXHAUSTED");
+    }
 
     this.registry.markCancelPrepared(intentId, []);
     if (!(await this.persist())) {
@@ -291,6 +575,7 @@ export class ExecutionCoordinator {
       exchangeOrderId: record.exchangeOrderId,
       clientOrderId: record.intent.clientOrderId,
     };
+    this.writesThisCycle += 1;
     const fenced = await this.fence.run(() => this.venue.cancelOrder(structuredClone(request)));
     const reasonCodes = this.applyCancelOutcome(record, fenced);
     if (!(await this.persist())) {
@@ -422,6 +707,167 @@ export class ExecutionCoordinator {
     return { reasonCodes, items };
   }
 
+  private async scanExclusive(anchorEpoch: AnchorEpoch): Promise<OpenOrderScan> {
+    // Until this scan completes, an unexpected throw leaves risk increase blocked.
+    this.openOrderBlockers = ["OPEN_ORDER_SCAN_FAILED"];
+    let snapshot: ExchangeOrderObservation[];
+    try {
+      snapshot = await this.venue.listOpenOrders();
+    } catch {
+      return this.failedScan("OPEN_ORDER_SCAN_FAILED");
+    }
+    if (!this.validSnapshot(snapshot)) {
+      return this.failedScan("OPEN_ORDER_OBSERVATION_INVALID");
+    }
+    const records = new Map(this.registry.list().map((record) => [record.intent.intentId, record]));
+    const evidence = this.ownershipEvidence([...records.values()], anchorEpoch);
+    const orders = snapshot
+      .map((order) => this.classifyOpenOrder(order, evidence, records))
+      .sort((left, right) => compareStrings(left.exchangeOrderId, right.exchangeOrderId));
+    const duplicates = ownedDuplicates(orders, records);
+
+    const blockers = new Set<string>();
+    for (const order of orders) {
+      if (order.ownership !== "OWNED") {
+        blockers.add(`${order.ownership}_OPEN_ORDER`);
+      }
+    }
+    if (duplicates.length > 0) {
+      blockers.add("OWNED_DUPLICATE_OPEN_ORDER");
+    }
+    this.openOrderBlockers = [...blockers].sort(compareStrings);
+    return { reasonCodes: [...this.openOrderBlockers], orders, duplicates };
+  }
+
+  private failedScan(reasonCode: string): OpenOrderScan {
+    this.openOrderBlockers = [reasonCode];
+    return { reasonCodes: [reasonCode], orders: [], duplicates: [] };
+  }
+
+  // A snapshot proves nothing unless every entry is an open order of this market with a
+  // unique exchange order ID.
+  private validSnapshot(snapshot: unknown): snapshot is ExchangeOrderObservation[] {
+    if (!Array.isArray(snapshot)) {
+      return false;
+    }
+    const { venue, market } = parseScopeKey(this.config.scopeKey);
+    const seen = new Set<string>();
+    for (const order of snapshot as unknown[]) {
+      if (typeof order !== "object" || order === null) {
+        return false;
+      }
+      const observed = order as ExchangeOrderObservation;
+      if (
+        observed.venue !== venue ||
+        observed.market !== market ||
+        !isNonEmptyString(observed.exchangeOrderId) ||
+        seen.has(observed.exchangeOrderId) ||
+        observed.status !== "OPEN" ||
+        (observed.clientOrderId !== null && !isNonEmptyString(observed.clientOrderId))
+      ) {
+        return false;
+      }
+      seen.add(observed.exchangeOrderId);
+    }
+    return true;
+  }
+
+  // Authority comes only from records whose linked order may still be working; a terminal
+  // record observed open again proves nothing about ownership.
+  private ownershipEvidence(
+    records: readonly IntentRecord[],
+    anchorEpoch: AnchorEpoch,
+  ): OwnershipEvidence {
+    const knownClientOrderIds = new Set<ClientOrderId>();
+    const knownExchangeOrderIds = new Set<ExchangeOrderId>();
+    const clientOrderEpochById = new Map<ClientOrderId, AnchorEpoch>();
+    const authorityLinks: OrderAuthorityLink[] = [];
+    for (const record of records) {
+      const intent = record.intent;
+      const clientOrderId = intent.clientOrderId as ClientOrderId;
+      knownClientOrderIds.add(clientOrderId);
+      clientOrderEpochById.set(clientOrderId, intent.anchorEpoch);
+      if (record.exchangeOrderId === null) {
+        continue;
+      }
+      knownExchangeOrderIds.add(record.exchangeOrderId);
+      if (WORKING_STATUSES.has(record.status) && record.authority !== null) {
+        authorityLinks.push({
+          source: record.authority.source,
+          evidenceId: record.authority.evidenceId,
+          exchangeOrderId: record.exchangeOrderId,
+          intentId: intent.intentId,
+          clientOrderId,
+          scopeKey: intent.scopeKey,
+          anchorEpoch: intent.anchorEpoch,
+        });
+      }
+    }
+    return {
+      currentScopeKey: this.config.scopeKey,
+      currentAnchorEpoch: anchorEpoch,
+      knownClientOrderIds,
+      knownExchangeOrderIds,
+      clientOrderEpochById,
+      authorityLinks,
+    };
+  }
+
+  private classifyOpenOrder(
+    order: ExchangeOrderObservation,
+    evidence: OwnershipEvidence,
+    records: ReadonlyMap<IntentId, IntentRecord>,
+  ): OpenOrderClassification {
+    const identity = { exchangeOrderId: order.exchangeOrderId, clientOrderId: order.clientOrderId };
+    const intentId = this.registry.intentIdForExchangeOrderId(order.exchangeOrderId);
+    const ownership = classifyOwnership(
+      { ...identity, scopeKey: null, anchorEpoch: null },
+      evidence,
+    );
+    if (ownership === "OWNED") {
+      // Proven authority is not enough: the open order must still be the recorded one.
+      const record = intentId === null ? undefined : records.get(intentId);
+      const owned = record !== undefined && observedMatchesRecord(order, record);
+      return { ...identity, ownership: owned ? "OWNED" : "AMBIGUOUS", intentId };
+    }
+    if (
+      ownership === "AMBIGUOUS" &&
+      intentId === null &&
+      order.clientOrderId !== null &&
+      !isEngineClientOrderId(order.clientOrderId)
+    ) {
+      // No record links it and this engine cannot have generated its client order ID.
+      return { ...identity, ownership: "UNOWNED", intentId };
+    }
+    return { ...identity, ownership, intentId };
+  }
+
+  private async cleanupExclusive(anchorEpoch: AnchorEpoch): Promise<DuplicateCleanupResult> {
+    const scan = await this.scanExclusive(anchorEpoch);
+    const cancels: CleanupCancel[] = [];
+    let stoppedBy: string | null = null;
+    for (const exchangeOrderId of scan.duplicates.flatMap((plan) => plan.cancelExchangeOrderIds)) {
+      // Only OWNED orders are planned, and OWNED implies a record linked to this order ID.
+      const intentId = this.registry.intentIdForExchangeOrderId(exchangeOrderId) as IntentId;
+      if (stoppedBy !== null) {
+        cancels.push({
+          intentId,
+          exchangeOrderId,
+          status: (this.registry.get(intentId) as IntentRecord).status,
+          reasonCodes: ["CLEANUP_STOPPED_BEFORE_SEND", stoppedBy],
+        });
+        continue;
+      }
+      const result = await this.cancelExclusive(intentId);
+      const status = (this.registry.get(intentId) as IntentRecord).status;
+      cancels.push({ intentId, exchangeOrderId, status, reasonCodes: result.reasonCodes });
+      if (status !== "CANCEL_UNVERIFIED") {
+        stoppedBy = "PRIOR_CANCEL_NOT_SENT";
+      }
+    }
+    return { scan, cancels, reasonCodes: stoppedBy === null ? [] : ["CLEANUP_INCOMPLETE"] };
+  }
+
   private async persist(): Promise<boolean> {
     try {
       await this.journal.persist(this.registry.exportState());
@@ -435,6 +881,61 @@ export class ExecutionCoordinator {
 
 function refused(reasonCode: string): SubmitResult {
   return { disposition: "REFUSED", record: null, reasonCodes: [reasonCode] };
+}
+
+function batchRefused(reasonCodes: string[]): BatchResult {
+  return { disposition: "REFUSED", reasonCodes, items: [] };
+}
+
+// A reduce-only order with a risk-increasing purpose is still counted, so the gate never
+// relies on reduce-only alone.
+function toProposedIntent(intent: OrderIntent): RiskProposedIntent {
+  return {
+    side: intent.side,
+    price: intent.price,
+    quantity: intent.quantity,
+    reduceOnly: !isRiskIncreasing(intent),
+    purpose: intent.purpose,
+  };
+}
+
+// Groups owned open orders by logical slot; a slot with more than one is a duplicate. The
+// survivor rule depends only on exchange order IDs, never on snapshot order.
+function ownedDuplicates(
+  orders: readonly OpenOrderClassification[],
+  records: ReadonlyMap<IntentId, IntentRecord>,
+): DuplicateCleanupPlan[] {
+  const groups = new Map<string, { intent: OrderIntent; exchangeOrderIds: ExchangeOrderId[] }>();
+  for (const order of orders) {
+    const record = order.intentId === null ? undefined : records.get(order.intentId);
+    if (order.ownership !== "OWNED" || record === undefined) {
+      continue;
+    }
+    const key = slotKey(record.intent);
+    const group = groups.get(key) ?? { intent: record.intent, exchangeOrderIds: [] };
+    group.exchangeOrderIds.push(order.exchangeOrderId);
+    groups.set(key, group);
+  }
+  return [...groups.entries()]
+    .sort(([left], [right]) => compareStrings(left, right))
+    .filter(([, group]) => group.exchangeOrderIds.length > 1)
+    .map(([, group]) =>
+      planOwnedDuplicateCleanup(group.exchangeOrderIds, group.intent.logicalLevelId),
+    );
+}
+
+function observedMatchesRecord(order: ExchangeOrderObservation, record: IntentRecord): boolean {
+  const { venue, market } = parseScopeKey(record.intent.scopeKey);
+  return (
+    orderMatchesIntent(order, record.intent, venue, market) &&
+    order.exchangeOrderId === record.exchangeOrderId &&
+    // The venue can only know more executions than recorded, never fewer.
+    decimalCmp(order.executedQuantity, record.executedQuantity) >= 0
+  );
+}
+
+function compareStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function slotKey(intent: OrderIntent): string {

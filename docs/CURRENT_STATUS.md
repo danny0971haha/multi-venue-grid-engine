@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: 2026-10-12. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-13. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
@@ -16,11 +16,11 @@ Historical identities, unchanged and retained for reference:
 
 ## Implemented vs reviewed
 
-Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); a fake-only offline integration harness.
+Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A and Phase 3B independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B and Phase 3C independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
-Not implemented: runtime wiring of telemetry, Phase 3C-3E (ownership/duplicates/batch/budget, execution cursor/replay, fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
+Not implemented: runtime wiring of telemetry, Phase 3D-3E (execution cursor/replay, fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
 
 ## Phase 2F telemetry and manifest
 
@@ -90,6 +90,45 @@ Known limitations:
 6. The registry schema version is unchanged (`phase3-intent-registry-1`); the status set and import checks grew. There is no durable journal yet (3E).
 7. Not wired into `src/index.ts`, telemetry, the risk gate or halt flatten paths.
 8. If the fence itself throws, the record stays `CANCEL_PREPARED` and the exception propagates (3E fatal matrix).
+
+## Phase 3C execution coordinator (ownership, duplicates, batch, write budget)
+
+`ExecutionCoordinator` gains `scanOpenOrders`, `cleanupOwnedDuplicates`, `submitBatch` and `startCycle`, and every risk-increasing submit now passes a planned-exposure gate. Tests cover TEST_FAULT_MATRIX P3-E09..P3-E12 (`test/execution/p3-ownership.test.ts`).
+
+- The venue port gains `listOpenOrders`: a fresh snapshot of every open order in the market, owned or not. A snapshot is accepted only if every entry is an `OPEN` order of this venue and market with a unique exchange order ID (otherwise `OPEN_ORDER_OBSERVATION_INVALID`); a failed read is `OPEN_ORDER_SCAN_FAILED`.
+- Each open order is classified `OWNED`, `UNOWNED` or `AMBIGUOUS` through the domain `classifyOwnership`. Only records whose order may still be working (`LINKED`, `CANCEL_PREPARED`, `CANCEL_UNVERIFIED`) grant authority. An owned order must still match its record (client order ID, side, limit price, quantity, reduce-only flag where reported, exchange order ID, and an executed quantity not below the recorded one), or it is `AMBIGUOUS`. An order that no record links, and whose client ID cannot be an engine ID (`mv1` + 20 hex), is `UNOWNED`. A null or engine-shaped client ID stays `AMBIGUOUS`.
+- Any non-owned order and any owned duplicate block risk-increasing intents (`OPEN_ORDER_SCAN_BLOCKS_RISK_INCREASE`) until a later clean scan. A scan marks itself failed before reading, so an exception mid-scan leaves risk increase blocked. Reduce-only exits are not blocked by scan results.
+- `cleanupOwnedDuplicates` rescans. In each slot it keeps the lowest exchange order ID and cancels the others through the 3B cancel path. Unowned and ambiguous orders are never candidates. A cancelled duplicate stays `CANCEL_UNVERIFIED`, and stays reserved, until reconciliation proves it closed. A cancel that ends in any other status stops the remaining cancels (`CLEANUP_STOPPED_BEFORE_SEND`, `PRIOR_CANCEL_NOT_SENT`).
+- The planned-exposure gate (`plannedExposureDecision`; cap `FROZEN_PLANNED_GROSS_NOTIONAL_USDT` = 150, inclusive) reads the signed position and mark/mid price through an `ExposureInputSource` port. It counts, per side and without netting:
+  - the position;
+  - every owned working order's remaining quantity;
+  - every `PREPARED`/`UNKNOWN` intent's full quantity;
+  - all proposed intents together.
+
+  A throwing or non-object read denies with `EXPOSURE_INPUT_UNAVAILABLE`, and a null position or price with `STALE_OR_MISSING_INPUT`. A market order is unbounded and denied. A reduce-only intent with a risk-increasing purpose still counts. Reduce-only exits skip the gate.
+- `submitBatch` runs every check before the first send:
+  - each intent's validity, prior record and admission;
+  - identity and slot conflicts inside the batch;
+  - the write budget for the whole batch;
+  - the exposure of the whole batch.
+
+  Any failure refuses the whole batch with no venue call. Sends then run in order, and each intent is re-admitted first. After a `NOT_SENT` (fence or lease loss, or a write-ahead failure), a journal latch or a failed re-admission, the remaining intents are reported `NOT_SENT` with `BATCH_STOPPED_BEFORE_SEND` and are not recorded. A plain venue rejection does not stop the batch.
+- `writeBudgetPerCycle` must be a positive safe integer. It caps place and cancel attempts per cycle, and `startCycle()` resets it (refused while an operation is in flight). An attempt counts once it reaches the fence, whether sent or not.
+- The Phase 0 bootstrap guard is unchanged; the new names avoid the guarded tokens. Test changes outside the new file are mechanical: the 3A/3B test port literals gained `listOpenOrders`, and the harness gained `writeBudgetPerCycle` (default 100) and `exposure` (default flat 0 at 100). As a result, existing 3A/3B tests now pass through the exposure gate. No 3A/3B assertion changed.
+
+Known limitations:
+
+1. Admission does not stop a second `LINKED` order in the same slot; only a scan finds duplicates. No scan is required before the first risk increase (3E continuation gate).
+2. Scan blockers live in memory only. They are neither persisted nor restored on restart.
+3. A `LINKED` record whose order is missing from a snapshot is neither resolved nor flagged (3D/3E).
+4. `listOpenOrders` takes no market argument; the adapter must scope it to the coordinator's market.
+5. The adapter must return client order IDs exactly as the engine sent them. Hyperliquid cloids are not `mv1` IDs, so until the Phase 4 mapping exists every engine order would classify `UNOWNED`. That fails closed, but it blocks risk increase.
+6. After lease loss the journal is still written; only venue mutations are fenced.
+7. The write budget also limits cancels, including future halt and flatten paths; 3E must decide whether emergency reduction bypasses it. A `NOT_SENT` attempt consumes budget (conservative).
+8. A non-survivor already `CANCEL_UNVERIFIED` is reported with `CANCEL_UNRESOLVED` and not re-sent. One in `CANCEL_PREPARED` stops the cleanup.
+9. The survivor rule compares exchange order IDs as strings (`sim-order-10` sorts before `sim-order-2`). It is deterministic, not chronological.
+10. Batch identity checks put intent IDs and client order IDs in one set (conservative).
+11. Not wired into `src/index.ts`, telemetry, the risk engine's actual-notional path or the halt paths.
 
 ## Process reset (2026-10-11)
 
