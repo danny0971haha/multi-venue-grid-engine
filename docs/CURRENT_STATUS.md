@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: 2026-10-11. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-12. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
@@ -16,11 +16,11 @@ Historical identities, unchanged and retained for reference:
 
 ## Implemented vs reviewed
 
-Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); a fake-only offline integration harness.
+Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F independent review is also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F and Phase 3A independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
-Not implemented: runtime wiring of telemetry, Phase 3 execution coordinator, any venue adapter, integrated dry-run.
+Not implemented: runtime wiring of telemetry, Phase 3B-3E (cancel, ownership/duplicates/batch/budget, execution cursor/replay, fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
 
 ## Phase 2F telemetry and manifest
 
@@ -45,6 +45,28 @@ Known limitations:
 8. One writer per run directory is assumed; production relies on the runtime lease. Telemetry takes no lease itself and detects external appends by a size check before each append.
 9. P2-T01 (unwritable directory) assumes tests do not run as root.
 
+## Phase 3A execution coordinator (place path)
+
+`src/execution/` implements the place half of IMPLEMENTATION_CONTRACT §6.1; tests cover TEST_FAULT_MATRIX P3-E01..P3-E05 plus lease, write-ahead and import cases (`npm run test:phase3`). Planned follow-ups: 3B cancel (P3-E06..E08), 3C ownership, duplicates, batch and write budget (P3-E09..E12), 3D execution cursor and replay (P3-E13..E15), 3E fatal matrix, durable journal and continuation gate.
+
+- The intent registry maps intent ID -> deterministic client order ID -> exchange order ID -> execution IDs. Client IDs must equal the domain derivation (`mv1` + 20 hex); anything else is refused before a send.
+- Each place is written ahead as `PREPARED` through an `IntentJournal` port, then sent through a `MutationFence` that proves the runtime lease immediately before the venue call (`createLeaseMutationFence` wraps `runLeaseFencedMutation`).
+- Outcomes: ACK links the order; a plain rejection is `REJECTED`; a thrown, unknown or duplicate-client-ID result is `UNKNOWN`, never a rejection; a fence or write-ahead failure is `NOT_SENT` with no venue call.
+- Any `PREPARED`/`UNKNOWN` intent blocks every risk-increasing intent and every new intent in the same slot. Only venue evidence for the same client ID (the order, or executions covering the full quantity) resolves it; absence of evidence never does.
+- A journal write failure latches the coordinator: no further submit or reconcile.
+- Registry import is strict (exact keys, sorted records, fingerprints, cross-record uniqueness) and never repairs.
+- The Phase 0 bootstrap guard (`test/bootstrap/runtimeMode.test.ts`) previously forbade the token `placeOrder` anywhere in `src/`. It now allows it only in `src/execution/coordinator.ts`, `src/execution/ports.ts` and `src/simulator/venue.ts`, and additionally requires that no module statically reachable from `src/index.ts` names it. `cancelOrder` and network imports remain forbidden everywhere. This is a guard change for reviewer attention.
+
+Known limitations:
+
+1. The journal is a port only; no durable on-disk journal exists yet (3E). Restart safety is proven only with an in-memory JSON round trip.
+2. There is no proof of non-arrival. A `PREPARED` or `UNKNOWN` intent with no venue evidence stays blocked until an operator or later evidence resolves it.
+3. `mv1` client IDs are 23 characters, not Hyperliquid cloids (128-bit hex). The Phase 4 adapter must map them deterministically and normalize duplicate-cloid rejections to `DUPLICATE_CLIENT_ORDER_ID`.
+4. Execution evidence must carry the intent's client ID. A market order's reported price is not checked during reconciliation.
+5. Not wired into the simulator level state, `src/index.ts`, telemetry or `gateRiskIncreaseOnEvidence`.
+6. If the fence itself throws, the intent stays `PREPARED` and the exception propagates (3E fatal matrix).
+7. `SimulatedVenue` (`src/simulator/venue.ts`) is a test double that lives in `src/` beside the existing simulator.
+
 ## Process reset (2026-10-11)
 
 Between 2026-09-01 and 2026-09-12 no runtime behavior changed; effort went to rebinding exact SHAs, trees, byte hashes and test counts after every change. The integration line retires that machinery (all of it remains in git history):
@@ -64,10 +86,10 @@ On 2026-10-11 the owner removed `trusted-phase2d-freeze-gate` from the `main` br
 PHASE_2E_AUTHORIZED=NO
 LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
 DEPLOYMENT_AUTHORIZED=NO
-MERGE_AUTHORIZED=NO
+MERGE_AUTHORIZED=PR16_PR17_BY_OWNER_ONLY
 ```
 
-On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. Phase 3 and later phases still require an explicit owner decision. Real/testnet credentials and exchange networking remain unauthorized.
+On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. On 2026-10-12 the owner authorized Phase 3 implementation without a Gate 2 PASS (a recorded deviation from ACCEPTANCE_GATES), and authorized merging PR #16 and PR #17 and closing superseded PRs; those merges are performed by the owner, not by this record. Phase 4 and later phases still require an explicit owner decision. Real/testnet credentials and exchange networking remain unauthorized.
 
 Unknown, stale, lease-uncertain or persistence-uncertain state must continue to fail closed and block risk increase. The separate risk, durable state, lease, halt, ACK and process-fence authorities are not a single boolean switch.
 

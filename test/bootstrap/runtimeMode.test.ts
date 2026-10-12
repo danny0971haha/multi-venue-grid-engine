@@ -37,6 +37,23 @@ function listTypeScriptFiles(directory: string): string[] {
   });
 }
 
+// Follows relative static imports (including type-only ones) from src/index.ts.
+function listBootstrapModules(): string[] {
+  const seen = new Set<string>();
+  const pending = [path.join(repositoryRoot, "src", "index.ts")];
+  for (let filePath = pending.pop(); filePath !== undefined; filePath = pending.pop()) {
+    if (seen.has(filePath)) {
+      continue;
+    }
+    seen.add(filePath);
+    const source = readFileSync(filePath, "utf8");
+    for (const match of source.matchAll(/(?:from|import) ["'](\.{1,2}\/[^"']+)\.js["']/g)) {
+      pending.push(path.resolve(path.dirname(filePath), `${match[1] ?? ""}.ts`));
+    }
+  }
+  return [...seen];
+}
+
 test("missing RUNTIME_MODE resolves to DRY_RUN", () => {
   assert.equal(resolveRuntimeMode(undefined), DEFAULT_RUNTIME_MODE);
   assert.equal(resolveRuntimeMode(""), DEFAULT_RUNTIME_MODE);
@@ -76,11 +93,31 @@ test("dry-run bootstrap performs zero network or exchange mutations", () => {
   const networkImport =
     /from ["'](?:node:(?:http|https|net|dns|tls|dgram|undici)|https?|net|undici|ws|axios|websocket)["']/;
 
+  // Phase 3A introduces the venue write port (VENUE_ADAPTER_CONTRACT §3) for the fenced
+  // coordinator and its test double. Only these files may name it; none may be reachable
+  // from the dry-run bootstrap.
+  const placeOrderFiles = new Set([
+    "src/execution/coordinator.ts",
+    "src/execution/ports.ts",
+    "src/simulator/venue.ts",
+  ]);
+
   for (const filePath of listTypeScriptFiles(sourceRoot)) {
     const source = readFileSync(filePath, "utf8");
+    const relativePath = path.relative(repositoryRoot, filePath).split(path.sep).join("/");
     assert.equal(networkImport.test(source), false, filePath);
-    assert.equal(source.includes("placeOrder"), false, filePath);
+    assert.equal(
+      source.includes("placeOrder") && !placeOrderFiles.has(relativePath),
+      false,
+      filePath,
+    );
     assert.equal(source.includes("cancelOrder"), false, filePath);
+  }
+
+  const bootstrapModules = listBootstrapModules();
+  assert.ok(bootstrapModules.includes(path.join(sourceRoot, "bootstrap", "runtimeMode.ts")));
+  for (const filePath of bootstrapModules) {
+    assert.equal(readFileSync(filePath, "utf8").includes("placeOrder"), false, filePath);
   }
 });
 

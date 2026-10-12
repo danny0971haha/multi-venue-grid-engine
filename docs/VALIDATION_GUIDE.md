@@ -5,8 +5,8 @@ These are distinct evidence classes. Success in one never implies success in ano
 | Evidence class | Entrypoint | Meaning and limit |
 | --- | --- | --- |
 | Full local/CI validation | `npm run ci` | Format check, lint, typecheck, `npm test`, secret scan, build, dry-run. The same steps run in `.github/workflows/ci.yml`. |
-| Product tests | `npm test` | Every product suite: bootstrap, math, domain, strategy, simulator, persistence, risk, halt/ACK/crash, telemetry/manifest, offline integration. Expects 0 fail/cancelled/skip/todo. |
-| Focused suites | `npm run test:phase2f`, `npm run test:phase2e`, `npm run test:offline-integration`, `npm run test:phase2d*` | Subsets of `npm test` for faster iteration. |
+| Product tests | `npm test` | Every product suite: bootstrap, math, domain, strategy, simulator, persistence, risk, halt/ACK/crash, telemetry/manifest, execution coordinator, offline integration. Expects 0 fail/cancelled/skip/todo. |
+| Focused suites | `npm run test:phase3`, `npm run test:phase2f`, `npm run test:phase2e`, `npm run test:offline-integration`, `npm run test:phase2d*` | Subsets of `npm test` for faster iteration. |
 | Offline simulation | `npm run simulate:offline-integration` | Deterministic fake-only wiring of existing modules with replay hashes. Not production orchestration or a new phase. |
 | Historical evidence bytes | `npm run verify:candidate-evidence`, `npm run test:candidate-evidence` | Optional. Verifies the retained `docs/evidence/current-candidate/` packet is byte-intact. |
 | Testnet/live authorization | Separate owner/reviewer decision | Absent. No command here grants it. |

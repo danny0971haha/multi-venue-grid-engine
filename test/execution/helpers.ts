@@ -1,0 +1,145 @@
+import type { ClientOrderId } from "../../src/domain/ids.js";
+import { makeClientOrderId, makeIntentId, makeScopeKey } from "../../src/domain/ids.js";
+import type { OrderIntent } from "../../src/domain/types.js";
+import {
+  ExecutionCoordinator,
+  type ExecutionVenuePort,
+  type FenceResult,
+  type IntentJournal,
+  IntentRegistry,
+  type IntentRegistryState,
+  type MutationFence,
+} from "../../src/execution/index.js";
+import { SimulatedVenue } from "../../src/simulator/venue.js";
+
+export const SCOPE_KEY = makeScopeKey("canary-01", "sim", "BTC_USDC_PERP", "grid-v0.1");
+export const OBSERVED_AT = "2026-08-22T00:00:00.000Z";
+
+type IntentOverrides = Partial<
+  Pick<
+    OrderIntent,
+    | "runId"
+    | "anchorEpoch"
+    | "logicalLevelId"
+    | "purpose"
+    | "side"
+    | "type"
+    | "timeInForce"
+    | "price"
+    | "quantity"
+    | "reduceOnly"
+    | "leaseGeneration"
+  >
+> & { sequence?: string };
+
+// Builds a valid place intent whose intent ID and client order ID follow the domain derivation.
+export function buildIntent(overrides: IntentOverrides = {}): OrderIntent {
+  const { sequence = "1", ...fields } = overrides;
+  const base = {
+    experimentId: "exp-1",
+    runId: "run-1",
+    scopeKey: SCOPE_KEY,
+    anchorEpoch: "epoch-1",
+    logicalLevelId: "B1",
+    purpose: "GRID_ENTRY",
+    side: "BUY",
+    type: "LIMIT",
+    timeInForce: "GTC",
+    price: "100",
+    quantity: "0.01",
+    reduceOnly: false,
+    leaseGeneration: "1",
+    createdAt: OBSERVED_AT,
+    ...fields,
+  } satisfies Omit<OrderIntent, "intentId" | "clientOrderId">;
+  const intentId = makeIntentId({ ...base, sequence });
+  return {
+    ...base,
+    intentId,
+    clientOrderId: makeClientOrderId({ ...base, intentId }),
+  };
+}
+
+export function clientIdOf(intent: OrderIntent): ClientOrderId {
+  if (intent.clientOrderId === null) {
+    throw new Error("TEST_INTENT_WITHOUT_CLIENT_ORDER_ID");
+  }
+  return intent.clientOrderId;
+}
+
+// In-memory journal that round-trips through JSON, like a durable store would.
+export class MemoryJournal implements IntentJournal {
+  readonly snapshots: string[] = [];
+  private readonly script: Array<"OK" | "FAIL"> = [];
+
+  scriptPersist(...outcomes: Array<"OK" | "FAIL">): void {
+    this.script.push(...outcomes);
+  }
+
+  async persist(state: IntentRegistryState): Promise<void> {
+    if ((this.script.shift() ?? "OK") === "FAIL") {
+      throw new Error("TEST_JOURNAL_WRITE_FAILED");
+    }
+    this.snapshots.push(JSON.stringify(state));
+  }
+
+  latest(): unknown {
+    const last = this.snapshots.at(-1);
+    if (last === undefined) {
+      throw new Error("TEST_JOURNAL_EMPTY");
+    }
+    return JSON.parse(last);
+  }
+}
+
+// Always lets the mutation run; a throwing mutation is UNKNOWN, as with the lease fence.
+export function openFence(leaseGeneration = "1"): MutationFence {
+  return {
+    leaseGeneration,
+    async run<T>(mutation: () => Promise<T>): Promise<FenceResult<T>> {
+      try {
+        return { outcome: "SENT", value: await mutation(), reasonCodes: [] };
+      } catch {
+        return { outcome: "UNKNOWN", value: null, reasonCodes: ["FENCED_CALLBACK_THREW"] };
+      }
+    },
+  };
+}
+
+export function notSentFence(leaseGeneration = "1"): MutationFence {
+  return {
+    leaseGeneration,
+    async run<T>(): Promise<FenceResult<T>> {
+      return { outcome: "NOT_SENT", value: null, reasonCodes: ["MUTATION_NOT_SENT"] };
+    },
+  };
+}
+
+export type Harness = {
+  venue: SimulatedVenue;
+  journal: MemoryJournal;
+  registry: IntentRegistry;
+  coordinator: ExecutionCoordinator;
+};
+
+export function createHarness(
+  options: {
+    venue?: SimulatedVenue;
+    port?: ExecutionVenuePort;
+    journal?: MemoryJournal;
+    registry?: IntentRegistry;
+    fence?: MutationFence;
+  } = {},
+): Harness {
+  const venue = options.venue ?? new SimulatedVenue("sim", "BTC_USDC_PERP", OBSERVED_AT);
+  const journal = options.journal ?? new MemoryJournal();
+  const registry = options.registry ?? new IntentRegistry();
+  const coordinator = new ExecutionCoordinator({
+    config: { experimentId: "exp-1", runId: "run-1", scopeKey: SCOPE_KEY },
+    registry,
+    venue: options.port ?? venue,
+    fence: options.fence ?? openFence(),
+    journal,
+  });
+  return { venue, journal, registry, coordinator };
+}
