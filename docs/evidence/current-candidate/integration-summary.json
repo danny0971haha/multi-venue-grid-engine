@@ -1,0 +1,38 @@
+{
+  "repository": "multi-venue-grid-engine",
+  "mode": "test",
+  "liveExchangeWrites": false,
+  "networkAccessRequired": false,
+  "authorizationGranted": false,
+  "validationCompleted": true,
+  "checks": [
+    {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "test/offline-integration/integration.test.ts"
+      ],
+      "exitCode": 0,
+      "log": "artifacts/offline-candidate/test/01.log",
+      "logSha256": "7b0acec7f565862f6a7d0db4120e3551da7a4d2d44f755c5e45b4bf8d250b3f5",
+      "tap": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "blockers": [],
+  "networkIsolation": "LINUX_SECCOMP_UNIX_SOCKETS_ONLY",
+  "candidate": "704afa2dd858c52dad06aa22941d463aa5ce4d69",
+  "candidateTree": "bda9793acd2fb8de033f65739b8c092cbdec7d9b",
+  "workingTreeStatus": "M  .gitignore\nM  AI_START_HERE.md\nM  README.md\nA  docs/CURRENT_STATUS.md\nA  docs/VALIDATION_GUIDE.md\nM  package.json\nAM scripts/offline-candidate.py\nA  scripts/validation-tests/test_offline_candidate.py\nA  test/offline-integration/integration.test.ts\nA  test/offline-integration/reload-worker.ts\nA  test/offline-integration/run.ts\nA  test/offline-integration/scenarios.ts",
+  "frozenBaselineTree": "1b0afe805269972cf7af40f7fbf0e4e6b3e35894",
+  "frozenIdentityPreserved": true
+}

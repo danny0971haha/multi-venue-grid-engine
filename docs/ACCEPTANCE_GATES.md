@@ -12,6 +12,20 @@ BLOCKED
 
 Green CI is necessary but never sufficient. No gate in this document authorizes live exchange writes.
 
+**Independent-review status (narrowly additive, 2026-08-24):**
+
+```text
+GATE_0=PASS
+GATE_1=PASS
+GATE_2=NOT_REVIEWED
+PHASE_2A=REVIEW_CANDIDATE
+PHASE_2A_CORRECTIVE_1=REJECT
+PHASE_2A_CORRECTIVE_2=REVIEW_CANDIDATE
+PHASE_2B_AUTHORIZED=NO
+```
+
+Phase 2A implements only read-side canonical envelope validation and exact-pair inspection. It does not complete Gate 2. See `docs/PHASE_2A_CONTRACT.md`.
+
 ## Gate 0 — deterministic baseline
 
 PASS only if current-byte evidence proves:

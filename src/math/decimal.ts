@@ -26,8 +26,21 @@ export class InvalidDecimalError extends Error {
   }
 }
 
+export const decimalConstructorStats = {
+  calls: 0,
+};
+
+export function resetDecimalConstructorStats(): void {
+  decimalConstructorStats.calls = 0;
+}
+
+function constructCanonicalDecimal(value: string): Decimal {
+  decimalConstructorStats.calls += 1;
+  return new CanonicalDecimal(value);
+}
+
 function asDecimal(value: DecimalString): Decimal {
-  return new CanonicalDecimal(parseDecimalString(value));
+  return constructCanonicalDecimal(parseDecimalString(value));
 }
 
 export function toCanonicalString(value: Decimal): DecimalString {
@@ -55,7 +68,7 @@ export function parseDecimalString(value: string): DecimalString {
     throw new InvalidDecimalError("NON_CANONICAL_DECIMAL");
   }
 
-  const parsed = new CanonicalDecimal(value);
+  const parsed = constructCanonicalDecimal(value);
   if (!parsed.isFinite()) {
     throw new InvalidDecimalError("NON_FINITE_DECIMAL");
   }

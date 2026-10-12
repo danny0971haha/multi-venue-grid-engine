@@ -9,6 +9,8 @@ coverage/
 *.key
 *.log
 data/
+artifacts/
 .DS_Store
 .idea/
 .vscode/
+__pycache__/

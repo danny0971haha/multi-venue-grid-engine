@@ -4,9 +4,52 @@ Version: `0.2.0`
 
 This contract defines the implementation sequence for the independent multi-venue perpetual grid engine.
 
-**Current authorization: Phase 0 only.** Later phases are defined so architecture is stable, but each later phase requires the preceding independent gate to PASS and should receive a fresh bounded phase prompt tied to the actual accepted baseline SHA.
+Independent-review status is recorded below. Later work requires a fresh bounded prompt tied to the accepted baseline SHA. This file does not authorize Phase 2E, Gate 2, live writes, merge, or deployment.
 
-No phase in this initial contract authorizes live exchange writes.
+No phase in this contract authorizes live exchange writes.
+
+**Independent-review status (narrowly additive, 2026-08-25 evidence-corrective-1):**
+
+```text
+GATE_0=PASS
+GATE_1=PASS
+PHASE_2A=PASS
+PHASE_2B=PASS
+PHASE_2C_CORRECTIVE_2=PASS
+ACCEPTED_PHASE_1_HEAD=057732cee021889d17573425ee4f24e2065df1e9
+ACCEPTED_PHASE_2A_HEAD=51400c0f5a43c96f691115383e565743f543c9ee
+ACCEPTED_PHASE_2B_HEAD=41eb277a7d6dfe36dbb864bc8190d5a20663dc4a
+AUTHORIZED_CHECKPOINT=PHASE_2D_CORRECTIVE_4_EVIDENCE_CORRECTIVE_1
+CORRECTIVE_4_IMPLEMENTATION_BASE=c64fa291af0d53139c6c526cd25ede434c08c17b
+CUMULATIVE_PHASE_2_BASELINE=PASS
+INTEGRATION_MERGE_HEAD=5b0fd685586ec57b110159ccc36e5b21ba23ac28
+INTEGRATION_MERGE_TREE=420c4184209a0c919829e5fc1b66b653d37b8460
+PHASE1_IS_ANCESTOR_OF_INTEGRATION=YES
+PHASE_2C=REJECT
+PHASE_2C_CORRECTIVE_1=REJECT
+PHASE_2C_SELF_DECLARED_PASS=NO
+PHASE_2D=REJECT
+PHASE_2D_CORRECTIVE_1=REJECT
+PHASE_2D_CORRECTIVE_2=ACCEPT
+PHASE_2D_CORRECTIVE_3=REJECT
+PHASE_2D_CORRECTIVE_4_IMPLEMENTATION=ACCEPT
+PHASE_2D_CORRECTIVE_4_IMPLEMENTATION_BASE=c64fa291af0d53139c6c526cd25ede434c08c17b
+PHASE_2D_CORRECTIVE_4_EVIDENCE_HEAD=76171a19f3bc2ade35f4d86cbd9b591aaf90dc8b
+PHASE_2D_CORRECTIVE_4_EVIDENCE_HEAD_DISPOSITION=REJECT
+PHASE_2D_CORRECTIVE_4_EVIDENCE_CORRECTIVE_1=REVIEW_CANDIDATE
+PHASE_2D_CORRECTIVE_4_OVERALL=REVIEW_CANDIDATE
+PHASE_2D_SELF_DECLARED_PASS=NO
+PHASE_2E_AUTHORIZED=NO
+PHASE_2E_STARTED=NO
+GATE_2=NOT_REVIEWED
+ALLOW_RISK_INCREASE=false
+SYSTEM_ALLOW_RISK_INCREASE=false
+LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
+MERGE_AUTHORIZED=NO
+DEPLOYMENT_AUTHORIZED=NO
+```
+
+Authoritative Phase 2A rules are in `docs/PHASE_2A_CONTRACT.md`. This file is not otherwise revised.
 
 ## 1. Binding inputs
 

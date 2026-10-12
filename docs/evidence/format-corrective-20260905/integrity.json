@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "restoredFromCommit": "a8402fd552d6e2fcf0436d8f2872b7618cb92412",
+  "manifest": "docs/evidence/current-candidate/files.json",
+  "identity": "SHA-256 and byte length of the actual current file at each manifest path",
+  "restoredFiles": [
+    "diagnostic-results.json",
+    "results.json",
+    "simulate-summary.json",
+    "umbrella-summary.json"
+  ],
+  "retainedFormatting": [
+    "test/offline-integration/reload-worker.ts",
+    "test/offline-integration/scenarios.ts"
+  ],
+  "historicalResultsRegenerated": false,
+  "semanticEqualitySubstitutesForByteIdentity": false
+}

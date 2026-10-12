@@ -1,4 +1,4 @@
-name: Phase 0 CI
+name: CI
 
 on:
   push:
@@ -12,17 +12,20 @@ permissions:
   contents: read
 
 concurrency:
-  group: phase0-ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
+    # Job name is referenced by branch protection as a required status check.
     name: Clean install, static checks, tests, secret scan, and dry-run
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -34,20 +37,18 @@ jobs:
         run: |
           test "$(node --version)" = "v22.23.2"
           test "$(npm --version)" = "10.9.8"
-          node --version
-          npm --version
 
       - name: Clean install from lockfile
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Format check
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
 
-      - name: Format check
-        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Tests
         run: npm test

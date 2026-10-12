@@ -1,58 +1,35 @@
 # AI START HERE
 
-You are the bounded implementation agent for this repository.
+Use this entrypoint for the current bounded task, not as a standing instruction to restart an earlier phase. [AGENTS.md](AGENTS.md) defines behavior and safety; this file is a reading map, not a second authorization source.
 
-## Required reading order
+## Start every task here
 
-Read these files completely before editing:
+1. Read [AGENTS.md](AGENTS.md) and [CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
+2. Read [REVIEW_CHANGE_PROTOCOL.md](docs/REVIEW_CHANGE_PROTOCOL.md) for authority, material conflicts, phase gates and evidence integrity.
+3. Identify the operator's current objective, analysis-only versus implementation mode, allowed paths and required checks. Record actual branch, HEAD/tree, working-tree status and relevant candidate refs before changes.
 
-1. `AGENTS.md`
-2. `docs/EXPERIMENT_SPEC.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/DOMAIN_CONTRACTS.md`
-5. `docs/VENUE_ADAPTER_CONTRACT.md`
-6. `docs/RISK_PERSISTENCE_CONTRACT.md`
-7. `docs/IMPLEMENTATION_CONTRACT.md`
-8. `docs/PHASE_0_CONTRACT.md`
-9. `docs/TEST_FAULT_MATRIX.md`
-10. `docs/ACCEPTANCE_GATES.md`
-11. `docs/EVIDENCE_TEMPLATE.md`
-12. `docs/REVIEW_CHANGE_PROTOCOL.md`
-13. `docs/THIRD_PARTY_BOUNDARY.md`
+A status snapshot is not proof that remote refs still match it. Check expected identities through permitted reads; an offline workflow must not enable networking to do so. State which refs could not be checked. Missing scope does not authorize a new phase.
 
-## Your authorized task
+## Read according to impact
 
-Implement **Phase 0 only** from `docs/PHASE_0_CONTRACT.md`.
+| Task impact | Additional required reading |
+| --- | --- |
+| Documentation, navigation or formatting only | Affected documents, their incoming/outgoing references and any contract statement being described. |
+| Validation tooling, fixtures or tests | [VALIDATION_GUIDE.md](docs/VALIDATION_GUIDE.md), the affected test contract, [TEST_FAULT_MATRIX.md](docs/TEST_FAULT_MATRIX.md) and [EVIDENCE_TEMPLATE.md](docs/EVIDENCE_TEMPLATE.md). |
+| Runtime, risk, persistence, halt/ACK or execution | [EXPERIMENT_SPEC.md](docs/EXPERIMENT_SPEC.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [DOMAIN_CONTRACTS.md](docs/DOMAIN_CONTRACTS.md), [RISK_PERSISTENCE_CONTRACT.md](docs/RISK_PERSISTENCE_CONTRACT.md), relevant phase contracts and fault matrices; also [VENUE_ADAPTER_CONTRACT.md](docs/VENUE_ADAPTER_CONTRACT.md) when venue semantics are involved. |
+| Phase implementation or formal gate handoff | [IMPLEMENTATION_CONTRACT.md](docs/IMPLEMENTATION_CONTRACT.md), the explicitly authorized phase/checkpoint contract, [ACCEPTANCE_GATES.md](docs/ACCEPTANCE_GATES.md) and [EVIDENCE_TEMPLATE.md](docs/EVIDENCE_TEMPLATE.md). |
+| External concepts, venue research or dependencies | [THIRD_PARTY_BOUNDARY.md](docs/THIRD_PARTY_BOUNDARY.md), relevant venue/dependency contracts and verified primary sources for facts used. |
 
-Create a feature branch such as:
+Read the applicable material fully enough to establish the affected semantics. Explicit task/gate reading requirements remain mandatory. If impact is uncertain, expand read-only investigation before editing. Convenience reading order does not override the protocol's precedence or any safety contract.
 
-```bash
-git checkout -b experiment/v0.1-phase0
-```
+## Execution and stopping
 
-Do not implement Phase 1 early, even if Phase 0 is simple.
+For an authorized implementation, complete the objective end to end under the autonomy rules in AGENTS.md. Resolve ordinary in-scope implementation failures without requesting another prompt. Keep required validation commands, pinned dependencies, historical test identities and fail-closed behavior intact.
 
-## Absolute restrictions
+On a material unresolved contract conflict, stop disputed implementation with `BLOCKED_CONTRACT_CHANGE_REQUIRED`. Give the exact files/statements, impact, safest no-change behavior and proposed resolution; do not silently reinterpret the contract or modify your rules to get unstuck.
 
-- Do not copy or import RitMEX source code.
-- Do not perform live exchange writes.
-- Do not use production trading credentials.
-- Do not add exchange authentication/signing or live order methods in Phase 0.
-- Do not change the frozen experiment envelope.
-- Do not weaken fail-closed requirements.
-- Do not modify architecture/contract documents to make implementation easier.
-- Do not self-declare Gate 0 PASS.
+For the candidate status recorded in CURRENT_STATUS, real/testnet credentials, exchange networking, a new runtime phase, automatic governance rebind, deployment and merge remain unauthorized. Historical requests and implemented candidate code do not grant those permissions.
 
-If a contract is internally inconsistent or cannot be implemented as written, stop with `BLOCKED_CONTRACT_CHANGE_REQUIRED` and describe the exact conflict. Do not silently reinterpret it.
+## Completion
 
-## Completion rule
-
-When Phase 0 implementation and validation are complete:
-
-1. commit/push only to the Phase 0 feature branch;
-2. fill out `docs/EVIDENCE_TEMPLATE.md` in your response;
-3. include exact base/result commit SHAs, changed files, diff stat, commands, exit codes, test counts, and unresolved risks;
-4. explicitly attest that no live exchange write occurred;
-5. stop.
-
-Do not proceed to Phase 1 until an independent reviewer returns `PASS` for Gate 0.
+Perform final diff/counterexample self-review and return the required evidence packet with exact identities, scope, real command exits, counts, hashes and unresolved blockers. State what was not run and whether credentials or exchange writes were used. Commit/push only where authorized, on the task's feature branch. Stop after handoff; self-review is not independent acceptance and does not start the next phase.

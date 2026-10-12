@@ -1,0 +1,75 @@
+{
+  "verifiedAtUtc": "2026-09-08T08:25:00Z",
+  "downloadSource": "https://api.github.com/repos/danny0971haha/multi-venue-grid-engine/actions/artifacts/10047050163/zip",
+  "githubArtifactDigest": "sha256:eabc5add87f77316d6cb7116b0f98adb9e997f00da3df4449cb013181bc4dddc",
+  "downloadedZip": {
+    "path": "zip/ci-native-log-retention-34203992314-attempt-1.zip",
+    "bytes": 3786,
+    "sha256": "eabc5add87f77316d6cb7116b0f98adb9e997f00da3df4449cb013181bc4dddc",
+    "matchesGitHubArtifactDigest": true
+  },
+  "testedCheckoutSha": "82105054f9aac595e767e5203d3e581ec3c10126",
+  "testedCheckoutTree": "fbeb1194203ad280587070416e2461114b1bcfb4",
+  "sourceHead": "4ead28400903ad6c62616835aa9459f67c6d8cd9",
+  "sourceHeadUsedAsTestedSha": false,
+  "verifyMjs": {
+    "command": [
+      "node",
+      "scripts/ci-native-log-retention/verify.mjs",
+      "docs/evidence/ci-native-log-retention-20260908/downloaded-packet"
+    ],
+    "exitCode": 0,
+    "ok": true,
+    "errors": [],
+    "integrationStatus": "RAN",
+    "freshExecutionLog": "OBTAINED",
+    "historicalOriginalLog": "NOT_OBTAINED"
+  },
+  "nativeChildLog": {
+    "path": "downloaded-packet/native/artifacts/offline-candidate/test/01.log",
+    "bytes": 2418,
+    "sha256": "8e377fa0b818364f0bc42afdb5b90fb5c999bddc8ba3800e96d6bf356c514849",
+    "tap": {
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "tapSource": "downloaded native log bytes, not wrapper summary"
+  },
+  "wrapperStdout": {
+    "path": "downloaded-packet/wrapper.stdout.log",
+    "bytes": 1148,
+    "sha256": "be4a3fc383b2c1fe3c1af386c735e30a9105e664be31e9b0eab57eb543af163b",
+    "reportedLogSha256": "8e377fa0b818364f0bc42afdb5b90fb5c999bddc8ba3800e96d6bf356c514849",
+    "matchesNativeSha256": true,
+    "wrapperCandidateSha": "82105054f9aac595e767e5203d3e581ec3c10126"
+  },
+  "wrapperStderr": {
+    "path": "downloaded-packet/wrapper.stderr.log",
+    "bytes": 98,
+    "sha256": "2890c4e48fd963e0bf449f7bb16f3319f985c21b83e93daa43b377a4388ba5fe"
+  },
+  "childCommandExit": {
+    "observedFromCaptureWait": 0,
+    "signal": null,
+    "notInferredFromGitHubConclusion": true
+  },
+  "newToolTests": {
+    "ciStep": "CI native log retention tool tests",
+    "reporter": "tap",
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "notAddedInto": ["25", "474", "13", "79"]
+  },
+  "historicalOriginalLog": "NOT_OBTAINED",
+  "freshExecutionLog": "OBTAINED",
+  "freshPacketVerification": "VERIFIED_FROM_DOWNLOAD",
+  "doesNotRecoverHistoricalRun33967073453": true
+}
