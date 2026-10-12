@@ -9,6 +9,8 @@ import type {
 } from "../domain/ids.js";
 import { parseScopeKey } from "../domain/ids.js";
 import type {
+  CancelAck,
+  CancelRequest,
   ExchangeOrderObservation,
   ExecutionObservation,
   OrderAck,
@@ -17,10 +19,12 @@ import type {
 } from "../domain/types.js";
 import { decimalAdd, decimalCmp, isCanonicalDecimalString } from "../math/decimal.js";
 import {
+  type CancelResolution,
   type IntentLink,
   type IntentRecord,
   type IntentRegistry,
   type IntentStatus,
+  type RecordedExecution,
   intentFingerprint,
   placeIntentProblem,
 } from "./intent-registry.js";
@@ -77,10 +81,13 @@ const RISK_REDUCING_PURPOSES = new Set<string>([
 
 type LookupDecision =
   | { kind: "UNRESOLVED"; reasonCode: string }
-  | { kind: "LINK"; link: IntentLink };
+  | { kind: "LINK"; link: IntentLink }
+  | { kind: "RESOLVE_CANCEL"; resolution: CancelResolution };
 
-// Owns intent identity and place outcomes for one experiment scope. One operation runs at a
-// time; any unresolved intent or journal failure blocks risk increase.
+type ExecutionFacts = Pick<RecordedExecution, "exchangeOrderId" | "quantity" | "price">;
+
+// Owns intent identity and place/cancel outcomes for one experiment scope. One operation runs
+// at a time; any unresolved intent or journal failure blocks risk increase.
 export class ExecutionCoordinator {
   private readonly config: ExecutionCoordinatorConfig;
   private readonly registry: IntentRegistry;
@@ -113,6 +120,20 @@ export class ExecutionCoordinator {
     this.busy = true;
     try {
       return await this.submitExclusive(intent);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // Cancels one linked order recorded by this coordinator. A sent or possibly sent cancel is
+  // never assumed to have worked; it stays unresolved until fresh venue evidence.
+  async cancel(intentId: IntentId): Promise<SubmitResult> {
+    if (this.busy) {
+      return refused("COORDINATOR_BUSY");
+    }
+    this.busy = true;
+    try {
+      return await this.cancelExclusive(intentId);
     } finally {
       this.busy = false;
     }
@@ -169,11 +190,7 @@ export class ExecutionCoordinator {
   }
 
   private admissionProblem(intent: OrderIntent): string | null {
-    if (
-      intent.experimentId !== this.config.experimentId ||
-      intent.runId !== this.config.runId ||
-      intent.scopeKey !== this.config.scopeKey
-    ) {
+    if (!this.inScope(intent)) {
       return "INTENT_SCOPE_MISMATCH";
     }
     if (intent.leaseGeneration !== this.fence.leaseGeneration) {
@@ -250,8 +267,112 @@ export class ExecutionCoordinator {
     }).reasonCodes;
   }
 
-  // Resolves PREPARED/UNKNOWN intents only from venue evidence for their client order ID.
-  // Absence of evidence never proves the order was not sent.
+  private async cancelExclusive(intentId: IntentId): Promise<SubmitResult> {
+    if (this.journalFailed) {
+      return refused("JOURNAL_LATCHED");
+    }
+    const record = this.registry.get(intentId);
+    if (record === null) {
+      return refused("INTENT_NOT_REGISTERED");
+    }
+    const problem = this.cancelProblem(record);
+    if (problem !== null || record.exchangeOrderId === null) {
+      return refused(problem ?? "CANCEL_REQUIRES_LINKED_ORDER");
+    }
+
+    this.registry.markCancelPrepared(intentId, []);
+    if (!(await this.persist())) {
+      const reverted = this.revertCancel(record, ["JOURNAL_WRITE_FAILED"]);
+      return { disposition: "RECORDED", record: reverted, reasonCodes: ["JOURNAL_WRITE_FAILED"] };
+    }
+
+    const request: CancelRequest = {
+      scopeKey: record.intent.scopeKey,
+      exchangeOrderId: record.exchangeOrderId,
+      clientOrderId: record.intent.clientOrderId,
+    };
+    const fenced = await this.fence.run(() => this.venue.cancelOrder(structuredClone(request)));
+    const reasonCodes = this.applyCancelOutcome(record, fenced);
+    if (!(await this.persist())) {
+      reasonCodes.push("JOURNAL_WRITE_FAILED");
+    }
+    return { disposition: "RECORDED", record: this.registry.get(intentId), reasonCodes };
+  }
+
+  // Only a linked, not fully executed order of this scope is provably owned and cancellable.
+  private cancelProblem(record: IntentRecord): string | null {
+    if (!this.inScope(record.intent)) {
+      return "INTENT_SCOPE_MISMATCH";
+    }
+    switch (record.status) {
+      case "LINKED":
+        return decimalCmp(record.executedQuantity, record.intent.quantity) < 0
+          ? null
+          : "ORDER_FULLY_EXECUTED";
+      case "CANCEL_PREPARED":
+      case "CANCEL_UNVERIFIED":
+        return "CANCEL_UNRESOLVED";
+      case "CANCELLED":
+      case "FILLED":
+        return "ORDER_ALREADY_CLOSED";
+      default:
+        return "CANCEL_REQUIRES_LINKED_ORDER";
+    }
+  }
+
+  // A cancel ACK proves at most that the request was accepted (VENUE_ADAPTER_CONTRACT §9.1),
+  // and a rejection may mean the order already closed. Only a proven non-send restores LINKED.
+  private applyCancelOutcome(
+    record: IntentRecord,
+    fenced: FenceResult<VenueWriteResult<CancelAck>>,
+  ): string[] {
+    const intentId = record.intent.intentId;
+    if (fenced.outcome === "NOT_SENT") {
+      return this.revertCancel(record, ["FENCE_NOT_SENT", ...fenced.reasonCodes]).reasonCodes;
+    }
+    const result = fenced.value;
+    if (fenced.outcome !== "SENT" || result === null) {
+      return this.registry.markCancelUnverified(intentId, [
+        "TRANSPORT_OUTCOME_UNKNOWN",
+        ...fenced.reasonCodes,
+      ]).reasonCodes;
+    }
+    switch (result.kind) {
+      case "ACK":
+        return this.registry.markCancelUnverified(intentId, [
+          cancelAckMatches(record, result.ack) ? "CANCEL_ACK" : "ACK_IDENTITY_MISMATCH",
+        ]).reasonCodes;
+      case "REJECTED":
+        return this.registry.markCancelUnverified(intentId, ["CANCEL_REJECTED"]).reasonCodes;
+      case "UNKNOWN":
+        return this.registry.markCancelUnverified(intentId, ["VENUE_OUTCOME_UNKNOWN"]).reasonCodes;
+      case "NOT_SENT":
+        return this.revertCancel(record, ["VENUE_NOT_SENT"]).reasonCodes;
+      default:
+        return this.registry.markCancelUnverified(intentId, ["UNRECOGNIZED_VENUE_RESULT"])
+          .reasonCodes;
+    }
+  }
+
+  // Restores the pre-cancel LINKED record when the cancel provably never left this process.
+  private revertCancel(record: IntentRecord, reasonCodes: string[]): IntentRecord {
+    return this.registry.resolveCancel(record.intent.intentId, {
+      status: "LINKED",
+      executions: record.executions,
+      reasonCodes,
+    });
+  }
+
+  private inScope(intent: OrderIntent): boolean {
+    return (
+      intent.experimentId === this.config.experimentId &&
+      intent.runId === this.config.runId &&
+      intent.scopeKey === this.config.scopeKey
+    );
+  }
+
+  // Resolves unresolved place and cancel intents only from venue evidence for their client
+  // order ID. Absence of evidence never proves an order was not sent, cancelled or filled.
   private async reconcileExclusive(): Promise<ReconcileResult> {
     if (this.journalFailed) {
       return { reasonCodes: ["JOURNAL_LATCHED"], items: [] };
@@ -271,7 +392,10 @@ export class ExecutionCoordinator {
         });
         continue;
       }
-      const decision = evaluateLookup(intent, lookup, this.registry);
+      const decision =
+        record.exchangeOrderId === null
+          ? evaluateLookup(intent, lookup, this.registry)
+          : evaluateCancelLookup(record, lookup, this.registry);
       if (decision.kind === "UNRESOLVED") {
         items.push({
           intentId: intent.intentId,
@@ -280,12 +404,15 @@ export class ExecutionCoordinator {
         });
         continue;
       }
-      const linked = this.registry.link(intent.intentId, decision.link);
+      const next =
+        decision.kind === "LINK"
+          ? this.registry.link(intent.intentId, decision.link)
+          : this.registry.resolveCancel(intent.intentId, decision.resolution);
       changed = true;
       items.push({
         intentId: intent.intentId,
-        status: linked.status,
-        reasonCodes: linked.reasonCodes,
+        status: next.status,
+        reasonCodes: next.reasonCodes,
       });
     }
     const reasonCodes: string[] = [];
@@ -333,20 +460,10 @@ function evaluateLookup(
   if (order !== null && !orderMatchesIntent(order, intent, venue, market)) {
     return unresolved("LOOKUP_ORDER_MISMATCH");
   }
-  const executions = new Map<string, ExecutionObservation>();
-  for (const execution of lookup.executions) {
-    if (!executionMatchesIntent(execution, intent, venue, market)) {
-      return unresolved("LOOKUP_EXECUTION_MISMATCH");
-    }
-    const seen = executions.get(execution.executionId);
-    if (seen !== undefined && !sameExecution(seen, execution)) {
-      return unresolved("LOOKUP_EXECUTION_MISMATCH");
-    }
-    executions.set(execution.executionId, execution);
+  const unique = uniqueExecutions(intent, lookup.executions, venue, market);
+  if (unique === null) {
+    return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
-  const unique = [...executions.values()].sort((left, right) =>
-    left.executionId < right.executionId ? -1 : 1,
-  );
 
   const exchangeOrderId = order?.exchangeOrderId ?? unique[0]?.exchangeOrderId ?? null;
   if (exchangeOrderId === null) {
@@ -381,19 +498,133 @@ function evaluateLookup(
     link: {
       exchangeOrderId,
       authority: { source: "AUTHORITATIVE_OBSERVATION", evidenceId },
-      executions: unique.map((execution) => ({
-        executionId: execution.executionId,
-        exchangeOrderId: execution.exchangeOrderId,
-        quantity: execution.quantity,
-        price: execution.price,
-      })),
+      executions: unique.map(toRecorded),
       reasonCodes: ["RECONCILED_BY_CLIENT_ORDER_ID"],
     },
   };
 }
 
+// Decides a pending cancel from a fresh lookup. Execution evidence wins over the cancel: only
+// an observed order status, or executions covering the full quantity, ends it. A missing
+// order is a reconciliation case, never a cancel or a fill.
+function evaluateCancelLookup(
+  record: IntentRecord,
+  lookup: ClientOrderLookup,
+  registry: IntentRegistry,
+): LookupDecision {
+  const intent = record.intent;
+  const { venue, market } = parseScopeKey(intent.scopeKey);
+  const order = lookup.order;
+  if (
+    order !== null &&
+    (!orderMatchesIntent(order, intent, venue, market) ||
+      order.exchangeOrderId !== record.exchangeOrderId)
+  ) {
+    return unresolved("LOOKUP_ORDER_MISMATCH");
+  }
+  const unique = uniqueExecutions(intent, lookup.executions, venue, market);
+  if (
+    unique === null ||
+    unique.some((execution) => execution.exchangeOrderId !== record.exchangeOrderId)
+  ) {
+    return unresolved("LOOKUP_EXECUTION_MISMATCH");
+  }
+  const executed = unique.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
+  const compared = decimalCmp(executed, intent.quantity);
+  if (compared > 0) {
+    return unresolved("LOOKUP_OVERFILL");
+  }
+  for (const recorded of record.executions) {
+    const observed = unique.find((execution) => execution.executionId === recorded.executionId);
+    if (observed === undefined) {
+      return unresolved("EXECUTION_EVIDENCE_MISSING");
+    }
+    if (!sameExecution(observed, recorded)) {
+      return unresolved("LOOKUP_EXECUTION_MISMATCH");
+    }
+  }
+  const foreign = unique.some((execution) => {
+    const owner = registry.intentIdForExecutionId(execution.executionId);
+    return owner !== null && owner !== intent.intentId;
+  });
+  if (foreign) {
+    return unresolved("EXECUTION_ID_COLLISION");
+  }
+
+  const executions = unique.map(toRecorded);
+  const full = compared === 0;
+  if (order === null) {
+    return full
+      ? resolvedCancel("FILLED", executions, "FILLED_BY_EXECUTION_EVIDENCE")
+      : unresolved("ORDER_NOT_OBSERVED");
+  }
+  if (decimalCmp(order.executedQuantity, executed) !== 0) {
+    return unresolved("EXECUTION_EVIDENCE_INCOMPLETE");
+  }
+  if (order.status === "FILLED" && full) {
+    return resolvedCancel("FILLED", executions, "ORDER_FILLED");
+  }
+  if (order.status === "CANCELLED" && !full) {
+    return resolvedCancel("CANCELLED", executions, "CANCEL_VERIFIED");
+  }
+  if (order.status === "OPEN" && !full) {
+    return resolvedCancel("LINKED", executions, "ORDER_STILL_ACTIVE");
+  }
+  return unresolved("ORDER_STATUS_UNPROVEN");
+}
+
 function unresolved(reasonCode: string): LookupDecision {
   return { kind: "UNRESOLVED", reasonCode };
+}
+
+function resolvedCancel(
+  status: CancelResolution["status"],
+  executions: RecordedExecution[],
+  reasonCode: string,
+): LookupDecision {
+  return { kind: "RESOLVE_CANCEL", resolution: { status, executions, reasonCodes: [reasonCode] } };
+}
+
+// Validates and de-duplicates execution evidence for one intent, sorted by execution ID. Null
+// means an execution contradicts the intent or another report of the same execution ID.
+function uniqueExecutions(
+  intent: OrderIntent,
+  observed: readonly ExecutionObservation[],
+  venue: VenueId,
+  market: MarketId,
+): ExecutionObservation[] | null {
+  const executions = new Map<string, ExecutionObservation>();
+  for (const execution of observed) {
+    if (!executionMatchesIntent(execution, intent, venue, market)) {
+      return null;
+    }
+    const seen = executions.get(execution.executionId);
+    if (seen !== undefined && !sameExecution(seen, execution)) {
+      return null;
+    }
+    executions.set(execution.executionId, execution);
+  }
+  return [...executions.values()].sort((left, right) =>
+    left.executionId < right.executionId ? -1 : 1,
+  );
+}
+
+function toRecorded(execution: ExecutionObservation): RecordedExecution {
+  return {
+    executionId: execution.executionId,
+    exchangeOrderId: execution.exchangeOrderId,
+    quantity: execution.quantity,
+    price: execution.price,
+  };
+}
+
+function cancelAckMatches(record: IntentRecord, ack: CancelAck): boolean {
+  return (
+    typeof ack === "object" &&
+    ack !== null &&
+    ack.exchangeOrderId === record.exchangeOrderId &&
+    ack.cancelled === true
+  );
 }
 
 function orderMatchesIntent(
@@ -435,7 +666,7 @@ function executionMatchesIntent(
   );
 }
 
-function sameExecution(left: ExecutionObservation, right: ExecutionObservation): boolean {
+function sameExecution(left: ExecutionFacts, right: ExecutionFacts): boolean {
   return (
     left.exchangeOrderId === right.exchangeOrderId &&
     decimalCmp(left.quantity, right.quantity) === 0 &&

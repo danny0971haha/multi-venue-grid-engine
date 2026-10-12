@@ -93,10 +93,11 @@ test("dry-run bootstrap performs zero network or exchange mutations", () => {
   const networkImport =
     /from ["'](?:node:(?:http|https|net|dns|tls|dgram|undici)|https?|net|undici|ws|axios|websocket)["']/;
 
-  // Phase 3A introduces the venue write port (VENUE_ADAPTER_CONTRACT §3) for the fenced
-  // coordinator and its test double. Only these files may name it; none may be reachable
-  // from the dry-run bootstrap.
-  const placeOrderFiles = new Set([
+  // Phase 3A/3B introduce the venue write port (VENUE_ADAPTER_CONTRACT §3) for the fenced
+  // coordinator and its test double. Only these files may name its writes; none may be
+  // reachable from the dry-run bootstrap.
+  const venueWrites = ["placeOrder", "cancelOrder"];
+  const venueWriteFiles = new Set([
     "src/execution/coordinator.ts",
     "src/execution/ports.ts",
     "src/simulator/venue.ts",
@@ -106,18 +107,22 @@ test("dry-run bootstrap performs zero network or exchange mutations", () => {
     const source = readFileSync(filePath, "utf8");
     const relativePath = path.relative(repositoryRoot, filePath).split(path.sep).join("/");
     assert.equal(networkImport.test(source), false, filePath);
-    assert.equal(
-      source.includes("placeOrder") && !placeOrderFiles.has(relativePath),
-      false,
-      filePath,
-    );
-    assert.equal(source.includes("cancelOrder"), false, filePath);
+    for (const write of venueWrites) {
+      assert.equal(
+        source.includes(write) && !venueWriteFiles.has(relativePath),
+        false,
+        `${filePath}: ${write}`,
+      );
+    }
   }
 
   const bootstrapModules = listBootstrapModules();
   assert.ok(bootstrapModules.includes(path.join(sourceRoot, "bootstrap", "runtimeMode.ts")));
   for (const filePath of bootstrapModules) {
-    assert.equal(readFileSync(filePath, "utf8").includes("placeOrder"), false, filePath);
+    const source = readFileSync(filePath, "utf8");
+    for (const write of venueWrites) {
+      assert.equal(source.includes(write), false, `${filePath}: ${write}`);
+    }
   }
 });
 

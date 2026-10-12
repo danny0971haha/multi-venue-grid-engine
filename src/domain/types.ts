@@ -73,6 +73,12 @@ export type OrderAck = {
   intentId: IntentId;
 };
 
+export type CancelRequest = {
+  scopeKey: ScopeKey;
+  exchangeOrderId: ExchangeOrderId;
+  clientOrderId: ClientOrderId | null;
+};
+
 export type CancelAck = {
   exchangeOrderId: ExchangeOrderId;
   cancelled: true;

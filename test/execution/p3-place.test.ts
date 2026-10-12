@@ -279,6 +279,7 @@ describe("P3-E05 no definitive evidence", () => {
     await h.coordinator.submit(intent);
     const port: ExecutionVenuePort = {
       placeOrder: (value) => h.venue.placeOrder(value),
+      cancelOrder: (request) => h.venue.cancelOrder(request),
       async lookupClientOrder(clientOrderId) {
         const lookup = await h.venue.lookupClientOrder(clientOrderId);
         return { ...lookup, order: lookup.order && { ...lookup.order, side: "SELL" } };
@@ -431,6 +432,7 @@ describe("P3 write-ahead journal", () => {
         statusesAtSend.push(record?.status ?? "MISSING");
         return base.venue.placeOrder(intent);
       },
+      cancelOrder: (request) => base.venue.cancelOrder(request),
       lookupClientOrder: (clientOrderId) => base.venue.lookupClientOrder(clientOrderId),
     };
     const h = createHarness({ venue: base.venue, port, journal });
@@ -508,7 +510,7 @@ describe("P3 strict registry import", () => {
         (state) => ({ ...state, records: [...state.records].reverse() }),
       ],
       ["IMPORT_INVALID_RECORD", (state) => withRecord(state, { extra: true })],
-      ["IMPORT_INVALID_STATUS", (state) => withRecord(state, { status: "FILLED" })],
+      ["IMPORT_INVALID_STATUS", (state) => withRecord(state, { status: "SETTLED" })],
       ["IMPORT_FINGERPRINT_MISMATCH", (state) => withRecord(state, { requestFingerprint: "0" })],
       ["IMPORT_LINK_INCONSISTENT", (state) => withRecord(state, { exchangeOrderId: null })],
       ["IMPORT_LINK_INCONSISTENT", (state) => withRecord(state, { status: "UNKNOWN" })],

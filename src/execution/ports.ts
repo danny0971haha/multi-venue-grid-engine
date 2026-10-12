@@ -1,5 +1,7 @@
 import type { ClientOrderId } from "../domain/ids.js";
 import type {
+  CancelAck,
+  CancelRequest,
   ExchangeOrderObservation,
   ExecutionObservation,
   OrderAck,
@@ -8,8 +10,9 @@ import type {
 } from "../domain/types.js";
 import type { IntentRegistryState } from "./intent-registry.js";
 
-// Read result for one deterministic client order ID. A rejected promise means the read
-// failed and proves nothing; both fields empty means nothing definitive was found.
+// Fresh read result for one deterministic client order ID. A rejected promise means the read
+// failed and proves nothing; both fields empty means nothing definitive was found. Order
+// status must be normalized to OPEN, FILLED or CANCELLED; any other status proves nothing.
 export type ClientOrderLookup = {
   order: ExchangeOrderObservation | null;
   executions: ExecutionObservation[];
@@ -19,6 +22,7 @@ export type ClientOrderLookup = {
 // it; neither owns intent state.
 export type ExecutionVenuePort = {
   placeOrder(intent: OrderIntent): Promise<VenueWriteResult<OrderAck>>;
+  cancelOrder(request: CancelRequest): Promise<VenueWriteResult<CancelAck>>;
   lookupClientOrder(clientOrderId: ClientOrderId): Promise<ClientOrderLookup>;
 };
 

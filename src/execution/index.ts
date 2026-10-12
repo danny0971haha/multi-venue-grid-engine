@@ -8,6 +8,7 @@ export type {
 } from "./coordinator.js";
 export { DUPLICATE_CLIENT_ORDER_ID_CODE, ExecutionCoordinator } from "./coordinator.js";
 export type {
+  CancelResolution,
   IntentAuthority,
   IntentLink,
   IntentRecord,
