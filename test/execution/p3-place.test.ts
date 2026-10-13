@@ -39,7 +39,7 @@ function assertRegistryError(run: () => unknown, reasonCode: string): void {
 
 describe("P3-E01 place ACK", () => {
   test("ACK links a stable intent -> client ID -> exchange ID mapping", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = buildIntent();
     const result = await h.coordinator.submit(intent);
 
@@ -57,7 +57,7 @@ describe("P3-E01 place ACK", () => {
   });
 
   test("resubmitting the same intent never sends a second order", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = buildIntent();
     await h.coordinator.submit(intent);
     const again = await h.coordinator.submit(structuredClone(intent));
@@ -68,7 +68,7 @@ describe("P3-E01 place ACK", () => {
   });
 
   test("same intent ID with different content is refused", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = buildIntent();
     await h.coordinator.submit(intent);
     const conflict = await h.coordinator.submit({ ...intent, price: "101" });
@@ -81,7 +81,7 @@ describe("P3-E01 place ACK", () => {
 
 describe("P3-E02 place REJECTED", () => {
   test("rejection leaves no working order and does not block risk", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("REJECT");
     const intent = buildIntent();
     const result = await h.coordinator.submit(intent);
@@ -99,7 +99,7 @@ describe("P3-E02 place REJECTED", () => {
 
 describe("P3-E03 UNKNOWN later found by client ID", () => {
   test("blocks risk, then adopts the existing order without a duplicate", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     const first = await h.coordinator.submit(intent);
@@ -138,7 +138,7 @@ describe("P3-E03 UNKNOWN later found by client ID", () => {
   });
 
   test("risk-reducing exit in another slot is still admitted while unresolved", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     await h.coordinator.submit(buildIntent());
     const exit = await h.coordinator.submit(
@@ -150,11 +150,11 @@ describe("P3-E03 UNKNOWN later found by client ID", () => {
   });
 
   test("lost journal: duplicate client ID rejection is UNKNOWN and reconciles to the original", async () => {
-    const before = createHarness();
+    const before = await createHarness();
     const intent = buildIntent();
     await before.coordinator.submit(intent);
 
-    const after = createHarness({ venue: before.venue });
+    const after = await createHarness({ venue: before.venue });
     const result = await after.coordinator.submit(intent);
     assert.equal(result.record?.status, "UNKNOWN");
     assert.deepEqual(result.reasonCodes, ["DUPLICATE_CLIENT_ORDER_ID_REJECTION"]);
@@ -171,7 +171,7 @@ describe("P3-E03 UNKNOWN later found by client ID", () => {
 
 describe("P3-E04 UNKNOWN with execution evidence", () => {
   test("full execution without the order record is authoritative", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     await h.coordinator.submit(intent);
@@ -191,7 +191,7 @@ describe("P3-E04 UNKNOWN with execution evidence", () => {
   });
 
   test("partial fill preserves executed quantity when the order is visible", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     await h.coordinator.submit(intent);
@@ -212,7 +212,7 @@ describe("P3-E04 UNKNOWN with execution evidence", () => {
   });
 
   test("partial executions without the order stay unresolved", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     await h.coordinator.submit(intent);
@@ -226,7 +226,7 @@ describe("P3-E04 UNKNOWN with execution evidence", () => {
   });
 
   test("a thrown transport call is UNKNOWN, never REJECTED", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("THROW_ACCEPTED");
     const intent = buildIntent();
     const result = await h.coordinator.submit(intent);
@@ -240,7 +240,7 @@ describe("P3-E04 UNKNOWN with execution evidence", () => {
 
 describe("P3-E05 no definitive evidence", () => {
   test("remains blocked and never retries the slot under a new ID", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_DROPPED");
     const intent = buildIntent();
     await h.coordinator.submit(intent);
@@ -258,7 +258,7 @@ describe("P3-E05 no definitive evidence", () => {
   });
 
   test("a failed lookup proves nothing and keeps the intent unresolved", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     await h.coordinator.submit(intent);
@@ -273,7 +273,7 @@ describe("P3-E05 no definitive evidence", () => {
   });
 
   test("a lookup that contradicts the intent does not link", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     await h.coordinator.submit(intent);
@@ -285,8 +285,9 @@ describe("P3-E05 no definitive evidence", () => {
         return { ...lookup, order: lookup.order && { ...lookup.order, side: "SELL" } };
       },
       listOpenOrders: () => h.venue.listOpenOrders(),
+      listExecutionsSince: (cursor) => h.venue.listExecutionsSince(cursor),
     };
-    const restarted = createHarness({
+    const restarted = await createHarness({
       venue: h.venue,
       port,
       registry: IntentRegistry.fromState(h.journal.latest()),
@@ -328,7 +329,7 @@ describe("P3 deterministic client order IDs", () => {
   });
 
   test("a client ID not derived from the intent is refused before any send", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const forged = await h.coordinator.submit({
       ...buildIntent(),
       clientOrderId: `mv1${"0".repeat(20)}`,
@@ -342,7 +343,7 @@ describe("P3 deterministic client order IDs", () => {
   });
 
   test("malformed and cancel intents are refused", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const extra = await h.coordinator.submit({ ...buildIntent(), note: "x" } as never);
     const cancel = await h.coordinator.submit(buildIntent({ purpose: "CANCEL" }));
     const market = await h.coordinator.submit(buildIntent({ type: "MARKET" }));
@@ -362,7 +363,7 @@ describe("P3 deterministic client order IDs", () => {
 
 describe("P3 lease fence before every mutation", () => {
   test("intent from another lease generation or scope is refused", async () => {
-    const h = createHarness({ fence: openFence("2") });
+    const h = await createHarness({ fence: openFence("2") });
     const stale = await h.coordinator.submit(buildIntent());
     const foreign = await h.coordinator.submit(
       buildIntent({ runId: "run-2", leaseGeneration: "2" }),
@@ -374,7 +375,7 @@ describe("P3 lease fence before every mutation", () => {
   });
 
   test("fence NOT_SENT records NOT_SENT and never calls the venue", async () => {
-    const h = createHarness({ fence: notSentFence() });
+    const h = await createHarness({ fence: notSentFence() });
     const result = await h.coordinator.submit(buildIntent());
 
     assert.equal(result.record?.status, "NOT_SENT");
@@ -400,7 +401,7 @@ describe("P3 lease fence before every mutation", () => {
       const authority = acquired.authority;
       assert.ok(authority !== null);
       const lease = { directory, scopeKey: SCOPE_KEY, authority, latch, clock };
-      const h = createHarness({ fence: createLeaseMutationFence(lease) });
+      const h = await createHarness({ fence: createLeaseMutationFence(lease) });
       const generation = authority.generation;
 
       const held = await h.coordinator.submit(buildIntent({ leaseGeneration: generation }));
@@ -425,7 +426,7 @@ describe("P3 write-ahead journal", () => {
   test("PREPARED is durable before the venue sees the order", async () => {
     const journal = new MemoryJournal();
     const statusesAtSend: string[] = [];
-    const base = createHarness({ journal });
+    const base = await createHarness({ journal });
     const port: ExecutionVenuePort = {
       placeOrder(intent) {
         const state = journal.latest() as IntentRegistryState;
@@ -436,8 +437,9 @@ describe("P3 write-ahead journal", () => {
       cancelOrder: (request) => base.venue.cancelOrder(request),
       lookupClientOrder: (clientOrderId) => base.venue.lookupClientOrder(clientOrderId),
       listOpenOrders: () => base.venue.listOpenOrders(),
+      listExecutionsSince: (cursor) => base.venue.listExecutionsSince(cursor),
     };
-    const h = createHarness({ venue: base.venue, port, journal });
+    const h = await createHarness({ venue: base.venue, port, journal });
     await h.coordinator.submit(buildIntent());
 
     assert.deepEqual(statusesAtSend, ["PREPARED"]);
@@ -446,7 +448,7 @@ describe("P3 write-ahead journal", () => {
   });
 
   test("write-ahead failure sends nothing and latches the coordinator", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.journal.scriptPersist("FAIL");
     const result = await h.coordinator.submit(buildIntent());
 
@@ -465,7 +467,7 @@ describe("P3 write-ahead journal", () => {
   });
 
   test("post-send journal failure latches; restart reconciles before new risk", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.journal.scriptPersist("OK", "FAIL");
     const intent = buildIntent();
     const result = await h.coordinator.submit(intent);
@@ -474,7 +476,7 @@ describe("P3 write-ahead journal", () => {
     assert.deepEqual(result.reasonCodes, ["VENUE_ACK", "JOURNAL_WRITE_FAILED"]);
     assert.equal(h.coordinator.canIncreaseRisk(), false);
 
-    const restarted = createHarness({
+    const restarted = await createHarness({
       venue: h.venue,
       registry: IntentRegistry.fromState(h.journal.latest()),
     });
@@ -492,7 +494,7 @@ describe("P3 write-ahead journal", () => {
 
 describe("P3 strict registry import", () => {
   async function linkedState(): Promise<IntentRegistryState> {
-    const h = createHarness();
+    const h = await createHarness();
     await h.coordinator.submit(buildIntent());
     await h.coordinator.submit(buildIntent({ logicalLevelId: "B2" }));
     return h.journal.latest() as IntentRegistryState;
@@ -547,11 +549,11 @@ describe("P3 strict registry import", () => {
   });
 
   test("unresolved imported intents block risk until reconciled", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_DROPPED");
     await h.coordinator.submit(buildIntent());
 
-    const restarted = createHarness({
+    const restarted = await createHarness({
       venue: h.venue,
       registry: IntentRegistry.fromState(h.journal.latest()),
     });

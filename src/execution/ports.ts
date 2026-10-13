@@ -1,4 +1,4 @@
-import type { ClientOrderId } from "../domain/ids.js";
+import type { ClientOrderId, ExecutionId, MarketId, VenueId } from "../domain/ids.js";
 import type { DecimalString } from "../math/decimal.js";
 import type {
   CancelAck,
@@ -19,6 +19,24 @@ export type ClientOrderLookup = {
   executions: ExecutionObservation[];
 };
 
+// Durable position in the venue's execution history for one market. Only the adapter
+// interprets opaque; the coordinator stores it and passes it back unchanged.
+export type ExecutionCursor = {
+  venue: VenueId;
+  market: MarketId;
+  opaque: string;
+  lastExecutionId: ExecutionId | null;
+  lastExecutionTime: string | null;
+};
+
+// One page of execution history from a cursor. Pages may overlap earlier pages; replay
+// deduplicates by execution ID. hasMore false means the page reached the current end.
+export type ExecutionPage = {
+  executions: ExecutionObservation[];
+  nextCursor: ExecutionCursor;
+  hasMore: boolean;
+};
+
 // The venue surface the coordinator needs. Venue adapters and the simulated venue implement
 // it; neither owns intent state.
 export type ExecutionVenuePort = {
@@ -28,6 +46,9 @@ export type ExecutionVenuePort = {
   // Fresh snapshot of every open order in this market, owned or not. A rejected promise means
   // the read failed and proves nothing.
   listOpenOrders(): Promise<ExchangeOrderObservation[]>;
+  // Executions of this market after the cursor, or from the start of the retained history for
+  // a null cursor. A rejected promise means the read failed and proves nothing.
+  listExecutionsSince(cursor: ExecutionCursor | null): Promise<ExecutionPage>;
 };
 
 // Fresh signed position and mark/mid price for the coordinator's market. Null, or a rejected
@@ -60,4 +81,10 @@ export type MutationFence = {
 // proven and the coordinator latches closed.
 export type IntentJournal = {
   persist(state: IntentRegistryState): Promise<void>;
+};
+
+// Durable store for the execution replay cursor. It is written only after the executions
+// before it are durable in the intent journal; a rejection leaves the previous cursor.
+export type ExecutionCheckpointStore = {
+  persist(cursor: ExecutionCursor): Promise<void>;
 };

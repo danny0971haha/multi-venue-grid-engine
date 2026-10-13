@@ -46,7 +46,7 @@ async function placeLinked(h: Harness, intent: OrderIntent = buildIntent()): Pro
   return intent;
 }
 
-function restart(h: Harness, port?: ExecutionVenuePort): Harness {
+function restart(h: Harness, port?: ExecutionVenuePort): Promise<Harness> {
   const registry = IntentRegistry.fromState(h.journal.latest());
   return createHarness(
     port === undefined ? { venue: h.venue, registry } : { venue: h.venue, port, registry },
@@ -64,12 +64,13 @@ function portOver(
     lookupClientOrder:
       overrides.lookupClientOrder ?? ((clientOrderId) => h.venue.lookupClientOrder(clientOrderId)),
     listOpenOrders: () => h.venue.listOpenOrders(),
+    listExecutionsSince: (cursor) => h.venue.listExecutionsSince(cursor),
   };
 }
 
 describe("P3-E06 cancel UNKNOWN", () => {
   test("a dropped cancel blocks risk until the order is observed active", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.scriptCancel("UNKNOWN_DROPPED");
 
@@ -104,7 +105,7 @@ describe("P3-E06 cancel UNKNOWN", () => {
   });
 
   test("a cancel applied behind a lost response is CANCELLED only after observation", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.scriptCancel("UNKNOWN_APPLIED");
 
@@ -119,7 +120,7 @@ describe("P3-E06 cancel UNKNOWN", () => {
   });
 
   test("a thrown cancel is a transport unknown, not a failure", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.scriptCancel("THROW_APPLIED");
 
@@ -131,7 +132,7 @@ describe("P3-E06 cancel UNKNOWN", () => {
   });
 
   test("a failed lookup or a vanished order proves nothing", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.fill("sim-order-1", "0.004", "100");
     h.venue.scriptCancel("UNKNOWN_APPLIED");
@@ -149,7 +150,7 @@ describe("P3-E06 cancel UNKNOWN", () => {
   });
 
   test("a restart with a written-ahead cancel reconciles before anything is sent", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.journal.scriptPersist("OK", "FAIL");
 
@@ -157,7 +158,7 @@ describe("P3-E06 cancel UNKNOWN", () => {
     assert.deepEqual(result.reasonCodes, ["CANCEL_ACK", "JOURNAL_WRITE_FAILED"]);
     assert.equal(h.coordinator.isJournalLatched(), true);
 
-    const restarted = restart(h);
+    const restarted = await restart(h);
     assert.equal(restarted.registry.get(intent.intentId)?.status, "CANCEL_PREPARED");
     assert.equal(restarted.coordinator.canIncreaseRisk(), false);
     assert.deepEqual((await restarted.coordinator.cancel(intent.intentId)).reasonCodes, [
@@ -173,7 +174,7 @@ describe("P3-E06 cancel UNKNOWN", () => {
 
 describe("P3-E07 cancel confirmed without fill", () => {
   test("an ACK is not a cancel until the venue shows the order cancelled", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
 
     const result = await h.coordinator.cancel(intent.intentId);
@@ -199,7 +200,7 @@ describe("P3-E07 cancel confirmed without fill", () => {
   });
 
   test("a rejected cancel of an open order resolves back to LINKED", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.scriptCancel("REJECT");
 
@@ -211,7 +212,7 @@ describe("P3-E07 cancel confirmed without fill", () => {
   });
 
   test("disappearance without execution evidence is never a fill", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     await h.coordinator.cancel(intent.intentId);
     h.venue.forgetOrder("sim-order-1");
@@ -239,9 +240,9 @@ describe("P3-E07 cancel confirmed without fill", () => {
       [null, "TRANSPORT_OUTCOME_UNKNOWN"],
     ];
     for (const [value, reasonCode] of results) {
-      const base = createHarness();
+      const base = await createHarness();
       const intent = await placeLinked(base);
-      const h = restart(
+      const h = await restart(
         base,
         portOver(base, {
           cancelOrder: async () => value as Awaited<ReturnType<ExecutionVenuePort["cancelOrder"]>>,
@@ -257,11 +258,11 @@ describe("P3-E07 cancel confirmed without fill", () => {
 
 describe("P3-E08 cancel races with fill", () => {
   test("PLACE -> ACK -> PARTIAL_FILL -> CANCEL_RACE -> FILL: execution evidence wins", async () => {
-    const base = createHarness();
+    const base = await createHarness();
     const intent = await placeLinked(base);
     base.venue.fill("sim-order-1", "0.004", "100");
     // The remainder fills while the cancel is in flight, so the venue sees the fill first.
-    const h = restart(
+    const h = await restart(
       base,
       portOver(base, {
         cancelOrder(request) {
@@ -296,7 +297,7 @@ describe("P3-E08 cancel races with fill", () => {
   });
 
   test("a partial fill before a confirmed cancel keeps the executed quantity", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.fill("sim-order-1", "0.004", "100");
     await h.coordinator.cancel(intent.intentId);
@@ -313,7 +314,7 @@ describe("P3-E08 cancel races with fill", () => {
   });
 
   test("a fill after an unknown cancel wins over the cancel", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.scriptCancel("UNKNOWN_DROPPED");
     await h.coordinator.cancel(intent.intentId);
@@ -324,7 +325,7 @@ describe("P3-E08 cancel races with fill", () => {
   });
 
   test("executions covering the quantity prove a fill even if the order vanished", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.venue.fill("sim-order-1", "0.004", "100");
     h.venue.scriptCancel("UNKNOWN_DROPPED");
@@ -339,7 +340,7 @@ describe("P3-E08 cancel races with fill", () => {
 
   test("contradicting or incomplete evidence never resolves the cancel", async () => {
     // LINKED with one recorded execution, then a cancel that never reached the venue.
-    const base = createHarness();
+    const base = await createHarness();
     base.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
     await base.coordinator.submit(intent);
@@ -405,7 +406,7 @@ describe("P3-E08 cancel races with fill", () => {
       ["ORDER_NOT_OBSERVED", (l) => ({ ...l, order: null })],
     ];
     for (const [reasonCode, mutate] of cases) {
-      const h = restart(
+      const h = await restart(
         base,
         portOver(base, {
           lookupClientOrder: async (clientOrderId) =>
@@ -420,7 +421,7 @@ describe("P3-E08 cancel races with fill", () => {
   });
 
   test("an execution owned by another intent never resolves the cancel", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const owner = buildIntent();
     await h.coordinator.submit(owner);
@@ -430,7 +431,7 @@ describe("P3-E08 cancel races with fill", () => {
     h.venue.scriptCancel("UNKNOWN_DROPPED");
     await h.coordinator.cancel(intent.intentId);
 
-    const restarted = restart(
+    const restarted = await restart(
       h,
       portOver(h, {
         async lookupClientOrder(clientOrderId) {
@@ -455,7 +456,7 @@ describe("P3-E08 cancel races with fill", () => {
 
 describe("P3 cancel admission", () => {
   test("only a linked, open order of this scope is cancellable", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED", "REJECT", "UNKNOWN_DROPPED");
     const filled = buildIntent();
     const rejected = buildIntent({ logicalLevelId: "B2" });
@@ -495,13 +496,15 @@ describe("P3 cancel admission", () => {
       fence: openFence(),
       journal: h.journal,
       exposure: flatExposure(),
+      checkpoints: h.checkpoints,
+      executionCursor: null,
     });
     assert.deepEqual((await otherRun.cancel(open.intentId)).reasonCodes, ["INTENT_SCOPE_MISMATCH"]);
     assert.equal(h.venue.calls.cancel, 0);
   });
 
   test("one operation at a time, and a latched journal refuses cancels", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     const first = h.coordinator.cancel(intent.intentId);
     assert.deepEqual((await h.coordinator.cancel(intent.intentId)).reasonCodes, [
@@ -509,7 +512,7 @@ describe("P3 cancel admission", () => {
     ]);
     await first;
 
-    const latched = createHarness();
+    const latched = await createHarness();
     const open = await placeLinked(latched);
     latched.journal.scriptPersist("FAIL");
     await latched.coordinator.submit(buildIntent({ logicalLevelId: "B2" }));
@@ -522,9 +525,9 @@ describe("P3 cancel admission", () => {
 
 describe("P3 cancel fencing and write-ahead", () => {
   test("a fence or venue NOT_SENT restores LINKED", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
-    const fenced = createHarness({
+    const fenced = await createHarness({
       venue: h.venue,
       registry: IntentRegistry.fromState(h.journal.latest()),
       fence: notSentFence(),
@@ -535,7 +538,7 @@ describe("P3 cancel fencing and write-ahead", () => {
     assert.equal(h.venue.calls.cancel, 0);
     assert.equal(fenced.coordinator.canIncreaseRisk(), true);
 
-    const venueNotSent = restart(
+    const venueNotSent = await restart(
       h,
       portOver(h, { cancelOrder: async () => ({ kind: "NOT_SENT", reason: "TEST" }) }),
     );
@@ -565,7 +568,7 @@ describe("P3 cancel fencing and write-ahead", () => {
       const authority = acquired.authority;
       assert.ok(authority !== null);
       const lease = { directory, scopeKey: SCOPE_KEY, authority, latch, clock };
-      const h = createHarness({ fence: createLeaseMutationFence(lease) });
+      const h = await createHarness({ fence: createLeaseMutationFence(lease) });
       const generation = authority.generation;
       const held = await placeLinked(h, buildIntent({ leaseGeneration: generation }));
       const later = await placeLinked(
@@ -587,10 +590,10 @@ describe("P3 cancel fencing and write-ahead", () => {
   });
 
   test("CANCEL_PREPARED is durable before the venue sees the cancel", async () => {
-    const base = createHarness();
+    const base = await createHarness();
     const intent = await placeLinked(base);
     const statusesAtSend: string[] = [];
-    const h = createHarness({
+    const h = await createHarness({
       venue: base.venue,
       journal: base.journal,
       registry: base.registry,
@@ -607,7 +610,7 @@ describe("P3 cancel fencing and write-ahead", () => {
   });
 
   test("a failed write-ahead latches and never sends the cancel", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     h.journal.scriptPersist("FAIL");
 
@@ -617,13 +620,13 @@ describe("P3 cancel fencing and write-ahead", () => {
     assert.equal(h.venue.calls.cancel, 0);
     assert.equal(h.coordinator.isJournalLatched(), true);
     assert.equal(h.coordinator.canIncreaseRisk(), false);
-    assert.equal(restart(h).registry.get(intent.intentId)?.status, "LINKED");
+    assert.equal((await restart(h)).registry.get(intent.intentId)?.status, "LINKED");
   });
 });
 
 describe("P3 cancel registry invariants", () => {
   async function closedState(): Promise<IntentRegistryState> {
-    const h = createHarness();
+    const h = await createHarness();
     const cancelled = await placeLinked(h);
     const filled = await placeLinked(h, buildIntent({ logicalLevelId: "B2" }));
     const pending = await placeLinked(h, buildIntent({ logicalLevelId: "B3" }));
@@ -677,7 +680,7 @@ describe("P3 cancel registry invariants", () => {
   });
 
   test("the registry never relinks or resolves outside a pending cancel", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const intent = await placeLinked(h);
     const id = intent.intentId;
     const link = {
