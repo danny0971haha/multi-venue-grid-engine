@@ -9,7 +9,12 @@ import type {
   OrderIntent,
   VenueWriteResult,
 } from "../domain/types.js";
-import type { ClientOrderLookup, ExecutionVenuePort } from "../execution/ports.js";
+import type {
+  ClientOrderLookup,
+  ExecutionCursor,
+  ExecutionPage,
+  ExecutionVenuePort,
+} from "../execution/ports.js";
 import { DUPLICATE_CLIENT_ORDER_ID_CODE } from "../execution/coordinator.js";
 import { type DecimalString, decimalAdd, decimalCmp, decimalSub } from "../math/decimal.js";
 import { requestFingerprint } from "./engine.js";
@@ -53,7 +58,7 @@ type SimulatedOrder = {
 // Deterministic fake venue with scripted place/cancel outcomes and fault injection. It holds
 // venue truth only; it never decides intent state.
 export class SimulatedVenue implements ExecutionVenuePort {
-  readonly calls = { place: 0, cancel: 0, lookup: 0, list: 0 };
+  readonly calls = { place: 0, cancel: 0, lookup: 0, list: 0, executions: 0 };
   private readonly venue: VenueId;
   private readonly market: MarketId;
   private readonly observedAt: string;
@@ -63,6 +68,9 @@ export class SimulatedVenue implements ExecutionVenuePort {
   private readonly byClientOrderId = new Map<ClientOrderId, ExchangeOrderId>();
   private readonly executions: ExecutionObservation[] = [];
   private failingLookups = 0;
+  private failingExecutionReads = 0;
+  private executionPageSize = 100;
+  private executionOverlap = 0;
   private nextOrder = 1;
   private nextExecution = 1;
 
@@ -82,6 +90,20 @@ export class SimulatedVenue implements ExecutionVenuePort {
 
   failNextLookups(count: number): void {
     this.failingLookups = count;
+  }
+
+  failNextExecutionReads(count: number): void {
+    this.failingExecutionReads = count;
+  }
+
+  setExecutionPageSize(size: number): void {
+    this.executionPageSize = size;
+  }
+
+  // Every later execution page starts this many entries before its cursor, as a venue whose
+  // cursor is only a time bound may repeat executions.
+  overlapExecutionReads(count: number): void {
+    this.executionOverlap = count;
   }
 
   async placeOrder(intent: OrderIntent): Promise<VenueWriteResult<OrderAck>> {
@@ -167,6 +189,30 @@ export class SimulatedVenue implements ExecutionVenuePort {
     return [...this.orders.values()]
       .filter((order) => !order.forgotten && isOpen(order))
       .map((order) => this.observe(order));
+  }
+
+  async listExecutionsSince(cursor: ExecutionCursor | null): Promise<ExecutionPage> {
+    this.calls.executions += 1;
+    if (this.failingExecutionReads > 0) {
+      this.failingExecutionReads -= 1;
+      throw new Error("SIM_EXECUTION_READ_FAILED");
+    }
+    const position = cursor === null ? 0 : this.cursorPosition(cursor);
+    const start = Math.max(0, position - this.executionOverlap);
+    const end = Math.min(this.executions.length, start + this.executionPageSize);
+    const page = this.executions.slice(start, end);
+    const last = page.at(-1);
+    return {
+      executions: page.map((execution) => structuredClone(execution)),
+      nextCursor: {
+        venue: this.venue,
+        market: this.market,
+        opaque: `sim-exec-cursor:${Math.max(end, position)}`,
+        lastExecutionId: last?.executionId ?? cursor?.lastExecutionId ?? null,
+        lastExecutionTime: last?.meta.serverTime ?? cursor?.lastExecutionTime ?? null,
+      },
+      hasMore: end < this.executions.length,
+    };
   }
 
   // Adds an open resting order that did not come from this engine, e.g. a manual order.
@@ -286,6 +332,19 @@ export class SimulatedVenue implements ExecutionVenuePort {
       ownership: "AMBIGUOUS",
       meta: this.meta("order"),
     };
+  }
+
+  private cursorPosition(cursor: ExecutionCursor): number {
+    const match = /^sim-exec-cursor:(0|[1-9][0-9]*)$/.exec(cursor.opaque);
+    const position = match === null ? Number.NaN : Number(match[1]);
+    if (
+      cursor.venue !== this.venue ||
+      cursor.market !== this.market ||
+      !(position <= this.executions.length)
+    ) {
+      throw new Error("SIM_EXECUTION_CURSOR_INVALID");
+    }
+    return position;
   }
 
   private requireOrder(exchangeOrderId: ExchangeOrderId): SimulatedOrder {

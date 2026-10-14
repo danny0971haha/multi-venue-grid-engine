@@ -50,6 +50,7 @@ function portWithSnapshot(
     cancelOrder: (request) => venue.cancelOrder(request),
     lookupClientOrder: (clientOrderId) => venue.lookupClientOrder(clientOrderId),
     listOpenOrders: listOpenOrders as ExecutionVenuePort["listOpenOrders"],
+    listExecutionsSince: (cursor) => venue.listExecutionsSince(cursor),
   };
 }
 
@@ -102,7 +103,7 @@ describe("P3-E09 owned duplicate cleanup", () => {
         const orders = await venue.listOpenOrders();
         return reversed ? orders.reverse() : orders;
       });
-      const h = createHarness({ venue, port });
+      const h = await createHarness({ venue, port });
       const [first, second] = await placeDuplicates(h, 2);
       assert.ok(first !== undefined && second !== undefined);
 
@@ -143,7 +144,7 @@ describe("P3-E09 owned duplicate cleanup", () => {
   });
 
   test("a cancelled duplicate stays reserved until reconciliation proves it closed", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     await placeDuplicates(h, 2);
     await h.coordinator.cleanupOwnedDuplicates(EPOCH);
 
@@ -163,7 +164,7 @@ describe("P3-E09 owned duplicate cleanup", () => {
   });
 
   test("a duplicate whose cancel is unverified and still open keeps blocking", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     await placeDuplicates(h, 2);
     h.venue.scriptCancel("UNKNOWN_DROPPED");
     await h.coordinator.cleanupOwnedDuplicates(EPOCH);
@@ -177,7 +178,7 @@ describe("P3-E09 owned duplicate cleanup", () => {
   });
 
   test("a cancel that is not sent stops the cleanup before later sends", async () => {
-    const h = createHarness({ fence: scriptedFence("SENT", "SENT", "SENT", "NOT_SENT") });
+    const h = await createHarness({ fence: scriptedFence("SENT", "SENT", "SENT", "NOT_SENT") });
     const [, second, third] = await placeDuplicates(h, 3);
     assert.ok(second !== undefined && third !== undefined);
 
@@ -204,7 +205,7 @@ describe("P3-E09 owned duplicate cleanup", () => {
 
 describe("P3-E10 ownership classification", () => {
   test("cleanup never cancels unowned or ambiguous orders, which keep blocking risk", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     await placeDuplicates(h, 2);
     // Same side, price and quantity as the owned orders; only the client order ID differs.
     h.venue.addForeignOrder({
@@ -257,7 +258,7 @@ describe("P3-E10 ownership classification", () => {
   });
 
   test("an engine order from an older anchor epoch is unowned and not cleaned up", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     await placeDuplicates(h, 2);
     const scan = await h.coordinator.scanOpenOrders("epoch-2");
     assert.deepEqual(scan.reasonCodes, ["UNOWNED_OPEN_ORDER"]);
@@ -273,7 +274,7 @@ describe("P3-E10 ownership classification", () => {
         order.exchangeOrderId === "sim-order-2" ? { ...order, price: "101" } : order,
       ),
     );
-    const h = createHarness({ venue, port });
+    const h = await createHarness({ venue, port });
     await placeDuplicates(h, 2);
 
     const scan = await h.coordinator.scanOpenOrders(EPOCH);
@@ -291,7 +292,7 @@ describe("P3-E10 ownership classification", () => {
         regress ? { ...order, executedQuantity: "0", remainingQuantity: "0.01" } : order,
       ),
     );
-    const h = createHarness({ venue, port });
+    const h = await createHarness({ venue, port });
     const intent = await placeLinked(h, buildIntent());
     venue.fill("sim-order-1", "0.004", "100");
     // An unverified cancel whose order is still open brings the execution into the record.
@@ -312,7 +313,7 @@ describe("P3-E10 ownership classification", () => {
     const venue = newVenue();
     const stale: ExchangeOrderObservation[] = [];
     const port = portWithSnapshot(venue, async () => structuredClone(stale));
-    const h = createHarness({ venue, port });
+    const h = await createHarness({ venue, port });
     const intent = await placeLinked(h, buildIntent());
     const observed = venue.orderForClientOrderId(clientIdOf(intent));
     assert.ok(observed !== null);
@@ -329,7 +330,7 @@ describe("P3-E10 ownership classification", () => {
   test("a failed or invalid snapshot blocks risk increase until a clean scan", async () => {
     const venue = newVenue();
     let snapshot: () => Promise<unknown> = () => venue.listOpenOrders();
-    const h = createHarness({ venue, port: portWithSnapshot(venue, () => snapshot()) });
+    const h = await createHarness({ venue, port: portWithSnapshot(venue, () => snapshot()) });
     await placeLinked(h, buildIntent());
     const valid = (await venue.listOpenOrders())[0];
     assert.ok(valid !== undefined);
@@ -385,7 +386,7 @@ describe("P3-E10 ownership classification", () => {
         },
       }));
     });
-    const h = createHarness({ venue, port });
+    const h = await createHarness({ venue, port });
     await placeLinked(h, buildIntent());
     assert.deepEqual((await h.coordinator.scanOpenOrders(EPOCH)).reasonCodes, []);
     poison = true;
@@ -417,7 +418,7 @@ describe("P3-E10 ownership classification", () => {
 
 describe("P3-E11 whole-batch exposure gate", () => {
   test("a batch over the cap with existing reservations sends nothing", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     await placeLinked(h, buildIntent({ quantity: "0.7" }));
 
     const over = await h.coordinator.submitBatch([
@@ -448,7 +449,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
   });
 
   test("the position counts and opposite sides do not net", async () => {
-    const h = createHarness({ exposure: exposureOf("1", "100") });
+    const h = await createHarness({ exposure: exposureOf("1", "100") });
     const buy = await h.coordinator.submit(buildIntent({ quantity: "0.51" }));
     assert.deepEqual(buy.reasonCodes, ["PLANNED_EXPOSURE_DENIED", "PLANNED_NOTIONAL"]);
     const sell = await h.coordinator.submit(
@@ -476,7 +477,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
       [exposureOf("0", null), ["PLANNED_EXPOSURE_DENIED", "STALE_OR_MISSING_INPUT"]],
     ];
     for (const [exposure, reasonCodes] of cases) {
-      const h = createHarness({ exposure });
+      const h = await createHarness({ exposure });
       assert.deepEqual((await h.coordinator.submit(buildIntent())).reasonCodes, reasonCodes);
       const batch = await h.coordinator.submitBatch([buildIntent()]);
       assert.deepEqual(batch.reasonCodes, reasonCodes);
@@ -486,7 +487,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
   });
 
   test("reduce-only exits skip the gate; a reduce-only entry is still counted", async () => {
-    const h = createHarness({
+    const h = await createHarness({
       exposure: {
         read: async () => {
           throw new Error("TEST_EXPOSURE_READ_FAILED");
@@ -499,7 +500,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
     ]);
     assert.equal(exits.disposition, "SUBMITTED");
 
-    const gated = createHarness({ exposure: exposureOf("0", "100") });
+    const gated = await createHarness({ exposure: exposureOf("0", "100") });
     const entry = await gated.coordinator.submit(
       buildIntent({ quantity: "1.51", reduceOnly: true }),
     );
@@ -507,7 +508,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
   });
 
   test("a market entry is unbounded and refused", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     const market = await h.coordinator.submit(
       buildIntent({ type: "MARKET", price: null, timeInForce: "IOC" }),
     );
@@ -520,7 +521,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
     assert.equal(h.venue.calls.place, 0);
   });
 
-  test("possibly-live, partially filled and unresolved-cancel records stay reserved", () => {
+  test("possibly-live, partially filled and unresolved-cancel records stay reserved", async () => {
     const registry = new IntentRegistry();
     const link = (intent: OrderIntent, exchangeOrderId: string, executed?: string) =>
       registry.link(intent.intentId, {
@@ -576,7 +577,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
       reasonCodes: [],
     });
 
-    const reservation = createHarness({ registry }).coordinator.exposureReservation();
+    const reservation = (await createHarness({ registry })).coordinator.exposureReservation();
     const sorted = (items: unknown[]) => items.map((item) => JSON.stringify(item)).sort();
     assert.deepEqual(
       sorted(reservation.ownedActiveOrders),
@@ -599,7 +600,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
 
 describe("P3-E12 batch stop", () => {
   test("after a send is not proven, the rest of the batch is neither sent nor recorded", async () => {
-    const h = createHarness({ fence: scriptedFence("SENT", "NOT_SENT") });
+    const h = await createHarness({ fence: scriptedFence("SENT", "NOT_SENT") });
     const intents = ["B1", "B2", "B3"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
     const result = await h.coordinator.submitBatch(intents);
     assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
@@ -646,7 +647,7 @@ describe("P3-E12 batch stop", () => {
           }
         }
       }
-      const h = createHarness({
+      const h = await createHarness({
         journal: new ReleasingJournal(),
         fence: createLeaseMutationFence(lease),
       });
@@ -674,7 +675,7 @@ describe("P3-E12 batch stop", () => {
   });
 
   test("an unknown outcome blocks the risk-increasing rest of the batch", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("ACK", "UNKNOWN_DROPPED");
     const intents = ["B1", "B2", "B3"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
     const result = await h.coordinator.submitBatch(intents);
@@ -693,7 +694,7 @@ describe("P3-E12 batch stop", () => {
   test("a journal failure latches and stops the rest of the batch", async () => {
     const journal = new MemoryJournal();
     journal.scriptPersist("OK", "FAIL");
-    const h = createHarness({ journal });
+    const h = await createHarness({ journal });
     const intents = ["B1", "B2"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
     const result = await h.coordinator.submitBatch(intents);
     assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
@@ -706,7 +707,7 @@ describe("P3-E12 batch stop", () => {
   });
 
   test("a plain venue rejection does not stop the batch", async () => {
-    const h = createHarness();
+    const h = await createHarness();
     h.venue.scriptPlace("REJECT");
     const intents = ["B1", "B2"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
     const result = await h.coordinator.submitBatch(intents);
@@ -738,7 +739,7 @@ describe("P3 batch pre-send checks", () => {
       ],
     ];
     for (const [batch, reasonCode] of cases) {
-      const h = createHarness();
+      const h = await createHarness();
       await placeLinked(h, recorded);
       const result = await h.coordinator.submitBatch(batch as OrderIntent[]);
       assert.deepEqual(result, { disposition: "REFUSED", reasonCodes: [reasonCode], items: [] });
@@ -750,7 +751,7 @@ describe("P3 batch pre-send checks", () => {
   test("a latched journal refuses a batch", async () => {
     const journal = new MemoryJournal();
     journal.scriptPersist("FAIL");
-    const h = createHarness({ journal });
+    const h = await createHarness({ journal });
     await h.coordinator.submit(buildIntent());
     assert.equal(h.coordinator.isJournalLatched(), true);
     const result = await h.coordinator.submitBatch([buildIntent({ logicalLevelId: "B2" })]);
@@ -763,7 +764,7 @@ describe("P3 batch pre-send checks", () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const h = createHarness({
+    const h = await createHarness({
       exposure: {
         read: async () => {
           await gate;
@@ -788,14 +789,14 @@ describe("P3 batch pre-send checks", () => {
 });
 
 describe("P3 write budget", () => {
-  test("the budget must be a positive safe integer", () => {
+  test("the budget must be a positive safe integer", async () => {
     for (const writeBudgetPerCycle of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53]) {
-      assert.throws(() => createHarness({ writeBudgetPerCycle }), /INVALID_WRITE_BUDGET/);
+      await assert.rejects(createHarness({ writeBudgetPerCycle }), /INVALID_WRITE_BUDGET/);
     }
   });
 
   test("places beyond the budget are refused until the next cycle", async () => {
-    const h = createHarness({ writeBudgetPerCycle: 2 });
+    const h = await createHarness({ writeBudgetPerCycle: 2 });
     await placeLinked(h, buildIntent({ logicalLevelId: "B1" }));
     await placeLinked(h, buildIntent({ logicalLevelId: "B2" }));
     const third = buildIntent({ logicalLevelId: "B3" });
@@ -807,7 +808,7 @@ describe("P3 write budget", () => {
   });
 
   test("a batch larger than the remaining budget is refused whole", async () => {
-    const h = createHarness({ writeBudgetPerCycle: 3 });
+    const h = await createHarness({ writeBudgetPerCycle: 3 });
     await placeLinked(h, buildIntent({ logicalLevelId: "B1" }));
     const levels = ["B2", "B3", "B4"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
     assert.deepEqual((await h.coordinator.submitBatch(levels)).reasonCodes, [
@@ -820,7 +821,7 @@ describe("P3 write budget", () => {
   });
 
   test("an attempted send counts even when the fence does not send it", async () => {
-    const h = createHarness({ writeBudgetPerCycle: 1, fence: scriptedFence("NOT_SENT") });
+    const h = await createHarness({ writeBudgetPerCycle: 1, fence: scriptedFence("NOT_SENT") });
     const first = await h.coordinator.submit(buildIntent({ logicalLevelId: "B1" }));
     assert.equal(first.record?.status, "NOT_SENT");
     const second = await h.coordinator.submit(buildIntent({ logicalLevelId: "B2" }));
@@ -828,7 +829,7 @@ describe("P3 write budget", () => {
   });
 
   test("cancels count toward the budget, including duplicate cleanup", async () => {
-    const h = createHarness({ writeBudgetPerCycle: 1 });
+    const h = await createHarness({ writeBudgetPerCycle: 1 });
     const intent = await placeLinked(h, buildIntent());
     const refusedCancel = await h.coordinator.cancel(intent.intentId);
     assert.deepEqual(refusedCancel.reasonCodes, ["WRITE_BUDGET_EXHAUSTED"]);
@@ -843,7 +844,7 @@ describe("P3 write budget", () => {
     assert.deepEqual(exit.reasonCodes, ["WRITE_BUDGET_EXHAUSTED"]);
     assert.equal(h.venue.calls.place, 1);
 
-    const dup = createHarness({ writeBudgetPerCycle: 3 });
+    const dup = await createHarness({ writeBudgetPerCycle: 3 });
     await placeDuplicates(dup, 3);
     const cleanup = await dup.coordinator.cleanupOwnedDuplicates(EPOCH);
     assert.deepEqual(cleanup.reasonCodes, ["CLEANUP_INCOMPLETE"]);

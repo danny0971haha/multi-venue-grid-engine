@@ -16,11 +16,11 @@ Historical identities, unchanged and retained for reference:
 
 ## Implemented vs reviewed
 
-Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); a fake-only offline integration harness.
+Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); execution cursor, checkpoint and overlap-safe replay as a library (Phase 3D, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B and Phase 3C independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B, Phase 3C and Phase 3D independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
-Not implemented: runtime wiring of telemetry, Phase 3D-3E (execution cursor/replay, fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
+Not implemented: runtime wiring of telemetry, Phase 3E (fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
 
 ## Phase 2F telemetry and manifest
 
@@ -83,7 +83,7 @@ Known limitations:
 Known limitations:
 
 1. The adapter must normalize order status to `OPEN`, `FILLED` or `CANCELLED`; any other status proves nothing. There is no freshness timestamp check; the adapter must return fresh evidence (VENUE_ADAPTER_CONTRACT §16).
-2. If a queued cancel applies after the venue reported the order `OPEN`, the record is already back to `LINKED` and stays there until a later lookup; LINKED records do not track fills until 3D (execution cursor).
+2. If a queued cancel applies after the venue reported the order `OPEN`, the record is already back to `LINKED` and stays there until a later lookup. Since 3D, executions of a `LINKED` order are recorded by replay, and a full quantity ends it `FILLED`.
 3. Place reconciliation (3A) still links an order regardless of its observed status; a later cancel then resolves it.
 4. `PREPARED`/`UNKNOWN` intents cannot be cancelled by client order ID; only linked orders can. Cancelling another run's orders is 3C/3E.
 5. A reverted cancel replaces the `LINKED` record's previous reason codes.
@@ -120,7 +120,7 @@ Known limitations:
 
 1. Admission does not stop a second `LINKED` order in the same slot; only a scan finds duplicates. No scan is required before the first risk increase (3E continuation gate).
 2. Scan blockers live in memory only. They are neither persisted nor restored on restart.
-3. A `LINKED` record whose order is missing from a snapshot is neither resolved nor flagged (3D/3E).
+3. A `LINKED` record whose order is missing from a snapshot is neither resolved nor flagged (3E). A 3D replay ends it `FILLED` only from execution evidence.
 4. `listOpenOrders` takes no market argument; the adapter must scope it to the coordinator's market.
 5. The adapter must return client order IDs exactly as the engine sent them. Hyperliquid cloids are not `mv1` IDs, so until the Phase 4 mapping exists every engine order would classify `UNOWNED`. That fails closed, but it blocks risk increase.
 6. After lease loss the journal is still written; only venue mutations are fenced.
@@ -129,6 +129,67 @@ Known limitations:
 9. The survivor rule compares exchange order IDs as strings (`sim-order-10` sorts before `sim-order-2`). It is deterministic, not chronological.
 10. Batch identity checks put intent IDs and client order IDs in one set (conservative).
 11. Not wired into `src/index.ts`, telemetry, the risk engine's actual-notional path or the halt paths.
+
+## Phase 3D execution cursor and replay
+
+`ExecutionCoordinator` gains `replayExecutions`, `ingestStreamExecution` and `executionStreamReconnected`. Tests cover TEST_FAULT_MATRIX P3-E13..P3-E15 (`test/execution/p3-replay.test.ts`).
+
+- The venue port gains `listExecutionsSince(cursor)`. It returns one page of the market's execution history: `executions`, a `nextCursor` and `hasMore`. An `ExecutionCursor` holds venue, market, an adapter-only `opaque` value and the last execution ID and time. Pages may overlap.
+- A new `ExecutionCheckpointStore` port persists the cursor. The coordinator takes a start cursor; null means the start of the venue's retained history. A cursor for another venue or market, or with an empty field, is refused (`INVALID_EXECUTION_CURSOR`).
+- Each page is checked as a whole before anything is recorded. The first problem stops the replay, records nothing from that page and leaves the cursor where it was. Each execution must:
+  - be an object of this venue and market with non-empty execution and exchange order IDs (`EXECUTION_OBSERVATION_INVALID`);
+  - belong to a linked record by exchange order ID. Otherwise it is `UNATTRIBUTED_EXECUTION`, `EXECUTION_FOR_UNLINKED_INTENT` (its client ID names a record that is not linked yet) or `EXECUTION_MISMATCH` (its client ID names a record linked to another order);
+  - match that record's client order ID and side, with a positive canonical quantity and price (`EXECUTION_MISMATCH`).
+
+  Then:
+  - An execution ID already recorded for another record is `EXECUTION_ID_COLLISION`. One already recorded with different facts, or repeated in the page with different facts, is `EXECUTION_CONFLICT`. An identical repeat is skipped.
+  - A new execution for a record that is no longer working (`CANCELLED`, `FILLED`) is `EXECUTION_AFTER_CLOSE`. New executions that would exceed the order quantity are `EXECUTION_OVERFILL`.
+- New executions go through `IntentRegistry.applyExecutions`. It keeps the status below full quantity and ends the record `FILLED` (`FILLED_BY_EXECUTION_EVIDENCE`) at full quantity. `LINKED -> FILLED` is now allowed, but only through this method; `resolveCancel` refuses `LINKED`.
+- Durability order per page:
+  1. the journal, only when something was added;
+  2. the checkpoint;
+  3. the in-memory cursor.
+
+  A journal failure latches the coordinator and leaves the checkpoint alone. A checkpoint failure leaves the cursor; the next replay re-reads the page and skips what it already recorded.
+- Risk increase is blocked (`EXECUTION_REPLAY_BLOCKS_RISK_INCREASE`, and `canIncreaseRisk()` is false) while any execution blocker is set:
+  - A new coordinator starts with `EXECUTION_REPLAY_INCOMPLETE`.
+  - Each replay first resets the blockers to that one code. Only a replay that reaches `hasMore: false` clears it.
+  - A failed read (`EXECUTION_REPLAY_READ_FAILED`), an invalid page (`EXECUTION_PAGE_INVALID`) or an execution problem stops the replay, and so does reaching 100 pages (`EXECUTION_REPLAY_PAGE_LIMIT`). Each adds its code.
+
+  Cancels and reduce-only exits are not blocked.
+- Stream events are never trusted to be complete. Each needs a decimal string `meta.sequence` with no leading zeros, compared as a big integer. Each of these adds a blocker that only a later completed replay clears:
+  - a missing or unusable sequence (`EXECUTION_STREAM_SEQUENCE_UNUSABLE`);
+  - a jump past the next expected sequence (`EXECUTION_STREAM_GAP`);
+  - an event that arrives while another operation runs or after a journal latch (`EXECUTION_STREAM_EVENT_DROPPED`);
+  - any execution problem.
+
+  Older or repeated sequences are accepted, because execution-ID checks make them harmless. Stream events never move the cursor.
+- `executionStreamReconnected()` resets the sequence baseline and adds `EXECUTION_STREAM_RECONNECTED`. A blocker raised while a replay runs survives that replay.
+- `SimulatedVenue` serves its existing `fill` executions as paged history: `listExecutionsSince`, `setExecutionPageSize`, `overlapExecutionReads`, `failNextExecutionReads` and `calls.executions`.
+- The Phase 0 bootstrap guard is unchanged. Test changes outside the new file are mechanical:
+  - `createHarness` is now async and runs one replay by default;
+  - the test port literals gained `listExecutionsSince`;
+  - the harness gained a `MemoryCheckpointStore`;
+  - the p3-cancel `restart` helper is async, and one restart call passes `checkpoints` and `executionCursor: null`;
+  - the write-budget validation test uses `assert.rejects` instead of `assert.throws`, with the same error pattern.
+
+  No 3A-3C expected value changed.
+
+Known limitations:
+
+1. Unattributed or foreign executions, and executions of `REJECTED`/`NOT_SENT` records, block risk increase and pin the cursor until an operator path exists (3E+). `EXECUTION_FOR_UNLINKED_INTENT` for a `PREPARED`/`UNKNOWN` record clears after `reconcileUnresolved` links the order and a replay re-reads it; for a `REJECTED`/`NOT_SENT` record it stays.
+2. An execution problem is reported, not resolved. An `EXECUTION_CONFLICT` or `EXECUTION_ID_COLLISION` raised by a stream event for an execution older than the cursor is cleared by the next completed replay without re-reading it.
+3. Blockers live in memory only. A restart starts from `EXECUTION_REPLAY_INCOMPLETE` and forgets the reason for an earlier block (3E).
+4. Stream events with a null sequence (the simulator, until an adapter provides one) always block until a replay.
+5. A stream that keeps filling while replays run can keep risk increase blocked through dropped events.
+6. REST lag: a replay can clear stream blockers before the REST history shows a streamed event. The event was already recorded from the stream, so nothing is lost, but the clear rests on the adapter's history being current.
+7. `executionStreamReconnected()` must be called on every connection, including the first. Nothing enforces it.
+8. A venue cursor that never advances, such as simulator overlap at or above the page size, ends every replay at the page limit.
+9. The retained history must cover the cursor. The simulator never expires history; the Phase 4 adapter must prove a stale cursor is refused rather than silently skipped.
+10. An order linked by 3A reconciliation with executions already at full quantity stays `LINKED` (remaining quantity 0; a cancel is refused with `ORDER_FULLY_EXECUTED`). Replay does not promote it, because every execution is already recorded.
+11. Executions must carry the engine's client order ID. A venue that omits it on fills fails closed with `EXECUTION_MISMATCH` (Phase 4 audit).
+12. A completed replay does not require a fresh open-order scan or reconciliation of unresolved records; that is the 3E continuation gate.
+13. Not wired into `src/index.ts`, telemetry, the risk engine's actual-notional path or the halt paths.
 
 ## Process reset (2026-10-11)
 

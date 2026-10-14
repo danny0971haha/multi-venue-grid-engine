@@ -106,6 +106,8 @@ const LINKED_STATUSES = new Set<IntentStatus>([
   "CANCELLED",
   "FILLED",
 ]);
+// Statuses whose linked order may still execute.
+const WORKING_STATUSES = new Set<IntentStatus>(["LINKED", "CANCEL_PREPARED", "CANCEL_UNVERIFIED"]);
 // A cancel can only be pending or verified for an order that is not fully executed.
 const PARTIAL_QUANTITY_STATUSES = new Set<IntentStatus>([
   "CANCEL_PREPARED",
@@ -117,7 +119,7 @@ const ALLOWED_TRANSITIONS: Record<IntentStatus, readonly IntentStatus[]> = {
   UNKNOWN: ["LINKED"],
   NOT_SENT: [],
   REJECTED: [],
-  LINKED: ["CANCEL_PREPARED"],
+  LINKED: ["CANCEL_PREPARED", "FILLED"],
   CANCEL_PREPARED: ["CANCEL_UNVERIFIED", "LINKED", "CANCELLED", "FILLED"],
   CANCEL_UNVERIFIED: ["LINKED", "CANCELLED", "FILLED"],
   CANCELLED: [],
@@ -361,12 +363,50 @@ export class IntentRegistry {
     return this.transition(intentId, "CANCEL_UNVERIFIED", reasonCodes);
   }
 
+  // Adds newly observed executions to a working order. A full quantity ends it as FILLED;
+  // otherwise the status is kept. Every check runs before any state changes.
+  applyExecutions(intentId: IntentId, executions: readonly RecordedExecution[]): IntentRecord {
+    const record = this.require(intentId);
+    const exchangeOrderId = record.exchangeOrderId;
+    if (exchangeOrderId === null || !WORKING_STATUSES.has(record.status)) {
+      throw new IntentRegistryError(`INVALID_TRANSITION:${record.status}->EXECUTED`);
+    }
+    const added = normalizeExecutions(executions, exchangeOrderId);
+    if (added.length === 0) {
+      throw new IntentRegistryError("NO_NEW_EXECUTIONS");
+    }
+    for (const execution of added) {
+      if (this.byExecutionId.has(execution.executionId)) {
+        throw new IntentRegistryError("EXECUTION_ID_COLLISION");
+      }
+    }
+    const merged = normalizeExecutions([...record.executions, ...added], exchangeOrderId);
+    const executedQuantity = sumExecutions(merged);
+    const compared = decimalCmp(executedQuantity, record.intent.quantity);
+    if (compared > 0) {
+      throw new IntentRegistryError("EXECUTION_OVERFILL");
+    }
+
+    if (compared === 0) {
+      assertTransition(record.status, "FILLED");
+      record.status = "FILLED";
+      record.reasonCodes = ["FILLED_BY_EXECUTION_EVIDENCE"];
+    }
+    record.executions = merged;
+    record.executedQuantity = executedQuantity;
+    for (const execution of added) {
+      this.byExecutionId.set(execution.executionId, intentId);
+    }
+    return structuredClone(record);
+  }
+
   // Ends a pending cancel from venue evidence. Recorded executions are never dropped or
   // changed. Every check runs before any state changes.
   resolveCancel(intentId: IntentId, resolution: CancelResolution): IntentRecord {
     const record = this.require(intentId);
     const exchangeOrderId = record.exchangeOrderId;
-    if (exchangeOrderId === null) {
+    // LINKED -> FILLED is allowed only through applyExecutions.
+    if (exchangeOrderId === null || record.status === "LINKED") {
       throw new IntentRegistryError(`INVALID_TRANSITION:${record.status}->${resolution.status}`);
     }
     assertTransition(record.status, resolution.status);

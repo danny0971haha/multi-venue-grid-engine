@@ -3,6 +3,7 @@ import type {
   AnchorEpoch,
   ClientOrderId,
   ExchangeOrderId,
+  ExecutionId,
   ExperimentId,
   IntentId,
   MarketId,
@@ -46,6 +47,9 @@ import {
 } from "./intent-registry.js";
 import type {
   ClientOrderLookup,
+  ExecutionCheckpointStore,
+  ExecutionCursor,
+  ExecutionPage,
   ExecutionVenuePort,
   ExposureInputSource,
   ExposureInputs,
@@ -69,6 +73,9 @@ export type ExecutionCoordinatorDeps = {
   fence: MutationFence;
   journal: IntentJournal;
   exposure: ExposureInputSource;
+  checkpoints: ExecutionCheckpointStore;
+  // The last durable replay cursor, or null to replay the venue's retained history.
+  executionCursor: ExecutionCursor | null;
 };
 
 export type SubmitDisposition = "REFUSED" | "ALREADY_RECORDED" | "RECORDED";
@@ -133,6 +140,13 @@ export type ExposureReservation = {
   unknownReservations: RiskUnknownReservation[];
 };
 
+// reasonCodes are the execution blockers left after the operation; recorded lists the
+// execution IDs it newly recorded.
+export type ExecutionReplayResult = {
+  reasonCodes: string[];
+  recorded: ExecutionId[];
+};
+
 // Venue adapters must normalize a duplicate-client-order-ID rejection to this code. It proves
 // an order with this intent's client ID already exists, so it is never a plain rejection.
 export const DUPLICATE_CLIENT_ORDER_ID_CODE = "DUPLICATE_CLIENT_ORDER_ID";
@@ -146,6 +160,9 @@ const RISK_REDUCING_PURPOSES = new Set<string>([
 const WORKING_STATUSES = new Set<IntentStatus>(["LINKED", "CANCEL_PREPARED", "CANCEL_UNVERIFIED"]);
 // Records whose send may have reached the venue without a linked order.
 const POSSIBLY_LIVE_STATUSES = new Set<IntentStatus>(["PREPARED", "UNKNOWN"]);
+// Pages one replay may read before it stops with risk increase still blocked.
+const MAX_REPLAY_PAGES = 100;
+const STREAM_SEQUENCE_PATTERN = /^(0|[1-9][0-9]*)$/;
 
 type LookupDecision =
   | { kind: "UNRESOLVED"; reasonCode: string }
@@ -154,9 +171,15 @@ type LookupDecision =
 
 type ExecutionFacts = Pick<RecordedExecution, "exchangeOrderId" | "quantity" | "price">;
 
-// Owns intent identity and place/cancel outcomes for one experiment scope. One operation runs
-// at a time; any unresolved intent, journal failure or open-order scan blocker blocks risk
-// increase.
+type ExecutionPlan = {
+  problem: string | null;
+  additions: Map<IntentId, RecordedExecution[]>;
+};
+
+// Owns intent identity, place/cancel outcomes and execution replay for one experiment scope.
+// One operation runs at a time; any unresolved intent, journal failure, open-order scan
+// blocker or execution blocker blocks risk increase. A new coordinator starts with its
+// execution history unproven.
 export class ExecutionCoordinator {
   private readonly config: ExecutionCoordinatorConfig;
   private readonly registry: IntentRegistry;
@@ -164,9 +187,14 @@ export class ExecutionCoordinator {
   private readonly fence: MutationFence;
   private readonly journal: IntentJournal;
   private readonly exposure: ExposureInputSource;
+  private readonly checkpoints: ExecutionCheckpointStore;
+  private cursor: ExecutionCursor | null;
   private busy = false;
   private journalFailed = false;
   private openOrderBlockers: string[] = [];
+  // Cleared only by a replay that reaches the venue's current end.
+  private executionBlockers = new Set<string>(["EXECUTION_REPLAY_INCOMPLETE"]);
+  private lastStreamSequence: bigint | null = null;
   private writesThisCycle = 0;
 
   constructor(deps: ExecutionCoordinatorDeps) {
@@ -174,20 +202,36 @@ export class ExecutionCoordinator {
     if (!Number.isSafeInteger(budget) || budget <= 0) {
       throw new Error("INVALID_WRITE_BUDGET");
     }
+    const cursor = deps.executionCursor;
+    if (cursor !== null && !isValidCursor(cursor, deps.config.scopeKey)) {
+      throw new Error("INVALID_EXECUTION_CURSOR");
+    }
     this.config = { ...deps.config };
     this.registry = deps.registry;
     this.venue = deps.venue;
     this.fence = deps.fence;
     this.journal = deps.journal;
     this.exposure = deps.exposure;
+    this.checkpoints = deps.checkpoints;
+    this.cursor = cursor === null ? null : copyCursor(cursor);
   }
 
   canIncreaseRisk(): boolean {
     return (
       !this.journalFailed &&
       this.registry.unresolved().length === 0 &&
-      this.openOrderBlockers.length === 0
+      this.openOrderBlockers.length === 0 &&
+      this.executionBlockers.size === 0
     );
+  }
+
+  // The cursor of the last replay page whose executions and checkpoint are durable.
+  executionCursor(): ExecutionCursor | null {
+    return this.cursor === null ? null : copyCursor(this.cursor);
+  }
+
+  executionBlockerCodes(): string[] {
+    return [...this.executionBlockers].sort(compareStrings);
   }
 
   // Starts a new write-budget cycle. Refused while an operation is in flight.
@@ -286,6 +330,56 @@ export class ExecutionCoordinator {
     } finally {
       this.busy = false;
     }
+  }
+
+  // Reads execution history from the durable cursor to the venue's current end and records
+  // every new execution of a linked order. Pages may overlap; an execution already recorded
+  // with the same facts is skipped. Risk increase stays blocked until a replay reaches the
+  // end with every execution attributed and durable.
+  async replayExecutions(): Promise<ExecutionReplayResult> {
+    if (this.busy) {
+      return { reasonCodes: ["COORDINATOR_BUSY"], recorded: [] };
+    }
+    this.busy = true;
+    try {
+      return await this.replayExclusive();
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // Records one execution pushed by the venue stream. The stream is never trusted to be
+  // complete: a gap, an unusable sequence, a dropped event or any execution problem blocks
+  // risk increase until a later replay completes. It never moves the replay cursor.
+  async ingestStreamExecution(execution: ExecutionObservation): Promise<ExecutionReplayResult> {
+    const reasonCodes: string[] = [];
+    const sequenceProblem = this.observeStreamSequence(execution);
+    if (sequenceProblem !== null) {
+      this.executionBlockers.add(sequenceProblem);
+      reasonCodes.push(sequenceProblem);
+    }
+    if (this.busy || this.journalFailed) {
+      this.executionBlockers.add("EXECUTION_STREAM_EVENT_DROPPED");
+      reasonCodes.push(
+        "EXECUTION_STREAM_EVENT_DROPPED",
+        this.busy ? "COORDINATOR_BUSY" : "JOURNAL_LATCHED",
+      );
+      return { reasonCodes, recorded: [] };
+    }
+    this.busy = true;
+    try {
+      return await this.ingestExclusive(execution, reasonCodes);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  // Reports every connection of the execution stream, including the first. Events missed
+  // while disconnected are unknown, so risk increase stays blocked until a replay started
+  // after this call completes. A reconnect never authorizes anything by itself.
+  executionStreamReconnected(): void {
+    this.lastStreamSequence = null;
+    this.executionBlockers.add("EXECUTION_STREAM_RECONNECTED");
   }
 
   // Exposure this coordinator's records still reserve: every risk-increasing order that may
@@ -486,6 +580,9 @@ export class ExecutionCoordinator {
     }
     if (this.openOrderBlockers.length > 0 && isRiskIncreasing(intent)) {
       return "OPEN_ORDER_SCAN_BLOCKS_RISK_INCREASE";
+    }
+    if (this.executionBlockers.size > 0 && isRiskIncreasing(intent)) {
+      return "EXECUTION_REPLAY_BLOCKS_RISK_INCREASE";
     }
     return null;
   }
@@ -868,6 +965,185 @@ export class ExecutionCoordinator {
     return { scan, cancels, reasonCodes: stoppedBy === null ? [] : ["CLEANUP_INCOMPLETE"] };
   }
 
+  private async replayExclusive(): Promise<ExecutionReplayResult> {
+    if (this.journalFailed) {
+      return { reasonCodes: ["JOURNAL_LATCHED"], recorded: [] };
+    }
+    // This replay re-proves or clears earlier problems; stream blockers raised while it runs
+    // stay, because it may have read past their events before they were raised.
+    this.executionBlockers = new Set(["EXECUTION_REPLAY_INCOMPLETE"]);
+    const recorded: ExecutionId[] = [];
+    for (let pages = 0; pages < MAX_REPLAY_PAGES; pages += 1) {
+      let page: ExecutionPage;
+      try {
+        page = await this.venue.listExecutionsSince(
+          this.cursor === null ? null : copyCursor(this.cursor),
+        );
+      } catch {
+        return this.replayStopped("EXECUTION_REPLAY_READ_FAILED", recorded);
+      }
+      if (!this.validPage(page)) {
+        return this.replayStopped("EXECUTION_PAGE_INVALID", recorded);
+      }
+      const plan = this.planExecutions(page.executions);
+      if (plan.problem !== null) {
+        return this.replayStopped(plan.problem, recorded);
+      }
+      const added = this.applyPlan(plan.additions);
+      recorded.push(...added);
+      // The checkpoint never moves past executions that are not yet durable.
+      if (added.length > 0 && !(await this.persist())) {
+        return this.replayStopped("JOURNAL_WRITE_FAILED", recorded);
+      }
+      const next = copyCursor(page.nextCursor);
+      try {
+        await this.checkpoints.persist(copyCursor(next));
+      } catch {
+        return this.replayStopped("EXECUTION_CHECKPOINT_WRITE_FAILED", recorded);
+      }
+      this.cursor = next;
+      if (!page.hasMore) {
+        this.executionBlockers.delete("EXECUTION_REPLAY_INCOMPLETE");
+        return { reasonCodes: this.executionBlockerCodes(), recorded };
+      }
+    }
+    return this.replayStopped("EXECUTION_REPLAY_PAGE_LIMIT", recorded);
+  }
+
+  private replayStopped(reasonCode: string, recorded: ExecutionId[]): ExecutionReplayResult {
+    this.executionBlockers.add(reasonCode);
+    return { reasonCodes: this.executionBlockerCodes(), recorded };
+  }
+
+  private async ingestExclusive(
+    execution: ExecutionObservation,
+    reasonCodes: string[],
+  ): Promise<ExecutionReplayResult> {
+    const plan = this.planExecutions([execution]);
+    if (plan.problem !== null) {
+      this.executionBlockers.add(plan.problem);
+      return { reasonCodes: [...reasonCodes, plan.problem], recorded: [] };
+    }
+    const recorded = this.applyPlan(plan.additions);
+    if (recorded.length > 0 && !(await this.persist())) {
+      return { reasonCodes: [...reasonCodes, "JOURNAL_WRITE_FAILED"], recorded };
+    }
+    return { reasonCodes, recorded };
+  }
+
+  // A sequence past the next expected one is a gap. A repeated or older one may be a
+  // duplicate or a late event; the execution ID checks make either harmless.
+  private observeStreamSequence(execution: unknown): string | null {
+    const sequence = streamSequence(execution);
+    if (sequence === null) {
+      return "EXECUTION_STREAM_SEQUENCE_UNUSABLE";
+    }
+    const last = this.lastStreamSequence;
+    if (last === null || sequence > last) {
+      this.lastStreamSequence = sequence;
+    }
+    return last !== null && sequence > last + 1n ? "EXECUTION_STREAM_GAP" : null;
+  }
+
+  private validPage(page: unknown): page is ExecutionPage {
+    if (typeof page !== "object" || page === null) {
+      return false;
+    }
+    const candidate = page as ExecutionPage;
+    return (
+      Array.isArray(candidate.executions) &&
+      typeof candidate.hasMore === "boolean" &&
+      isValidCursor(candidate.nextCursor, this.config.scopeKey)
+    );
+  }
+
+  // Checks observed executions against the registry before anything is recorded. The first
+  // problem wins and nothing is applied. An execution already recorded with the same facts,
+  // or repeated within the batch, is skipped.
+  private planExecutions(observed: readonly unknown[]): ExecutionPlan {
+    const { venue, market } = parseScopeKey(this.config.scopeKey);
+    const additions = new Map<IntentId, RecordedExecution[]>();
+    const seen = new Map<ExecutionId, ExecutionObservation>();
+    const problem = (reasonCode: string): ExecutionPlan => ({
+      problem: reasonCode,
+      additions: new Map(),
+    });
+    for (const raw of observed) {
+      if (!isExecutionInMarket(raw, venue, market)) {
+        return problem("EXECUTION_OBSERVATION_INVALID");
+      }
+      const execution = raw;
+      const intentId = this.registry.intentIdForExchangeOrderId(execution.exchangeOrderId);
+      if (intentId === null) {
+        return problem(this.unattributedProblem(execution));
+      }
+      const record = this.registry.get(intentId) as IntentRecord;
+      if (!executionMatchesIntent(execution, record.intent, venue, market)) {
+        return problem("EXECUTION_MISMATCH");
+      }
+      const owner = this.registry.intentIdForExecutionId(execution.executionId);
+      if (owner !== null) {
+        if (owner !== intentId) {
+          return problem("EXECUTION_ID_COLLISION");
+        }
+        const recorded = record.executions.find(
+          (item) => item.executionId === execution.executionId,
+        );
+        if (recorded === undefined || !sameExecution(recorded, execution)) {
+          return problem("EXECUTION_CONFLICT");
+        }
+        continue;
+      }
+      const earlier = seen.get(execution.executionId);
+      if (earlier !== undefined) {
+        if (!sameExecution(earlier, execution)) {
+          return problem("EXECUTION_CONFLICT");
+        }
+        continue;
+      }
+      if (!WORKING_STATUSES.has(record.status)) {
+        return problem("EXECUTION_AFTER_CLOSE");
+      }
+      seen.set(execution.executionId, execution);
+      additions.set(intentId, [...(additions.get(intentId) ?? []), toRecorded(execution)]);
+    }
+    for (const [intentId, executions] of additions) {
+      const record = this.registry.get(intentId) as IntentRecord;
+      const executed = executions.reduce(
+        (sum, execution) => decimalAdd(sum, execution.quantity),
+        record.executedQuantity,
+      );
+      if (decimalCmp(executed, record.intent.quantity) > 0) {
+        return problem("EXECUTION_OVERFILL");
+      }
+    }
+    return { problem: null, additions };
+  }
+
+  // No record links the execution's order. It may belong to an intent whose ack was lost,
+  // another runtime or a manual order; the execution alone cannot attribute it.
+  private unattributedProblem(execution: ExecutionObservation): string {
+    const clientOrderId = execution.clientOrderId;
+    const intentId =
+      clientOrderId === null ? null : this.registry.intentIdForClientOrderId(clientOrderId);
+    if (intentId === null) {
+      return "UNATTRIBUTED_EXECUTION";
+    }
+    const record = this.registry.get(intentId) as IntentRecord;
+    return record.exchangeOrderId === null ? "EXECUTION_FOR_UNLINKED_INTENT" : "EXECUTION_MISMATCH";
+  }
+
+  // Applies a checked plan in intent ID order and returns the recorded execution IDs, sorted.
+  private applyPlan(additions: ReadonlyMap<IntentId, RecordedExecution[]>): ExecutionId[] {
+    const recorded: ExecutionId[] = [];
+    for (const intentId of [...additions.keys()].sort(compareStrings)) {
+      const executions = additions.get(intentId) as RecordedExecution[];
+      this.registry.applyExecutions(intentId, executions);
+      recorded.push(...executions.map((execution) => execution.executionId));
+    }
+    return recorded.sort(compareStrings);
+  }
+
   private async persist(): Promise<boolean> {
     try {
       await this.journal.persist(this.registry.exportState());
@@ -932,6 +1208,62 @@ function observedMatchesRecord(order: ExchangeOrderObservation, record: IntentRe
     // The venue can only know more executions than recorded, never fewer.
     decimalCmp(order.executedQuantity, record.executedQuantity) >= 0
   );
+}
+
+function isValidCursor(value: unknown, scopeKey: ScopeKey): value is ExecutionCursor {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const { venue, market } = parseScopeKey(scopeKey);
+  const cursor = value as ExecutionCursor;
+  return (
+    cursor.venue === venue &&
+    cursor.market === market &&
+    isNonEmptyString(cursor.opaque) &&
+    (cursor.lastExecutionId === null || isNonEmptyString(cursor.lastExecutionId)) &&
+    (cursor.lastExecutionTime === null || isNonEmptyString(cursor.lastExecutionTime))
+  );
+}
+
+function copyCursor(cursor: ExecutionCursor): ExecutionCursor {
+  return {
+    venue: cursor.venue,
+    market: cursor.market,
+    opaque: cursor.opaque,
+    lastExecutionId: cursor.lastExecutionId,
+    lastExecutionTime: cursor.lastExecutionTime,
+  };
+}
+
+function isExecutionInMarket(
+  value: unknown,
+  venue: VenueId,
+  market: MarketId,
+): value is ExecutionObservation {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const execution = value as ExecutionObservation;
+  return (
+    execution.venue === venue &&
+    execution.market === market &&
+    isNonEmptyString(execution.executionId) &&
+    isNonEmptyString(execution.exchangeOrderId)
+  );
+}
+
+function streamSequence(execution: unknown): bigint | null {
+  if (typeof execution !== "object" || execution === null) {
+    return null;
+  }
+  const meta = (execution as ExecutionObservation).meta;
+  if (typeof meta !== "object" || meta === null) {
+    return null;
+  }
+  const sequence = meta.sequence;
+  return typeof sequence === "string" && STREAM_SEQUENCE_PATTERN.test(sequence)
+    ? BigInt(sequence)
+    : null;
 }
 
 function compareStrings(left: string, right: string): number {

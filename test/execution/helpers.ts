@@ -2,7 +2,9 @@ import type { ClientOrderId } from "../../src/domain/ids.js";
 import { makeClientOrderId, makeIntentId, makeScopeKey } from "../../src/domain/ids.js";
 import type { OrderIntent } from "../../src/domain/types.js";
 import {
+  type ExecutionCheckpointStore,
   ExecutionCoordinator,
+  type ExecutionCursor,
   type ExecutionVenuePort,
   type ExposureInputSource,
   type FenceResult,
@@ -93,6 +95,28 @@ export class MemoryJournal implements IntentJournal {
   }
 }
 
+// In-memory replay checkpoint store that round-trips through JSON.
+export class MemoryCheckpointStore implements ExecutionCheckpointStore {
+  readonly snapshots: string[] = [];
+  private readonly script: Array<"OK" | "FAIL"> = [];
+
+  scriptPersist(...outcomes: Array<"OK" | "FAIL">): void {
+    this.script.push(...outcomes);
+  }
+
+  async persist(cursor: ExecutionCursor): Promise<void> {
+    if ((this.script.shift() ?? "OK") === "FAIL") {
+      throw new Error("TEST_CHECKPOINT_WRITE_FAILED");
+    }
+    this.snapshots.push(JSON.stringify(cursor));
+  }
+
+  latest(): ExecutionCursor | null {
+    const last = this.snapshots.at(-1);
+    return last === undefined ? null : (JSON.parse(last) as ExecutionCursor);
+  }
+}
+
 // Always lets the mutation run; a throwing mutation is UNKNOWN, as with the lease fence.
 export function openFence(leaseGeneration = "1"): MutationFence {
   return {
@@ -125,23 +149,30 @@ export type Harness = {
   venue: SimulatedVenue;
   journal: MemoryJournal;
   registry: IntentRegistry;
+  checkpoints: MemoryCheckpointStore;
   coordinator: ExecutionCoordinator;
 };
 
-export function createHarness(
+// Starts a coordinator from the given (or the latest checkpointed) cursor and, unless replay
+// is false, runs its first execution replay, as a runtime must before any risk increase.
+export async function createHarness(
   options: {
     venue?: SimulatedVenue;
     port?: ExecutionVenuePort;
     journal?: MemoryJournal;
     registry?: IntentRegistry;
+    checkpoints?: MemoryCheckpointStore;
+    executionCursor?: ExecutionCursor | null;
     fence?: MutationFence;
     exposure?: ExposureInputSource;
     writeBudgetPerCycle?: number;
+    replay?: boolean;
   } = {},
-): Harness {
+): Promise<Harness> {
   const venue = options.venue ?? new SimulatedVenue("sim", "BTC_USDC_PERP", OBSERVED_AT);
   const journal = options.journal ?? new MemoryJournal();
   const registry = options.registry ?? new IntentRegistry();
+  const checkpoints = options.checkpoints ?? new MemoryCheckpointStore();
   const coordinator = new ExecutionCoordinator({
     config: {
       experimentId: "exp-1",
@@ -154,6 +185,12 @@ export function createHarness(
     fence: options.fence ?? openFence(),
     journal,
     exposure: options.exposure ?? flatExposure(),
+    checkpoints,
+    executionCursor:
+      options.executionCursor === undefined ? checkpoints.latest() : options.executionCursor,
   });
-  return { venue, journal, registry, coordinator };
+  if (options.replay ?? true) {
+    await coordinator.replayExecutions();
+  }
+  return { venue, journal, registry, checkpoints, coordinator };
 }

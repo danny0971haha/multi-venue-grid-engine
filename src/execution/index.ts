@@ -5,6 +5,7 @@ export type {
   DuplicateCleanupResult,
   ExecutionCoordinatorConfig,
   ExecutionCoordinatorDeps,
+  ExecutionReplayResult,
   ExposureReservation,
   OpenOrderClassification,
   OpenOrderScan,
@@ -33,6 +34,9 @@ export {
 export { createLeaseMutationFence } from "./lease-fence.js";
 export type {
   ClientOrderLookup,
+  ExecutionCheckpointStore,
+  ExecutionCursor,
+  ExecutionPage,
   ExecutionVenuePort,
   ExposureInputSource,
   ExposureInputs,
