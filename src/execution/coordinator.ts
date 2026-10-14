@@ -178,8 +178,8 @@ type ExecutionPlan = {
 
 // Owns intent identity, place/cancel outcomes and execution replay for one experiment scope.
 // One operation runs at a time; any unresolved intent, journal failure, open-order scan
-// blocker or execution blocker blocks risk increase. A new coordinator starts with its
-// execution history unproven.
+// blocker or execution blocker blocks risk increase. A new coordinator starts with its open
+// orders and execution history unproven.
 export class ExecutionCoordinator {
   private readonly config: ExecutionCoordinatorConfig;
   private readonly registry: IntentRegistry;
@@ -191,7 +191,8 @@ export class ExecutionCoordinator {
   private cursor: ExecutionCursor | null;
   private busy = false;
   private journalFailed = false;
-  private openOrderBlockers: string[] = [];
+  // Cleared only by a scan that proves every open order owned and unduplicated.
+  private openOrderBlockers: string[] = ["OPEN_ORDER_SCAN_REQUIRED"];
   // Cleared only by a replay that reaches the venue's current end.
   private executionBlockers = new Set<string>(["EXECUTION_REPLAY_INCOMPLETE"]);
   private lastStreamSequence: bigint | null = null;
@@ -217,12 +218,19 @@ export class ExecutionCoordinator {
   }
 
   canIncreaseRisk(): boolean {
-    return (
-      !this.journalFailed &&
-      this.registry.unresolved().length === 0 &&
-      this.openOrderBlockers.length === 0 &&
-      this.executionBlockers.size === 0
-    );
+    return this.riskIncreaseBlockers().length === 0;
+  }
+
+  // Every reason risk increase is currently blocked, sorted; empty only when nothing blocks.
+  riskIncreaseBlockers(): string[] {
+    const blockers = new Set<string>([...this.openOrderBlockers, ...this.executionBlockers]);
+    if (this.journalFailed) {
+      blockers.add("JOURNAL_LATCHED");
+    }
+    if (this.registry.unresolved().length > 0) {
+      blockers.add("UNRESOLVED_INTENT");
+    }
+    return [...blockers].sort(compareStrings);
   }
 
   // The cursor of the last replay page whose executions and checkpoint are durable.
@@ -1210,7 +1218,7 @@ function observedMatchesRecord(order: ExchangeOrderObservation, record: IntentRe
   );
 }
 
-function isValidCursor(value: unknown, scopeKey: ScopeKey): value is ExecutionCursor {
+export function isValidCursor(value: unknown, scopeKey: ScopeKey): value is ExecutionCursor {
   if (typeof value !== "object" || value === null) {
     return false;
   }

@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: 2026-10-13. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-14. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
@@ -16,11 +16,11 @@ Historical identities, unchanged and retained for reference:
 
 ## Implemented vs reviewed
 
-Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); execution cursor, checkpoint and overlap-safe replay as a library (Phase 3D, see below); a fake-only offline integration harness.
+Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); execution cursor, checkpoint and overlap-safe replay as a library (Phase 3D, see below); fatal process guard, durable intent journal and execution checkpoint, restart recovery and restart gate as a library (Phase 3E, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B, Phase 3C and Phase 3D independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B, Phase 3C, Phase 3D and Phase 3E independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
-Not implemented: runtime wiring of telemetry, Phase 3E (fatal matrix, durable journal, continuation gate), any venue adapter, integrated dry-run.
+Not implemented: runtime wiring of telemetry and of the Phase 3 execution library, the continuation gate (CONTINUE/REDUCE/HALT, planned as Phase 3F), any venue adapter, integrated dry-run.
 
 ## Phase 2F telemetry and manifest
 
@@ -59,12 +59,12 @@ Known limitations:
 
 Known limitations:
 
-1. The journal is a port only; no durable on-disk journal exists yet (3E). Restart safety is proven only with an in-memory JSON round trip.
+1. The journal is a port only; no durable on-disk journal exists yet (3E). Restart safety is proven only with an in-memory JSON round trip. Since 3E, `openDurableExecutionState` provides an on-disk journal (see below).
 2. There is no proof of non-arrival. A `PREPARED` or `UNKNOWN` intent with no venue evidence stays blocked until an operator or later evidence resolves it.
 3. `mv1` client IDs are 23 characters, not Hyperliquid cloids (128-bit hex). The Phase 4 adapter must map them deterministically and normalize duplicate-cloid rejections to `DUPLICATE_CLIENT_ORDER_ID`.
 4. Execution evidence must carry the intent's client ID. A market order's reported price is not checked during reconciliation.
 5. Not wired into the simulator level state, `src/index.ts`, telemetry or `gateRiskIncreaseOnEvidence`.
-6. If the fence itself throws, the intent stays `PREPARED` and the exception propagates (3E fatal matrix).
+6. If the fence itself throws, the intent stays `PREPARED` and the exception propagates (3E fatal matrix). Since 3E, restart recovery turns it `UNKNOWN`.
 7. `SimulatedVenue` (`src/simulator/venue.ts`) is a test double that lives in `src/` beside the existing simulator.
 
 ## Phase 3B execution coordinator (cancel path)
@@ -89,7 +89,7 @@ Known limitations:
 5. A reverted cancel replaces the `LINKED` record's previous reason codes.
 6. The registry schema version is unchanged (`phase3-intent-registry-1`); the status set and import checks grew. There is no durable journal yet (3E).
 7. Not wired into `src/index.ts`, telemetry, the risk gate or halt flatten paths.
-8. If the fence itself throws, the record stays `CANCEL_PREPARED` and the exception propagates (3E fatal matrix).
+8. If the fence itself throws, the record stays `CANCEL_PREPARED` and the exception propagates (3E fatal matrix). Since 3E, restart recovery turns it `CANCEL_UNVERIFIED`.
 
 ## Phase 3C execution coordinator (ownership, duplicates, batch, write budget)
 
@@ -118,7 +118,7 @@ Known limitations:
 
 Known limitations:
 
-1. Admission does not stop a second `LINKED` order in the same slot; only a scan finds duplicates. No scan is required before the first risk increase (3E continuation gate).
+1. Admission does not stop a second `LINKED` order in the same slot; only a scan finds duplicates. No scan is required before the first risk increase (3E continuation gate). Since 3E, a new coordinator requires one.
 2. Scan blockers live in memory only. They are neither persisted nor restored on restart.
 3. A `LINKED` record whose order is missing from a snapshot is neither resolved nor flagged (3E). A 3D replay ends it `FILLED` only from execution evidence.
 4. `listOpenOrders` takes no market argument; the adapter must scope it to the coordinator's market.
@@ -188,8 +188,53 @@ Known limitations:
 9. The retained history must cover the cursor. The simulator never expires history; the Phase 4 adapter must prove a stale cursor is refused rather than silently skipped.
 10. An order linked by 3A reconciliation with executions already at full quantity stays `LINKED` (remaining quantity 0; a cancel is refused with `ORDER_FULLY_EXECUTED`). Replay does not promote it, because every execution is already recorded.
 11. Executions must carry the engine's client order ID. A venue that omits it on fills fails closed with `EXECUTION_MISMATCH` (Phase 4 audit).
-12. A completed replay does not require a fresh open-order scan or reconciliation of unresolved records; that is the 3E continuation gate.
+12. A completed replay does not require a fresh open-order scan or reconciliation of unresolved records; that is the 3E continuation gate. Since 3E, `runRestartGate` runs all three at startup; the gate between cycles is 3F.
 13. Not wired into `src/index.ts`, telemetry, the risk engine's actual-notional path or the halt paths.
+
+## Phase 3E fatal process errors, durable journal and restart gate
+
+Phase 3E implements the durable `UNKNOWN` state and restart reconciliation of IMPLEMENTATION_CONTRACT §6.1 and TEST_FAULT_MATRIX §11 F-01..F-05. The continuation gate (CONTINUE/REDUCE/HALT) is deferred to Phase 3F. Tests: `test/execution/p3-fatal.test.ts` (child processes) and `test/execution/p3-restart.test.ts`.
+
+- `installFatalProcessGuard(latch)` (`src/execution/fatal-guard.ts`) handles `uncaughtException` and `unhandledRejection`:
+  1. It blocks the runtime persistence latch (`FATAL_UNCAUGHT_EXCEPTION` / `FATAL_UNHANDLED_REJECTION`), so no fenced write can start.
+  2. It writes only `{"event":"FATAL_PROCESS_ERROR","reasonCode":...}` to stderr, never the error itself.
+  3. It exits with `FATAL_EXIT_CODE` (70).
+
+  A second install throws `FATAL_GUARD_ALREADY_INSTALLED`. A test fails if any other file in `src/` registers a process-level error handler.
+- `openDurableExecutionState({ directory, scopeKey, latch })` (`src/execution/journal-store.ts`) loads two Phase 2B exact pairs: the intent journal (`intent-journal`) and the execution checkpoint (`execution-checkpoint`, schema `phase3-execution-checkpoint-1`). It returns a registry, a start cursor, and an `IntentJournal` and `ExecutionCheckpointStore` backed by those pairs. It fails closed when:
+  - a pair is not a proven exact pair with a `VALID` primary (`INTENT_JOURNAL_UNPROVEN` / `EXECUTION_CHECKPOINT_UNPROVEN`, plus the inspection codes);
+  - a checkpoint exists without a journal (`EXECUTION_CHECKPOINT_WITHOUT_JOURNAL`);
+  - the journal is not a valid registry state, or holds an intent of another scope (`INTENT_JOURNAL_INVALID`);
+  - the checkpoint is not exactly `{ schemaVersion, cursor }`, or its cursor does not have exactly the five cursor keys or fails the 3D cursor check (`EXECUTION_CHECKPOINT_INVALID`).
+
+  A fresh directory gets an empty journal before anything else, so a checkpoint never exists without its journal (`INTENT_JOURNAL_INITIALIZATION_FAILED` if that write fails).
+- Each pair has one ordered writer that writes from the generation and hash it last proved. A write that does not prove the requested state committed is rejected (`INTENT_JOURNAL_WRITE_FAILED` / `EXECUTION_CHECKPOINT_WRITE_FAILED`), and the latch is blocked. Once the latch is blocked, whatever blocked it, both writers refuse every later write. The coordinator then latches through its existing `JOURNAL_LATCHED` path.
+- `recoverInterruptedIntents(registry, journal)` (`src/execution/restart.ts`) runs before a coordinator uses a loaded registry. It turns every `PREPARED` record into `UNKNOWN` (`RESTART_SEND_OUTCOME_UNKNOWN`) and every `CANCEL_PREPARED` into `CANCEL_UNVERIFIED` (`RESTART_CANCEL_OUTCOME_UNKNOWN`) in one journal write. If that write fails (`RESTART_RECOVERY_WRITE_FAILED`), the caller must stop. Both statuses already block risk increase and keep their exposure reserved (3A-3C).
+- A new coordinator now also starts with `OPEN_ORDER_SCAN_REQUIRED`; only a clean scan clears it. `riskIncreaseBlockers()` lists every current blocker, sorted: the scan and replay blockers, `JOURNAL_LATCHED` and `UNRESOLVED_INTENT`. `canIncreaseRisk()` is true only when that list is empty.
+- `runRestartGate(coordinator, anchorEpoch)` runs `reconcileUnresolved`, `scanOpenOrders` and `replayExecutions`, each even after an earlier one reports a problem. It allows risk increase only when `riskIncreaseBlockers()` is empty afterwards.
+- Fault matrix (each test prints its §14 evidence fields as test diagnostics):
+  - F-01 / F-02: a worker that places one order per tick throws, or rejects a promise, while idle, and queues one more submit behind the fault. It exits 70 with the latch blocked and makes no venue call after the fault. Negative controls with a log-and-ignore handler place the queued order and exit 0.
+  - F-03: SIGKILL after the `PREPARED` write and before the venue call. On restart the record becomes `UNKNOWN`; the lookup finds nothing, so it stays `UNKNOWN` and every risk increase is refused. A second restart sees the durable `UNKNOWN`.
+  - F-04: SIGKILL after the venue stored the order and before the response. On restart the record becomes `UNKNOWN`, the lookup links it without a resend, and a new order is then accepted.
+  - F-05: after a fatal exit, a restart before the lease expires is `BLOCKED`. After expiry, the gate records a fill that happened while nothing ran before any new order. A foreign open order keeps the gate closed (`UNOWNED_OPEN_ORDER`).
+- Test changes outside the new files:
+  - `createHarness` now also scans by default (`scan: false` skips it), and `buildIntent` accepts `scopeKey`.
+  - In `p3-place.test.ts`, the lost-journal duplicate test now places the stale order after the restart scan, since a scan before it blocks first. A new test covers that blocking scan.
+  - A write-ahead test rescans after reconciliation before asserting that risk increase is allowed.
+
+  No other 3A-3D expected value changed. The Phase 0 bootstrap guard is unchanged; the test venue lives in `test/fixtures/`.
+
+Known limitations:
+
+1. Absence is never proof. An F-03 intent with no venue evidence stays `UNKNOWN`, and blocks risk increase, until an operator path exists.
+2. Not wired into `src/index.ts`, telemetry, halt persistence or a supervisor. The guard only terminates; the tests play the supervisor.
+3. After a SIGKILL, takeover waits for the 30 s lease expiry, and a leftover coordination claim is cleared by the Phase 2C liveness probe. The tests use a fixed lease clock past expiry and never renew the lease.
+4. The restart gate's result covers coordinator blockers only. The latch and lease are enforced at send time by the fence, and by the journal writers.
+5. Opening a fresh directory writes the empty journal with the Phase 2B non-live bootstrap authorization; live bootstrap is not provided.
+6. Open treats a corrupt primary as unproven even when the pair store could recover it from `.bak` (stricter; recovery is an operator decision).
+7. Scan and replay blockers are still in memory. A restart recomputes them; only `UNKNOWN`/`CANCEL_UNVERIFIED` records carry a block across restarts.
+8. With a lost journal, an engine-shaped order already open at the restart scan is `AMBIGUOUS_OPEN_ORDER` and blocks risk increase until an operator resolves it.
+9. Every journal write stores the whole registry; there is no compaction.
 
 ## Process reset (2026-10-11)
 

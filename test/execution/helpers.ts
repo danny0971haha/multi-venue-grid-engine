@@ -22,6 +22,7 @@ type IntentOverrides = Partial<
   Pick<
     OrderIntent,
     | "runId"
+    | "scopeKey"
     | "anchorEpoch"
     | "logicalLevelId"
     | "purpose"
@@ -153,8 +154,9 @@ export type Harness = {
   coordinator: ExecutionCoordinator;
 };
 
-// Starts a coordinator from the given (or the latest checkpointed) cursor and, unless replay
-// is false, runs its first execution replay, as a runtime must before any risk increase.
+// Starts a coordinator from the given (or the latest checkpointed) cursor and, unless disabled,
+// runs its first execution replay and open-order scan, as a runtime must before any risk
+// increase.
 export async function createHarness(
   options: {
     venue?: SimulatedVenue;
@@ -167,6 +169,7 @@ export async function createHarness(
     exposure?: ExposureInputSource;
     writeBudgetPerCycle?: number;
     replay?: boolean;
+    scan?: boolean;
   } = {},
 ): Promise<Harness> {
   const venue = options.venue ?? new SimulatedVenue("sim", "BTC_USDC_PERP", OBSERVED_AT);
@@ -191,6 +194,9 @@ export async function createHarness(
   });
   if (options.replay ?? true) {
     await coordinator.replayExecutions();
+  }
+  if (options.scan ?? true) {
+    await coordinator.scanOpenOrders("epoch-1");
   }
   return { venue, journal, registry, checkpoints, coordinator };
 }

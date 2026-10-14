@@ -149,12 +149,26 @@ describe("P3-E03 UNKNOWN later found by client ID", () => {
     assert.equal(h.coordinator.canIncreaseRisk(), false);
   });
 
-  test("lost journal: duplicate client ID rejection is UNKNOWN and reconciles to the original", async () => {
+  test("lost journal: an order already open at the restart scan blocks risk increase", async () => {
     const before = await createHarness();
     const intent = buildIntent();
     await before.coordinator.submit(intent);
 
     const after = await createHarness({ venue: before.venue });
+    assert.deepEqual(after.coordinator.riskIncreaseBlockers(), ["AMBIGUOUS_OPEN_ORDER"]);
+    const result = await after.coordinator.submit(intent);
+    assert.equal(result.disposition, "REFUSED");
+    assert.deepEqual(result.reasonCodes, ["OPEN_ORDER_SCAN_BLOCKS_RISK_INCREASE"]);
+    assert.equal(before.venue.calls.place, 1);
+  });
+
+  test("lost journal: duplicate client ID rejection is UNKNOWN and reconciles to the original", async () => {
+    // The stale order lands after the restart scan, so only the place rejection reveals it.
+    const after = await createHarness();
+    const before = await createHarness({ venue: after.venue });
+    const intent = buildIntent();
+    await before.coordinator.submit(intent);
+
     const result = await after.coordinator.submit(intent);
     assert.equal(result.record?.status, "UNKNOWN");
     assert.deepEqual(result.reasonCodes, ["DUPLICATE_CLIENT_ORDER_ID_REJECTION"]);
@@ -487,6 +501,9 @@ describe("P3 write-ahead journal", () => {
 
     await restarted.coordinator.reconcileUnresolved();
     assert.equal(restarted.registry.get(intent.intentId)?.exchangeOrderId, "sim-order-1");
+    // The restart scan saw the order before it was linked; only a fresh scan proves it owned.
+    assert.deepEqual(restarted.coordinator.riskIncreaseBlockers(), ["AMBIGUOUS_OPEN_ORDER"]);
+    assert.deepEqual((await restarted.coordinator.scanOpenOrders("epoch-1")).reasonCodes, []);
     assert.equal(restarted.coordinator.canIncreaseRisk(), true);
     assert.equal(h.venue.calls.place, 1);
   });
