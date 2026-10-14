@@ -107,6 +107,12 @@ export function makeClientOrderId(input: {
   return `mv1${digest.slice(0, 20)}`;
 }
 
+// True when a client order ID has the format makeClientOrderId produces. Format alone never
+// proves ownership; it only rules out IDs this engine cannot have generated.
+export function isEngineClientOrderId(value: string): boolean {
+  return /^mv1[0-9a-f]{20}$/.test(value);
+}
+
 export function parseLeaseGeneration(value: string): LeaseGeneration {
   if (!/^\d+$/.test(value)) {
     throw new Error("INVALID_LEASE_GENERATION");

@@ -1,4 +1,5 @@
 import type { ClientOrderId } from "../domain/ids.js";
+import type { DecimalString } from "../math/decimal.js";
 import type {
   CancelAck,
   CancelRequest,
@@ -24,6 +25,20 @@ export type ExecutionVenuePort = {
   placeOrder(intent: OrderIntent): Promise<VenueWriteResult<OrderAck>>;
   cancelOrder(request: CancelRequest): Promise<VenueWriteResult<CancelAck>>;
   lookupClientOrder(clientOrderId: ClientOrderId): Promise<ClientOrderLookup>;
+  // Fresh snapshot of every open order in this market, owned or not. A rejected promise means
+  // the read failed and proves nothing.
+  listOpenOrders(): Promise<ExchangeOrderObservation[]>;
+};
+
+// Fresh signed position and mark/mid price for the coordinator's market. Null, or a rejected
+// promise, means the input is missing and blocks risk increase.
+export type ExposureInputs = {
+  signedPosition: DecimalString | null;
+  markOrMidPrice: DecimalString | null;
+};
+
+export type ExposureInputSource = {
+  read(): Promise<ExposureInputs>;
 };
 
 export type FenceOutcome = "SENT" | "NOT_SENT" | "UNKNOWN";

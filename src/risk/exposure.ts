@@ -7,6 +7,7 @@ import {
   isCanonicalDecimalString,
 } from "../math/decimal.js";
 import type { RiskProposedIntent, RiskUnknownReservation, RiskWorkingOrder } from "./risk-types.js";
+import { FROZEN_PLANNED_GROSS_NOTIONAL_USDT } from "./risk-types.js";
 import {
   isRiskSide,
   validateProposedIntent,
@@ -178,6 +179,44 @@ export function computeExposure(args: {
     unbounded: false,
     reasonCodes: [],
   };
+}
+
+export type PlannedExposureDecision = {
+  allowed: boolean;
+  plannedGrossNotional: DecimalString | null;
+  reasonCodes: string[];
+};
+
+// Pre-send gate for one whole risk-increasing batch: the worst directional scenario over the
+// position, owned working orders, possibly-live unknown submissions and the batch must be
+// bounded and within the frozen planned gross notional cap. computeExposure skips invalid
+// entries, so any invalid entry denies here instead of being left out of the sum.
+export function plannedExposureDecision(
+  args: Parameters<typeof computeExposure>[0],
+): PlannedExposureDecision {
+  const invalid = [
+    ...args.ownedActiveOrders.flatMap((order) => validateWorkingOrder(order)),
+    ...args.unknownReservations.flatMap((reservation) => validateUnknownReservation(reservation)),
+    ...args.proposedBatch.flatMap((intent) =>
+      intent.purpose === "CANCEL" ? ["INVALID_RISK_INPUT"] : validateProposedIntent(intent),
+    ),
+  ];
+  if (invalid.length > 0) {
+    return { allowed: false, plannedGrossNotional: null, reasonCodes: [...new Set(invalid)] };
+  }
+  const exposure = computeExposure(args);
+  const reasonCodes = [...exposure.reasonCodes];
+  const planned = exposure.plannedGrossNotional;
+  if (
+    exposure.unbounded ||
+    (planned !== null && decimalCmp(planned, FROZEN_PLANNED_GROSS_NOTIONAL_USDT) > 0)
+  ) {
+    reasonCodes.push("PLANNED_NOTIONAL");
+  }
+  if (planned === null && reasonCodes.length === 0) {
+    reasonCodes.push("STALE_OR_MISSING_INPUT");
+  }
+  return { allowed: reasonCodes.length === 0, plannedGrossNotional: planned, reasonCodes };
 }
 
 function emptyExposure(reasonCodes: string[]): ExposureComputation {

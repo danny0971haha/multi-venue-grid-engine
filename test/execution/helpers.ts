@@ -4,6 +4,7 @@ import type { OrderIntent } from "../../src/domain/types.js";
 import {
   ExecutionCoordinator,
   type ExecutionVenuePort,
+  type ExposureInputSource,
   type FenceResult,
   type IntentJournal,
   IntentRegistry,
@@ -115,6 +116,11 @@ export function notSentFence(leaseGeneration = "1"): MutationFence {
   };
 }
 
+// Flat position at mark 100, so only working orders and proposals count toward exposure.
+export function flatExposure(): ExposureInputSource {
+  return { read: async () => ({ signedPosition: "0", markOrMidPrice: "100" }) };
+}
+
 export type Harness = {
   venue: SimulatedVenue;
   journal: MemoryJournal;
@@ -129,17 +135,25 @@ export function createHarness(
     journal?: MemoryJournal;
     registry?: IntentRegistry;
     fence?: MutationFence;
+    exposure?: ExposureInputSource;
+    writeBudgetPerCycle?: number;
   } = {},
 ): Harness {
   const venue = options.venue ?? new SimulatedVenue("sim", "BTC_USDC_PERP", OBSERVED_AT);
   const journal = options.journal ?? new MemoryJournal();
   const registry = options.registry ?? new IntentRegistry();
   const coordinator = new ExecutionCoordinator({
-    config: { experimentId: "exp-1", runId: "run-1", scopeKey: SCOPE_KEY },
+    config: {
+      experimentId: "exp-1",
+      runId: "run-1",
+      scopeKey: SCOPE_KEY,
+      writeBudgetPerCycle: options.writeBudgetPerCycle ?? 100,
+    },
     registry,
     venue: options.port ?? venue,
     fence: options.fence ?? openFence(),
     journal,
+    exposure: options.exposure ?? flatExposure(),
   });
   return { venue, journal, registry, coordinator };
 }

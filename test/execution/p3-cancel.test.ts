@@ -24,6 +24,7 @@ import {
   buildIntent,
   clientIdOf,
   createHarness,
+  flatExposure,
   type Harness,
   notSentFence,
   openFence,
@@ -62,6 +63,7 @@ function portOver(
     cancelOrder: overrides.cancelOrder ?? ((request) => h.venue.cancelOrder(request)),
     lookupClientOrder:
       overrides.lookupClientOrder ?? ((clientOrderId) => h.venue.lookupClientOrder(clientOrderId)),
+    listOpenOrders: () => h.venue.listOpenOrders(),
   };
 }
 
@@ -482,11 +484,17 @@ describe("P3 cancel admission", () => {
       buildIntent({ logicalLevelId: "B4", purpose: "GRID_EXIT", reduceOnly: true }),
     );
     const otherRun = new ExecutionCoordinator({
-      config: { experimentId: "exp-1", runId: "run-2", scopeKey: SCOPE_KEY },
+      config: {
+        experimentId: "exp-1",
+        runId: "run-2",
+        scopeKey: SCOPE_KEY,
+        writeBudgetPerCycle: 100,
+      },
       registry: h.registry,
       venue: h.venue,
       fence: openFence(),
       journal: h.journal,
+      exposure: flatExposure(),
     });
     assert.deepEqual((await otherRun.cancel(open.intentId)).reasonCodes, ["INTENT_SCOPE_MISMATCH"]);
     assert.equal(h.venue.calls.cancel, 0);

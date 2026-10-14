@@ -38,7 +38,8 @@ export type SimulatedCancelBehavior =
 type SimulatedOrder = {
   exchangeOrderId: ExchangeOrderId;
   clientOrderId: ClientOrderId | null;
-  intentId: IntentId;
+  // Null for an order this engine never submitted, such as a manual or other-bot order.
+  intentId: IntentId | null;
   side: OrderIntent["side"];
   type: OrderIntent["type"];
   price: DecimalString | null;
@@ -52,7 +53,7 @@ type SimulatedOrder = {
 // Deterministic fake venue with scripted place/cancel outcomes and fault injection. It holds
 // venue truth only; it never decides intent state.
 export class SimulatedVenue implements ExecutionVenuePort {
-  readonly calls = { place: 0, cancel: 0, lookup: 0 };
+  readonly calls = { place: 0, cancel: 0, lookup: 0, list: 0 };
   private readonly venue: VenueId;
   private readonly market: MarketId;
   private readonly observedAt: string;
@@ -161,6 +162,38 @@ export class SimulatedVenue implements ExecutionVenuePort {
     };
   }
 
+  async listOpenOrders(): Promise<ExchangeOrderObservation[]> {
+    this.calls.list += 1;
+    return [...this.orders.values()]
+      .filter((order) => !order.forgotten && isOpen(order))
+      .map((order) => this.observe(order));
+  }
+
+  // Adds an open resting order that did not come from this engine, e.g. a manual order.
+  addForeignOrder(order: {
+    clientOrderId: ClientOrderId | null;
+    side: OrderIntent["side"];
+    price: DecimalString;
+    quantity: DecimalString;
+  }): ExchangeOrderId {
+    if (order.clientOrderId !== null && this.byClientOrderId.has(order.clientOrderId)) {
+      throw new Error("SIM_DUPLICATE_CLIENT_ORDER_ID");
+    }
+    return this.store({
+      exchangeOrderId: `sim-order-${this.nextOrder}`,
+      clientOrderId: order.clientOrderId,
+      intentId: null,
+      side: order.side,
+      type: "LIMIT",
+      price: order.price,
+      originalQuantity: order.quantity,
+      executedQuantity: "0",
+      reduceOnly: false,
+      forgotten: false,
+      cancelled: false,
+    }).exchangeOrderId;
+  }
+
   fill(
     exchangeOrderId: ExchangeOrderId,
     quantity: DecimalString,
@@ -206,7 +239,7 @@ export class SimulatedVenue implements ExecutionVenuePort {
   }
 
   private accept(intent: OrderIntent): SimulatedOrder {
-    const order: SimulatedOrder = {
+    return this.store({
       exchangeOrderId: `sim-order-${this.nextOrder}`,
       clientOrderId: intent.clientOrderId,
       intentId: intent.intentId,
@@ -218,7 +251,10 @@ export class SimulatedVenue implements ExecutionVenuePort {
       reduceOnly: intent.reduceOnly,
       forgotten: false,
       cancelled: false,
-    };
+    });
+  }
+
+  private store(order: SimulatedOrder): SimulatedOrder {
     this.nextOrder += 1;
     this.orders.set(order.exchangeOrderId, order);
     if (order.clientOrderId !== null) {

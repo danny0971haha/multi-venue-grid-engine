@@ -1,6 +1,13 @@
 export type {
+  BatchItem,
+  BatchResult,
+  CleanupCancel,
+  DuplicateCleanupResult,
   ExecutionCoordinatorConfig,
   ExecutionCoordinatorDeps,
+  ExposureReservation,
+  OpenOrderClassification,
+  OpenOrderScan,
   ReconcileItem,
   ReconcileResult,
   SubmitDisposition,
@@ -27,6 +34,8 @@ export { createLeaseMutationFence } from "./lease-fence.js";
 export type {
   ClientOrderLookup,
   ExecutionVenuePort,
+  ExposureInputSource,
+  ExposureInputs,
   FenceOutcome,
   FenceResult,
   IntentJournal,
