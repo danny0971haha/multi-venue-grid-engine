@@ -27,9 +27,12 @@ import {
   buildIntent,
   createHarness,
   flatExposure,
+  grant,
   MemoryJournal,
   OBSERVED_AT,
   openFence,
+  riskSource,
+  runningHaltAuthority,
   SCOPE_KEY,
 } from "./helpers.js";
 
@@ -98,6 +101,8 @@ function coordinatorOver(
     exposure: flatExposure(),
     checkpoints: state.checkpoints,
     executionCursor: state.executionCursor,
+    riskInputs: riskSource(),
+    haltAuthority: runningHaltAuthority(),
   });
 }
 
@@ -135,6 +140,7 @@ describe("P3E durable intent journal and execution checkpoint", () => {
       const coordinator = coordinatorOver(state, venue);
       assert.equal((await runRestartGate(coordinator, "epoch-1")).allowRiskIncrease, true);
       const intent = buildIntent();
+      await grant(coordinator);
       assert.equal((await coordinator.submit(intent)).record?.status, "LINKED");
       venue.fill("sim-order-1", "0.004", "100");
       assert.deepEqual((await coordinator.replayExecutions()).recorded, ["sim-exec-1"]);
@@ -309,6 +315,7 @@ describe("P3E durable intent journal and execution checkpoint", () => {
       assert.equal((await runRestartGate(coordinator, "epoch-1")).allowRiskIncrease, true);
       await advanceJournalElsewhere(directory);
 
+      await grant(coordinator);
       const result = await coordinator.submit(buildIntent());
       assert.equal(result.record?.status, "NOT_SENT");
       assert.deepEqual(result.reasonCodes, ["JOURNAL_WRITE_FAILED"]);
@@ -403,6 +410,7 @@ describe("P3E restart gate", () => {
     const gate = await runRestartGate(h.coordinator, "epoch-1");
     assert.equal(gate.allowRiskIncrease, true);
     assert.deepEqual(gate.reasonCodes, []);
+    await grant(h.coordinator);
     assert.equal(
       (await h.coordinator.submit(buildIntent({ sequence: "2" }))).disposition,
       "RECORDED",

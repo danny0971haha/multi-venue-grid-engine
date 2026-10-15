@@ -36,6 +36,11 @@ import type {
   RiskWorkingOrder,
 } from "../risk/risk-types.js";
 import {
+  type ContinuationDecision,
+  decideContinuation,
+  unevaluatedContinuation,
+} from "./continuation.js";
+import {
   type CancelResolution,
   type IntentLink,
   type IntentRecord,
@@ -54,8 +59,10 @@ import type {
   ExposureInputSource,
   ExposureInputs,
   FenceResult,
+  HaltAuthorityPort,
   IntentJournal,
   MutationFence,
+  RiskInputSource,
 } from "./ports.js";
 
 export type ExecutionCoordinatorConfig = {
@@ -76,6 +83,9 @@ export type ExecutionCoordinatorDeps = {
   checkpoints: ExecutionCheckpointStore;
   // The last durable replay cursor, or null to replay the venue's retained history.
   executionCursor: ExecutionCursor | null;
+  // Account inputs and halt authority of the continuation gate.
+  riskInputs: RiskInputSource;
+  haltAuthority: HaltAuthorityPort;
 };
 
 export type SubmitDisposition = "REFUSED" | "ALREADY_RECORDED" | "RECORDED";
@@ -179,7 +189,8 @@ type ExecutionPlan = {
 // Owns intent identity, place/cancel outcomes and execution replay for one experiment scope.
 // One operation runs at a time; any unresolved intent, journal failure, open-order scan
 // blocker or execution blocker blocks risk increase. A new coordinator starts with its open
-// orders and execution history unproven.
+// orders and execution history unproven. A risk-increasing submit also needs a grant from the
+// continuation gate, which any other operation revokes.
 export class ExecutionCoordinator {
   private readonly config: ExecutionCoordinatorConfig;
   private readonly registry: IntentRegistry;
@@ -188,6 +199,8 @@ export class ExecutionCoordinator {
   private readonly journal: IntentJournal;
   private readonly exposure: ExposureInputSource;
   private readonly checkpoints: ExecutionCheckpointStore;
+  private readonly riskInputs: RiskInputSource;
+  private readonly haltAuthority: HaltAuthorityPort;
   private cursor: ExecutionCursor | null;
   private busy = false;
   private journalFailed = false;
@@ -197,6 +210,8 @@ export class ExecutionCoordinator {
   private executionBlockers = new Set<string>(["EXECUTION_REPLAY_INCOMPLETE"]);
   private lastStreamSequence: bigint | null = null;
   private writesThisCycle = 0;
+  // Set only by a continuation gate that allowed risk increase; used up by the next operation.
+  private continuationGranted = false;
 
   constructor(deps: ExecutionCoordinatorDeps) {
     const budget = deps.config.writeBudgetPerCycle;
@@ -214,14 +229,19 @@ export class ExecutionCoordinator {
     this.journal = deps.journal;
     this.exposure = deps.exposure;
     this.checkpoints = deps.checkpoints;
+    this.riskInputs = deps.riskInputs;
+    this.haltAuthority = deps.haltAuthority;
     this.cursor = cursor === null ? null : copyCursor(cursor);
   }
 
+  // Whether this coordinator's own state blocks nothing. A risk-increasing submit also needs a
+  // continuation grant.
   canIncreaseRisk(): boolean {
     return this.riskIncreaseBlockers().length === 0;
   }
 
-  // Every reason risk increase is currently blocked, sorted; empty only when nothing blocks.
+  // Every reason this coordinator's own state blocks risk increase, sorted; empty only when
+  // nothing blocks. The continuation grant is not one of them.
   riskIncreaseBlockers(): string[] {
     const blockers = new Set<string>([...this.openOrderBlockers, ...this.executionBlockers]);
     if (this.journalFailed) {
@@ -242,11 +262,13 @@ export class ExecutionCoordinator {
     return [...this.executionBlockers].sort(compareStrings);
   }
 
-  // Starts a new write-budget cycle. Refused while an operation is in flight.
+  // Starts a new write-budget cycle and revokes any continuation grant. Refused while an
+  // operation is in flight.
   startCycle(): boolean {
     if (this.busy) {
       return false;
     }
+    this.continuationGranted = false;
     this.writesThisCycle = 0;
     return true;
   }
@@ -255,6 +277,8 @@ export class ExecutionCoordinator {
     return this.journalFailed;
   }
 
+  // A risk-increasing intent is admitted only under a continuation grant. Whatever happens,
+  // the call uses the grant up.
   async submit(intent: OrderIntent): Promise<SubmitResult> {
     if (this.busy) {
       return refused("COORDINATOR_BUSY");
@@ -263,6 +287,7 @@ export class ExecutionCoordinator {
     try {
       return await this.submitExclusive(intent);
     } finally {
+      this.continuationGranted = false;
       this.busy = false;
     }
   }
@@ -274,6 +299,7 @@ export class ExecutionCoordinator {
       return refused("COORDINATOR_BUSY");
     }
     this.busy = true;
+    this.continuationGranted = false;
     try {
       return await this.cancelExclusive(intentId);
     } finally {
@@ -286,6 +312,7 @@ export class ExecutionCoordinator {
       return { reasonCodes: ["COORDINATOR_BUSY"], items: [] };
     }
     this.busy = true;
+    this.continuationGranted = false;
     try {
       return await this.reconcileExclusive();
     } finally {
@@ -294,7 +321,8 @@ export class ExecutionCoordinator {
   }
 
   // Checks every intent and the whole batch's exposure before the first send. Sends then run
-  // in order; after one is not sent, the rest are neither attempted nor recorded.
+  // in order; after one is not sent, the rest are neither attempted nor recorded. One
+  // continuation grant covers the whole batch and is used up by it.
   async submitBatch(intents: readonly OrderIntent[]): Promise<BatchResult> {
     if (this.busy) {
       return batchRefused(["COORDINATOR_BUSY"]);
@@ -303,6 +331,7 @@ export class ExecutionCoordinator {
     try {
       return await this.submitBatchExclusive(intents);
     } finally {
+      this.continuationGranted = false;
       this.busy = false;
     }
   }
@@ -314,6 +343,7 @@ export class ExecutionCoordinator {
       return { reasonCodes: ["COORDINATOR_BUSY"], orders: [], duplicates: [] };
     }
     this.busy = true;
+    this.continuationGranted = false;
     try {
       return await this.scanExclusive(anchorEpoch);
     } finally {
@@ -333,6 +363,7 @@ export class ExecutionCoordinator {
       };
     }
     this.busy = true;
+    this.continuationGranted = false;
     try {
       return await this.cleanupExclusive(anchorEpoch);
     } finally {
@@ -349,6 +380,7 @@ export class ExecutionCoordinator {
       return { reasonCodes: ["COORDINATOR_BUSY"], recorded: [] };
     }
     this.busy = true;
+    this.continuationGranted = false;
     try {
       return await this.replayExclusive();
     } finally {
@@ -360,6 +392,7 @@ export class ExecutionCoordinator {
   // complete: a gap, an unusable sequence, a dropped event or any execution problem blocks
   // risk increase until a later replay completes. It never moves the replay cursor.
   async ingestStreamExecution(execution: ExecutionObservation): Promise<ExecutionReplayResult> {
+    this.continuationGranted = false;
     const reasonCodes: string[] = [];
     const sequenceProblem = this.observeStreamSequence(execution);
     if (sequenceProblem !== null) {
@@ -386,8 +419,30 @@ export class ExecutionCoordinator {
   // while disconnected are unknown, so risk increase stays blocked until a replay started
   // after this call completes. A reconnect never authorizes anything by itself.
   executionStreamReconnected(): void {
+    this.continuationGranted = false;
     this.lastStreamSequence = null;
     this.executionBlockers.add("EXECUTION_STREAM_RECONNECTED");
+  }
+
+  // The continuation gate. Reconciles unresolved intents, scans open orders and replays
+  // executions, then evaluates the frozen risk rules on fresh account inputs with this
+  // coordinator's own working orders and reservations, and inspects the durable halt
+  // authority. Only CONTINUE, with no blocker left and a RUNNING halt record that allows risk
+  // increase, grants the next operation; anything else leaves risk increase denied. The gate
+  // never sends, cancels or reduces anything itself.
+  async evaluateContinuation(anchorEpoch: AnchorEpoch): Promise<ContinuationDecision> {
+    if (this.busy) {
+      return unevaluatedContinuation(["COORDINATOR_BUSY"]);
+    }
+    this.busy = true;
+    this.continuationGranted = false;
+    try {
+      const decision = await this.continuationExclusive(anchorEpoch);
+      this.continuationGranted = decision.allowRiskIncrease;
+      return decision;
+    } finally {
+      this.busy = false;
+    }
   }
 
   // Exposure this coordinator's records still reserve: every risk-increasing order that may
@@ -423,6 +478,32 @@ export class ExecutionCoordinator {
       }
     }
     return { ownedActiveOrders, unknownReservations };
+  }
+
+  private async continuationExclusive(anchorEpoch: AnchorEpoch): Promise<ContinuationDecision> {
+    await this.reconcileExclusive();
+    await this.scanExclusive(anchorEpoch);
+    await this.replayExclusive();
+    const reservation = this.exposureReservation();
+    let riskInputs: unknown = null;
+    try {
+      riskInputs = await this.riskInputs.read();
+    } catch {
+      riskInputs = null;
+    }
+    let haltView: unknown = null;
+    try {
+      haltView = await this.haltAuthority.inspect();
+    } catch {
+      haltView = null;
+    }
+    // Blockers raised while the reads above were pending count too.
+    return decideContinuation({
+      riskInputs,
+      haltView,
+      reservation,
+      blockers: this.riskIncreaseBlockers(),
+    });
   }
 
   private async submitExclusive(intent: OrderIntent): Promise<SubmitResult> {
@@ -591,6 +672,9 @@ export class ExecutionCoordinator {
     }
     if (this.executionBlockers.size > 0 && isRiskIncreasing(intent)) {
       return "EXECUTION_REPLAY_BLOCKS_RISK_INCREASE";
+    }
+    if (!this.continuationGranted && isRiskIncreasing(intent)) {
+      return "CONTINUATION_NOT_GRANTED";
     }
     return null;
   }

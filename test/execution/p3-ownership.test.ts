@@ -27,6 +27,7 @@ import {
   buildIntent,
   clientIdOf,
   createHarness,
+  grant,
   type Harness,
   MemoryJournal,
   OBSERVED_AT,
@@ -73,6 +74,9 @@ function exposureOf(signedPosition: string | null, markOrMidPrice: string | null
 }
 
 async function placeLinked(h: Harness, intent: OrderIntent): Promise<OrderIntent> {
+  if (!intent.reduceOnly) {
+    await grant(h.coordinator);
+  }
   const placed = await h.coordinator.submit(intent);
   assert.equal(placed.record?.status, "LINKED");
   return intent;
@@ -85,6 +89,18 @@ async function placeDuplicates(h: Harness, count: number): Promise<OrderIntent[]
     intents.push(await placeLinked(h, buildIntent({ sequence: String(sequence) })));
   }
   return intents;
+}
+
+// A harness whose open-order snapshot shows nothing while `lagging` is set, as a venue whose
+// order list has not caught up with its acknowledgements. The continuation gate's scan sees
+// only the snapshot, so this is how more than two owned duplicates can accumulate.
+async function laggingHarness(
+  options: { fence?: MutationFence; writeBudgetPerCycle?: number } = {},
+): Promise<{ h: Harness; lag: { lagging: boolean } }> {
+  const venue = newVenue();
+  const lag = { lagging: false };
+  const port = portWithSnapshot(venue, async () => (lag.lagging ? [] : venue.listOpenOrders()));
+  return { h: await createHarness({ ...options, venue, port }), lag };
 }
 
 function openIds(venue: SimulatedVenue): Promise<string[]> {
@@ -178,8 +194,12 @@ describe("P3-E09 owned duplicate cleanup", () => {
   });
 
   test("a cancel that is not sent stops the cleanup before later sends", async () => {
-    const h = await createHarness({ fence: scriptedFence("SENT", "SENT", "SENT", "NOT_SENT") });
+    const { h, lag } = await laggingHarness({
+      fence: scriptedFence("SENT", "SENT", "SENT", "NOT_SENT"),
+    });
+    lag.lagging = true;
     const [, second, third] = await placeDuplicates(h, 3);
+    lag.lagging = false;
     assert.ok(second !== undefined && third !== undefined);
 
     const cleanup = await h.coordinator.cleanupOwnedDuplicates(EPOCH);
@@ -421,6 +441,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
     const h = await createHarness();
     await placeLinked(h, buildIntent({ quantity: "0.7" }));
 
+    await grant(h.coordinator);
     const over = await h.coordinator.submitBatch([
       buildIntent({ logicalLevelId: "B2", quantity: "0.4" }),
       buildIntent({ logicalLevelId: "B3", quantity: "0.41" }),
@@ -433,6 +454,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
     assert.equal(h.venue.calls.place, 1);
     assert.equal(h.registry.list().length, 1);
 
+    await grant(h.coordinator);
     const fits = await h.coordinator.submitBatch([
       buildIntent({ logicalLevelId: "B2", quantity: "0.4" }),
       buildIntent({ logicalLevelId: "B3", quantity: "0.4" }),
@@ -443,6 +465,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
       ["LINKED", "LINKED"],
     );
 
+    await grant(h.coordinator);
     const single = await h.coordinator.submit(buildIntent({ logicalLevelId: "B4" }));
     assert.deepEqual(single.reasonCodes, ["PLANNED_EXPOSURE_DENIED", "PLANNED_NOTIONAL"]);
     assert.equal(h.venue.calls.place, 3);
@@ -450,13 +473,16 @@ describe("P3-E11 whole-batch exposure gate", () => {
 
   test("the position counts and opposite sides do not net", async () => {
     const h = await createHarness({ exposure: exposureOf("1", "100") });
+    await grant(h.coordinator);
     const buy = await h.coordinator.submit(buildIntent({ quantity: "0.51" }));
     assert.deepEqual(buy.reasonCodes, ["PLANNED_EXPOSURE_DENIED", "PLANNED_NOTIONAL"]);
+    await grant(h.coordinator);
     const sell = await h.coordinator.submit(
       buildIntent({ logicalLevelId: "S1", side: "SELL", quantity: "1.51" }),
     );
     assert.deepEqual(sell.reasonCodes, ["PLANNED_EXPOSURE_DENIED", "PLANNED_NOTIONAL"]);
     assert.equal(h.venue.calls.place, 0);
+    await grant(h.coordinator);
     const fits = await h.coordinator.submit(buildIntent({ quantity: "0.5" }));
     assert.equal(fits.record?.status, "LINKED");
   });
@@ -478,7 +504,9 @@ describe("P3-E11 whole-batch exposure gate", () => {
     ];
     for (const [exposure, reasonCodes] of cases) {
       const h = await createHarness({ exposure });
+      await grant(h.coordinator);
       assert.deepEqual((await h.coordinator.submit(buildIntent())).reasonCodes, reasonCodes);
+      await grant(h.coordinator);
       const batch = await h.coordinator.submitBatch([buildIntent()]);
       assert.deepEqual(batch.reasonCodes, reasonCodes);
       assert.equal(h.venue.calls.place, 0);
@@ -501,6 +529,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
     assert.equal(exits.disposition, "SUBMITTED");
 
     const gated = await createHarness({ exposure: exposureOf("0", "100") });
+    await grant(gated.coordinator);
     const entry = await gated.coordinator.submit(
       buildIntent({ quantity: "1.51", reduceOnly: true }),
     );
@@ -509,6 +538,7 @@ describe("P3-E11 whole-batch exposure gate", () => {
 
   test("a market entry is unbounded and refused", async () => {
     const h = await createHarness();
+    await grant(h.coordinator);
     const market = await h.coordinator.submit(
       buildIntent({ type: "MARKET", price: null, timeInForce: "IOC" }),
     );
@@ -602,6 +632,7 @@ describe("P3-E12 batch stop", () => {
   test("after a send is not proven, the rest of the batch is neither sent nor recorded", async () => {
     const h = await createHarness({ fence: scriptedFence("SENT", "NOT_SENT") });
     const intents = ["B1", "B2", "B3"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
+    await grant(h.coordinator);
     const result = await h.coordinator.submitBatch(intents);
     assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
     assert.deepEqual(
@@ -654,6 +685,7 @@ describe("P3-E12 batch stop", () => {
       const intents = ["B1", "B2", "B3"].map((logicalLevelId) =>
         buildIntent({ logicalLevelId, leaseGeneration: authority.generation }),
       );
+      await grant(h.coordinator);
       const result = await h.coordinator.submitBatch(intents);
       assert.equal(released, "RELEASED");
       assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
@@ -678,6 +710,7 @@ describe("P3-E12 batch stop", () => {
     const h = await createHarness();
     h.venue.scriptPlace("ACK", "UNKNOWN_DROPPED");
     const intents = ["B1", "B2", "B3"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
+    await grant(h.coordinator);
     const result = await h.coordinator.submitBatch(intents);
     assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
     assert.deepEqual(
@@ -696,6 +729,7 @@ describe("P3-E12 batch stop", () => {
     journal.scriptPersist("OK", "FAIL");
     const h = await createHarness({ journal });
     const intents = ["B1", "B2"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
+    await grant(h.coordinator);
     const result = await h.coordinator.submitBatch(intents);
     assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
     assert.deepEqual(result.items[0]?.reasonCodes, ["VENUE_ACK", "JOURNAL_WRITE_FAILED"]);
@@ -710,6 +744,7 @@ describe("P3-E12 batch stop", () => {
     const h = await createHarness();
     h.venue.scriptPlace("REJECT");
     const intents = ["B1", "B2"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
+    await grant(h.coordinator);
     const result = await h.coordinator.submitBatch(intents);
     assert.deepEqual(result.reasonCodes, []);
     assert.deepEqual(
@@ -741,6 +776,7 @@ describe("P3 batch pre-send checks", () => {
     for (const [batch, reasonCode] of cases) {
       const h = await createHarness();
       await placeLinked(h, recorded);
+      await grant(h.coordinator);
       const result = await h.coordinator.submitBatch(batch as OrderIntent[]);
       assert.deepEqual(result, { disposition: "REFUSED", reasonCodes: [reasonCode], items: [] });
       assert.equal(h.venue.calls.place, 1, reasonCode);
@@ -752,6 +788,7 @@ describe("P3 batch pre-send checks", () => {
     const journal = new MemoryJournal();
     journal.scriptPersist("FAIL");
     const h = await createHarness({ journal });
+    await grant(h.coordinator);
     await h.coordinator.submit(buildIntent());
     assert.equal(h.coordinator.isJournalLatched(), true);
     const result = await h.coordinator.submitBatch([buildIntent({ logicalLevelId: "B2" })]);
@@ -772,6 +809,7 @@ describe("P3 batch pre-send checks", () => {
         },
       },
     });
+    await grant(h.coordinator);
     const pending = h.coordinator.submit(buildIntent());
     assert.deepEqual(
       (await h.coordinator.submitBatch([buildIntent({ logicalLevelId: "B2" })])).reasonCodes,
@@ -800,6 +838,7 @@ describe("P3 write budget", () => {
     await placeLinked(h, buildIntent({ logicalLevelId: "B1" }));
     await placeLinked(h, buildIntent({ logicalLevelId: "B2" }));
     const third = buildIntent({ logicalLevelId: "B3" });
+    await grant(h.coordinator);
     assert.deepEqual((await h.coordinator.submit(third)).reasonCodes, ["WRITE_BUDGET_EXHAUSTED"]);
     assert.equal(h.venue.calls.place, 2);
     assert.equal(h.registry.get(third.intentId), null);
@@ -811,10 +850,12 @@ describe("P3 write budget", () => {
     const h = await createHarness({ writeBudgetPerCycle: 3 });
     await placeLinked(h, buildIntent({ logicalLevelId: "B1" }));
     const levels = ["B2", "B3", "B4"].map((logicalLevelId) => buildIntent({ logicalLevelId }));
+    await grant(h.coordinator);
     assert.deepEqual((await h.coordinator.submitBatch(levels)).reasonCodes, [
       "WRITE_BUDGET_EXHAUSTED",
     ]);
     assert.equal(h.venue.calls.place, 1);
+    await grant(h.coordinator);
     const fits = await h.coordinator.submitBatch(levels.slice(0, 2));
     assert.deepEqual(fits.reasonCodes, []);
     assert.equal(h.venue.calls.place, 3);
@@ -822,8 +863,10 @@ describe("P3 write budget", () => {
 
   test("an attempted send counts even when the fence does not send it", async () => {
     const h = await createHarness({ writeBudgetPerCycle: 1, fence: scriptedFence("NOT_SENT") });
+    await grant(h.coordinator);
     const first = await h.coordinator.submit(buildIntent({ logicalLevelId: "B1" }));
     assert.equal(first.record?.status, "NOT_SENT");
+    await grant(h.coordinator);
     const second = await h.coordinator.submit(buildIntent({ logicalLevelId: "B2" }));
     assert.deepEqual(second.reasonCodes, ["WRITE_BUDGET_EXHAUSTED"]);
   });
@@ -844,8 +887,10 @@ describe("P3 write budget", () => {
     assert.deepEqual(exit.reasonCodes, ["WRITE_BUDGET_EXHAUSTED"]);
     assert.equal(h.venue.calls.place, 1);
 
-    const dup = await createHarness({ writeBudgetPerCycle: 3 });
+    const { h: dup, lag } = await laggingHarness({ writeBudgetPerCycle: 3 });
+    lag.lagging = true;
     await placeDuplicates(dup, 3);
+    lag.lagging = false;
     const cleanup = await dup.coordinator.cleanupOwnedDuplicates(EPOCH);
     assert.deepEqual(cleanup.reasonCodes, ["CLEANUP_INCOMPLETE"]);
     assert.deepEqual(

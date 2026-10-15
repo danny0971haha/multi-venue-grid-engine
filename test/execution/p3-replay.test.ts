@@ -9,7 +9,14 @@ import {
   IntentRegistryError,
 } from "../../src/execution/index.js";
 import { SimulatedVenue } from "../../src/simulator/venue.js";
-import { buildIntent, clientIdOf, createHarness, type Harness, OBSERVED_AT } from "./helpers.js";
+import {
+  buildIntent,
+  clientIdOf,
+  createHarness,
+  grant,
+  type Harness,
+  OBSERVED_AT,
+} from "./helpers.js";
 
 const START_CURSOR = {
   venue: "sim",
@@ -31,6 +38,9 @@ function assertRegistryError(run: () => unknown, reasonCode: string): void {
 }
 
 async function placeLinked(h: Harness, intent: OrderIntent = buildIntent()): Promise<OrderIntent> {
+  if (!intent.reduceOnly) {
+    await grant(h.coordinator);
+  }
   const placed = await h.coordinator.submit(intent);
   assert.equal(placed.record?.status, "LINKED");
   return intent;
@@ -415,6 +425,7 @@ describe("P3 unattributed executions", () => {
     const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
+    await grant(h.coordinator);
     assert.equal((await h.coordinator.submit(intent)).record?.status, "UNKNOWN");
     h.venue.fill("sim-order-1", "0.004", "100");
 
@@ -689,6 +700,7 @@ describe("P3-E15 reconnect requires REST reconciliation before new risk", () => 
     });
     assert.equal(recordOf(h, intent).executedQuantity, "0.004");
     assert.equal(h.coordinator.canIncreaseRisk(), true);
+    await grant(h.coordinator);
     assert.equal((await h.coordinator.submit(entry)).record?.status, "LINKED");
   });
 
@@ -764,6 +776,7 @@ describe("P3-E15 reconnect requires REST reconciliation before new risk", () => 
 
     assert.deepEqual(await h.coordinator.replayExecutions(), { reasonCodes: [], recorded: [] });
     assert.deepEqual(h.coordinator.executionCursor(), START_CURSOR);
+    await grant(h.coordinator);
     assert.equal((await h.coordinator.submit(buildIntent())).record?.status, "LINKED");
   });
 

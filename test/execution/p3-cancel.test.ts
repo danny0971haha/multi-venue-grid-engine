@@ -25,9 +25,12 @@ import {
   clientIdOf,
   createHarness,
   flatExposure,
+  grant,
   type Harness,
   notSentFence,
   openFence,
+  riskSource,
+  runningHaltAuthority,
   SCOPE_KEY,
 } from "./helpers.js";
 
@@ -41,6 +44,9 @@ function assertRegistryError(run: () => unknown, reasonCode: string): void {
 
 // Places an intent that the venue acknowledges, so it is LINKED.
 async function placeLinked(h: Harness, intent: OrderIntent = buildIntent()): Promise<OrderIntent> {
+  if (!intent.reduceOnly) {
+    await grant(h.coordinator);
+  }
   const placed = await h.coordinator.submit(intent);
   assert.equal(placed.record?.status, "LINKED");
   return intent;
@@ -343,6 +349,7 @@ describe("P3-E08 cancel races with fill", () => {
     const base = await createHarness();
     base.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const intent = buildIntent();
+    await grant(base.coordinator);
     await base.coordinator.submit(intent);
     const first = base.venue.fill("sim-order-1", "0.004", "100");
     await base.coordinator.reconcileUnresolved();
@@ -424,6 +431,7 @@ describe("P3-E08 cancel races with fill", () => {
     const h = await createHarness();
     h.venue.scriptPlace("UNKNOWN_ACCEPTED");
     const owner = buildIntent();
+    await grant(h.coordinator);
     await h.coordinator.submit(owner);
     const owned = h.venue.fill("sim-order-1", "0.004", "100");
     await h.coordinator.reconcileUnresolved();
@@ -461,11 +469,14 @@ describe("P3 cancel admission", () => {
     const filled = buildIntent();
     const rejected = buildIntent({ logicalLevelId: "B2" });
     const unknown = buildIntent({ logicalLevelId: "B3" });
+    await grant(h.coordinator);
     await h.coordinator.submit(filled);
     h.venue.fill("sim-order-1", "0.01", "100");
     await h.coordinator.reconcileUnresolved();
     assert.equal(h.registry.get(filled.intentId)?.executedQuantity, "0.01");
+    await grant(h.coordinator);
     assert.equal((await h.coordinator.submit(rejected)).record?.status, "REJECTED");
+    await grant(h.coordinator);
     assert.equal((await h.coordinator.submit(unknown)).record?.status, "UNKNOWN");
 
     const cases: Array<[OrderIntent, string]> = [
@@ -498,6 +509,8 @@ describe("P3 cancel admission", () => {
       exposure: flatExposure(),
       checkpoints: h.checkpoints,
       executionCursor: null,
+      riskInputs: riskSource(),
+      haltAuthority: runningHaltAuthority(),
     });
     assert.deepEqual((await otherRun.cancel(open.intentId)).reasonCodes, ["INTENT_SCOPE_MISMATCH"]);
     assert.equal(h.venue.calls.cancel, 0);
@@ -515,6 +528,7 @@ describe("P3 cancel admission", () => {
     const latched = await createHarness();
     const open = await placeLinked(latched);
     latched.journal.scriptPersist("FAIL");
+    await grant(latched.coordinator);
     await latched.coordinator.submit(buildIntent({ logicalLevelId: "B2" }));
     assert.deepEqual((await latched.coordinator.cancel(open.intentId)).reasonCodes, [
       "JOURNAL_LATCHED",
