@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: 2026-10-15. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-16. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
@@ -275,6 +275,20 @@ Known limitations:
 9. `runRestartGate` alone no longer allows a risk-increasing submit; callers need `evaluateContinuation`.
 10. Not wired into `src/index.ts`, telemetry or a supervisor.
 
+## Phase 4.1 Hyperliquid capability audit (documentation and public metadata)
+
+[venue-audits/hyperliquid-2026-10-16.md](venue-audits/hyperliquid-2026-10-16.md) is the IMPLEMENTATION_CONTRACT §7.1 capability audit for Hyperliquid BTC perpetuals. It was written from the official documentation plus one public, unauthenticated mainnet `meta` read (E1, audit section 10), which carried no account address. No credential was created or used and no SDK was installed. It proposes values for the 18 capabilities, maps TEST_FAULT_MATRIX V-01..V-14 and lists adapter requirements H-01..H-17.
+
+Main findings:
+
+- Fills carry the venue order ID and a trade ID, but not the client order ID. The engine's `mv1` IDs are not valid cloids (`0x` + 32 hex), so a deterministic mapping and oid-based fill attribution are required.
+- There is no execution cursor and no WebSocket sequence number. Replay must use overlapping time-range queries; only the 10000 most recent fills are retained.
+- No server-time endpoint is documented.
+- The price rule (5 significant figures) is not a fixed tick, which `MarketRules.priceTick` cannot express.
+- Public metadata on 2026-10-16 (E1): BTC is mainnet asset index 0 with szDecimals 5 and maxLeverage 40, and has no isolated-only or margin-mode restriction. The minimum order value is not in the metadata.
+
+The audit recommends `CANARY_ELIGIBLE=BLOCKED`. Open blockers: account-scoped read-only evidence and order evidence are missing; API-wallet withdrawal incapability is not provable from the documentation; server time is unproven; and it is unknown whether a reduce-only order below the minimum order value can close a residual. The envelope-currency blocker was resolved by the owner's Q1 decision (see the authorization boundary below). Gate 4A also needs a read-only adapter and its conformance tests. Independent review: `NOT_PERFORMED`.
+
 ## Process reset (2026-10-11)
 
 Between 2026-09-01 and 2026-09-12 no runtime behavior changed; effort went to rebinding exact SHAs, trees, byte hashes and test counts after every change. The integration line retires that machinery (all of it remains in git history):
@@ -297,10 +311,18 @@ DEPLOYMENT_AUTHORIZED=NO
 MERGE_AUTHORIZED=PR16_PR17_BY_OWNER_ONLY
 ```
 
-On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. On 2026-10-12 the owner authorized Phase 3 implementation without a Gate 2 PASS (a recorded deviation from ACCEPTANCE_GATES), and authorized merging PR #16 and PR #17 and closing superseded PRs; those merges are performed by the owner, not by this record. Phase 4 and later phases still require an explicit owner decision. Real/testnet credentials and exchange networking remain unauthorized.
+On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. On 2026-10-12 the owner authorized Phase 3 implementation without a Gate 2 PASS (a recorded deviation from ACCEPTANCE_GATES), and authorized merging PR #16 and PR #17 and closing superseded PRs; those merges are performed by the owner, not by this record. On 2026-10-16 the owner authorized the Gate 3 review request (issue #24) and Phase 4 together; Phase 4.1 therefore started without a Gate 3 PASS (a recorded deviation). Later Phase 4 steps and later phases still require an explicit owner decision.
+
+Owner answers of 2026-10-16 to the Phase 4.1 audit questions (audit section 8):
+
+- Q1: on Hyperliquid the envelope's "U" is USDC; the numbers are unchanged (capital 100, margin 30, gross notional 150, daily PnL halt -5, drawdown halt 10). `docs/EXPERIMENT_SPEC.md` was not edited; the reviewer decides whether a formal amendment is also needed.
+- Q2: read-only networking for evidence is approved, without a chosen scope. The narrowest offered scope was applied: one public mainnet `meta` read with no account address (E1). Testnet reads and account-address reads need the owner to choose that scope.
+- Q3 and Q4: no decision; the auditor's recommendations are recorded in the audit. Both block a live canary, not read-only work.
+
+Real/testnet credentials and every exchange write remain unauthorized. Exchange networking beyond public, unauthenticated, address-free Hyperliquid `info` reads remains unauthorized.
 
 Unknown, stale, lease-uncertain or persistence-uncertain state must continue to fail closed and block risk increase. The separate risk, durable state, lease, halt, ACK and process-fence authorities are not a single boolean switch.
 
 ## Known product risk: venue minimum order size
 
-The frozen envelope plans at most 150U gross notional over 10 levels, roughly 15U per order. `docs/EXPERIMENT_SPEC.md` section 3 requires reporting incompatibility rather than raising leverage, margin or notional. Unverified public reports suggest Binance USD-M BTCUSDT requires about 100U minimum notional (incompatible), Hyperliquid about 10U minimum notional (possibly compatible), and OKX BTC-USDT-SWAP a 0.01 BTC contract value with an unverified minimum size. The Phase 4 venue audit must read these limits from each venue's public metadata before selecting a venue; an unverifiable venue stays unsupported. Hyperliquid is the owner's first Phase 4 venue (not started); its minimum order value, size/price precision and margin rules must be verified from official metadata before an adapter is accepted, or it stays unsupported.
+The frozen envelope plans at most 150U gross notional over 10 levels, roughly 15U per order. `docs/EXPERIMENT_SPEC.md` section 3 requires reporting incompatibility rather than raising leverage, margin or notional. Unverified public reports suggest Binance USD-M BTCUSDT requires about 100U minimum notional (incompatible), Hyperliquid about 10U minimum notional (possibly compatible), and OKX BTC-USDT-SWAP a 0.01 BTC contract value with an unverified minimum size. The Phase 4 venue audit must read these limits from each venue's public metadata before selecting a venue; an unverifiable venue stays unsupported. Hyperliquid is the owner's first Phase 4 venue. Its documentation shows a 10 minimum order value only in an error example, and size precision and margin mode come from per-asset metadata ([venue-audits/hyperliquid-2026-10-16.md](venue-audits/hyperliquid-2026-10-16.md), section 6). Public metadata read on 2026-10-16 gives BTC szDecimals 5 and maxLeverage 40, so quantity rounding cannot push a 15-per-level BTC order below 10 while BTC trades at or below 500000. The minimum order value itself is still unverified, and the adapter must read the metadata again at startup; until both hold, the venue stays unsupported.
