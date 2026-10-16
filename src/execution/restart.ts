@@ -60,7 +60,8 @@ export async function recoverInterruptedIntents(
 
 // The restart gate: reconcile unresolved intents, scan open orders, then replay executions.
 // Every step runs even after an earlier one reports a problem, so the result names each
-// blocker. Risk increase is allowed only when the coordinator reports no blocker afterwards.
+// blocker. allowRiskIncrease means the coordinator reports no blocker afterwards; a
+// risk-increasing submit still needs a grant from evaluateContinuation.
 export async function runRestartGate(
   coordinator: ExecutionCoordinator,
   anchorEpoch: AnchorEpoch,

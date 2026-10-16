@@ -19,6 +19,8 @@ export {
   ExecutionCoordinator,
   isValidCursor,
 } from "./coordinator.js";
+export type { ContinuationDecision, ContinuationEvidence } from "./continuation.js";
+export { createHaltAuthorityPort, decideContinuation } from "./continuation.js";
 export { FATAL_EXIT_CODE, installFatalProcessGuard } from "./fatal-guard.js";
 export type {
   CancelResolution,
@@ -56,8 +58,12 @@ export type {
   ExposureInputs,
   FenceOutcome,
   FenceResult,
+  HaltAuthorityPort,
+  HaltAuthorityView,
   IntentJournal,
   MutationFence,
+  RiskAccountInputs,
+  RiskInputSource,
 } from "./ports.js";
 export type { RecoveredIntent, RestartGateResult, RestartRecoveryResult } from "./restart.js";
 export { recoverInterruptedIntents, runRestartGate } from "./restart.js";

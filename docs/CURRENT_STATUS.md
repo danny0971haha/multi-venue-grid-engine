@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: 2026-10-14. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-15. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
@@ -16,11 +16,11 @@ Historical identities, unchanged and retained for reference:
 
 ## Implemented vs reviewed
 
-Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); execution cursor, checkpoint and overlap-safe replay as a library (Phase 3D, see below); fatal process guard, durable intent journal and execution checkpoint, restart recovery and restart gate as a library (Phase 3E, see below); a fake-only offline integration harness.
+Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); execution cursor, checkpoint and overlap-safe replay as a library (Phase 3D, see below); fatal process guard, durable intent journal and execution checkpoint, restart recovery and restart gate as a library (Phase 3E, see below); continuation gate (CONTINUE/REDUCE/HALT) and single-use risk-increase grant as a library (Phase 3F, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B, Phase 3C, Phase 3D and Phase 3E independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B, Phase 3C, Phase 3D, Phase 3E and Phase 3F independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
-Not implemented: runtime wiring of telemetry and of the Phase 3 execution library, the continuation gate (CONTINUE/REDUCE/HALT, planned as Phase 3F), any venue adapter, integrated dry-run.
+Not implemented: runtime wiring of telemetry and of the Phase 3 execution library (including the continuation gate), execution of the REDUCE and HALT actions by a supervisor, any venue adapter, integrated dry-run.
 
 ## Phase 2F telemetry and manifest
 
@@ -188,7 +188,7 @@ Known limitations:
 9. The retained history must cover the cursor. The simulator never expires history; the Phase 4 adapter must prove a stale cursor is refused rather than silently skipped.
 10. An order linked by 3A reconciliation with executions already at full quantity stays `LINKED` (remaining quantity 0; a cancel is refused with `ORDER_FULLY_EXECUTED`). Replay does not promote it, because every execution is already recorded.
 11. Executions must carry the engine's client order ID. A venue that omits it on fills fails closed with `EXECUTION_MISMATCH` (Phase 4 audit).
-12. A completed replay does not require a fresh open-order scan or reconciliation of unresolved records; that is the 3E continuation gate. Since 3E, `runRestartGate` runs all three at startup; the gate between cycles is 3F.
+12. A completed replay does not require a fresh open-order scan or reconciliation of unresolved records; that is the 3E continuation gate. Since 3E, `runRestartGate` runs all three at startup. Since 3F, `evaluateContinuation` runs all three before every grant.
 13. Not wired into `src/index.ts`, telemetry, the risk engine's actual-notional path or the halt paths.
 
 ## Phase 3E fatal process errors, durable journal and restart gate
@@ -229,12 +229,51 @@ Known limitations:
 1. Absence is never proof. An F-03 intent with no venue evidence stays `UNKNOWN`, and blocks risk increase, until an operator path exists.
 2. Not wired into `src/index.ts`, telemetry, halt persistence or a supervisor. The guard only terminates; the tests play the supervisor.
 3. After a SIGKILL, takeover waits for the 30 s lease expiry, and a leftover coordination claim is cleared by the Phase 2C liveness probe. The tests use a fixed lease clock past expiry and never renew the lease.
-4. The restart gate's result covers coordinator blockers only. The latch and lease are enforced at send time by the fence, and by the journal writers.
+4. The restart gate's result covers coordinator blockers only. The latch and lease are enforced at send time by the fence, and by the journal writers. Since 3F, a risk-increasing submit also needs a grant from `evaluateContinuation`.
 5. Opening a fresh directory writes the empty journal with the Phase 2B non-live bootstrap authorization; live bootstrap is not provided.
 6. Open treats a corrupt primary as unproven even when the pair store could recover it from `.bak` (stricter; recovery is an operator decision).
 7. Scan and replay blockers are still in memory. A restart recomputes them; only `UNKNOWN`/`CANCEL_UNVERIFIED` records carry a block across restarts.
 8. With a lost journal, an engine-shaped order already open at the restart scan is `AMBIGUOUS_OPEN_ORDER` and blocks risk increase until an operator resolves it.
 9. Every journal write stores the whole registry; there is no compaction.
+
+## Phase 3F continuation gate
+
+Phase 3F implements the production-shaped continuation gate of IMPLEMENTATION_CONTRACT §6.1 ("yields `CONTINUE`, `REDUCE`, or `HALT`") on top of the 2D risk rules and the 2E halt authority. Tests: `test/execution/p3-continuation.test.ts` (P3-C01..P3-C12).
+
+- Two new coordinator ports (`src/execution/ports.ts`):
+  - `RiskInputSource.read()` returns `RiskAccountInputs`: the 2D `RiskInput` without `ownedActiveOrders`, `unknownReservations`, `proposedBatch` and `haltAuthorityClear`, which the coordinator supplies itself.
+  - `HaltAuthorityPort.inspect()` returns `{ durableStatus, allowRiskIncrease, reasonCodes }`. `createHaltAuthorityPort(context)` (`src/execution/continuation.ts`) reads a 2E `HaltRuntimeContext` through `inspectHaltContinuation`, without changing it.
+- `coordinator.evaluateContinuation(anchorEpoch)` is exclusive like every other coordinator operation. It runs `reconcileUnresolved`, `scanOpenOrders` and `replayExecutions`, takes the coordinator's exposure reservation, reads the risk inputs and inspects the halt authority. A rejected read counts as missing. It then calls `decideContinuation` with the blockers present after the reads, so a reconnect or a dropped stream event during the reads counts. The gate never places, cancels or reduces anything itself.
+- `decideContinuation(evidence)` is pure:
+  1. The risk inputs must be a non-array object without any own coordinator-owned key; otherwise, or if reading them throws, the 2D rules get `null` (`RISK_INPUT_UNAVAILABLE`, `INVALID_RISK_INPUT`, `HALT`).
+  2. The coordinator's working orders and unknown reservations are added, the proposed batch is empty and `haltAuthorityClear` is `false`. Any coordinator blocker is passed to the 2D rules as unresolved reconciliation (`RECONCILIATION_REQUIRED`, `HALT`).
+  3. The halt view must have exactly the expected types (`HALT_AUTHORITY_UNAVAILABLE` otherwise). Only `RUNNING` with `allowRiskIncrease: true` lets the gate continue (`HALT_AUTHORITY_DENIED` otherwise, and the action becomes `HALT`).
+  4. `allowRiskIncrease` is true only for `CONTINUE` with no blocker, risk metrics within limits and no `BOUNDARY_SEED_BLOCKED` (`CONTINUATION_GRANTED`). `REDUCE` (actual notional above the cap with a bounded reduction possible) never grants.
+
+  Reason codes are the sorted union of the risk, blocker, halt and gate codes.
+- A grant allows exactly one risk-increasing `submit` or `submitBatch` (`CONTINUATION_NOT_GRANTED` otherwise). Every submit or batch that runs uses it up, even one refused by an admission check or one with exits only. Every other coordinator operation revokes it: `startCycle`, `cancel`, `reconcileUnresolved`, `scanOpenOrders`, `cleanupOwnedDuplicates`, `replayExecutions` and a later `evaluateContinuation` that denies. `ingestStreamExecution` and `executionStreamReconnected` revoke it even while another operation is in flight. Any other call refused as busy changes nothing. Reduce-only exits and cancels never need a grant, so `REDUCE` and `HALT` never block risk reduction.
+- `runRestartGate` is unchanged apart from its comment: its `allowRiskIncrease` reports coordinator blockers only.
+- Test changes outside the new file:
+  - `createHarness` takes `riskInputs` and `haltAuthority` (defaults: a fresh flat account inside the grid band and a `RUNNING` halt view). The new helper `grant(coordinator)` evaluates the gate and throws unless it grants.
+  - Tests that expect a risk-increasing submit to reach the venue, the exposure gate or a later admission check now call `grant` first. Tests that expect a refusal before that check, and reduce-only exits, do not.
+  - In `p3-ownership.test.ts`, two tests that need three owned duplicates use a venue snapshot that lags behind its acknowledgements. With a current snapshot the gate's scan now refuses a third duplicate.
+  - In `p3-place.test.ts`, the lost-journal duplicate test grants both coordinators before the stale order is placed, since the gate's scan would otherwise find it first.
+  - The F-03..F-05 child-process tests also report the gate's decision: `HALT` for an `UNKNOWN` intent or a foreign open order, `CONTINUE` after a clean restart.
+
+  No 3A-3E expected value changed. The Phase 0 bootstrap guard is unchanged: `continuation.ts` contains no venue write.
+
+Known limitations:
+
+1. The gate only decides. `REDUCE` and `HALT` do not run the 2E hard-halt sequence or a bounded reduction; a supervisor must act on them (not implemented).
+2. Every coordinator blocker is reported as `RECONCILIATION_REQUIRED`, so a transient blocker, such as a reconnect, yields `HALT` rather than a softer action. A busy coordinator also yields `HALT` (`COORDINATOR_BUSY`, not evaluated).
+3. A grant is bounded by use and by the next operation, not by a clock. Venue changes between the gate and the submit are seen only by the submit's own checks.
+4. A halt recorded between the gate and the submit is not seen by the coordinator; the fence and the halt process fence must stop the send. Halt and submit must be serialized by the supervisor.
+5. `haltAuthorityClear` is always `false` in the 2D input, so `DURABLE_HALT_OR_ACK_UNAVAILABLE` appears in every decision; the halt authority is checked through the port instead.
+6. Denying a grant for `BOUNDARY_SEED_BLOCKED` (flat position outside the grid band) is a fail-closed reading of PHASE_2D_CONTRACT ("It may block seeding"), RISK_PERSISTENCE_CONTRACT and TEST_FAULT_MATRIX P2-R15, flagged for the reviewer.
+7. The freshness and correctness of the risk inputs are the source's job (Phase 4 adapter). The 2D freshness rules apply, but the gate cannot tell a stale source that reports fresh timestamps.
+8. A venue snapshot that lags behind its acknowledgements can hide duplicates from the gate's scan.
+9. `runRestartGate` alone no longer allows a risk-increasing submit; callers need `evaluateContinuation`.
+10. Not wired into `src/index.ts`, telemetry or a supervisor.
 
 ## Process reset (2026-10-11)
 

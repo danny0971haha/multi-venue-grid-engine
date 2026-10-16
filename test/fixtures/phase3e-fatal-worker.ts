@@ -4,8 +4,8 @@ import path from "node:path";
 import {
   createLeaseMutationFence,
   ExecutionCoordinator,
-  installFatalProcessGuard,
   type IntentRegistry,
+  installFatalProcessGuard,
   openDurableExecutionState,
   recoverInterruptedIntents,
   runRestartGate,
@@ -18,13 +18,21 @@ import {
   setLeasePreCallbackHookForTests,
 } from "../../src/persistence/runtime-lease.js";
 import { RuntimePersistenceLatch } from "../../src/persistence/runtime-persistence-latch.js";
-import { buildIntent, flatExposure, SCOPE_KEY } from "../execution/helpers.js";
+import {
+  buildIntent,
+  flatExposure,
+  grant,
+  riskSource,
+  runningHaltAuthority,
+  SCOPE_KEY,
+} from "../execution/helpers.js";
 import { appendEvent, FileBackedVenue } from "./phase3e-venue.js";
 
 // FATAL_LOOP: submits one order per idle tick, then injects a fatal fault while idle.
 // PRE_TRANSPORT_KILL: hangs after the PREPARED intent is durable, before the venue call.
 // IN_TRANSPORT_KILL: hangs after the venue accepted the order, before the response returns.
-// RESTART: recovers, runs the restart gate, and reports what it saw on stdout.
+// RESTART: recovers, runs the restart gate and the continuation gate, and reports what it saw
+// on stdout.
 // DOUBLE_INSTALL: installs the fatal guard twice and reports the second outcome.
 export type Phase3EWorkerCommand = {
   mode: "FATAL_LOOP" | "PRE_TRANSPORT_KILL" | "IN_TRANSPORT_KILL" | "RESTART" | "DOUBLE_INSTALL";
@@ -47,6 +55,7 @@ export type Phase3ERestartReport = {
   unknownReservationsBeforeGate?: number;
   preGateSubmit?: SubmitSummary;
   gate?: { allowRiskIncrease: boolean; reasonCodes: string[]; recordedExecutions: string[] };
+  continuation?: { action: string; allowRiskIncrease: boolean; reasonCodes: string[] };
   postGateSubmit?: SubmitSummary;
   finalStatuses?: Record<string, string>;
   latchBlocked?: boolean;
@@ -182,6 +191,8 @@ async function run(command: Phase3EWorkerCommand): Promise<void> {
     exposure: flatExposure(),
     checkpoints: durable.checkpoints,
     executionCursor: durable.executionCursor,
+    riskInputs: riskSource(),
+    haltAuthority: runningHaltAuthority(),
   });
   const intentFor = (n: number, prefix: string) =>
     buildIntent({
@@ -200,7 +211,13 @@ async function run(command: Phase3EWorkerCommand): Promise<void> {
       reasonCodes: gate.reasonCodes,
       recordedExecutions: gate.replay.recorded,
     };
-    // Attempted regardless of the gate, so a refusal is observed rather than assumed.
+    const continuation = await coordinator.evaluateContinuation("epoch-1");
+    report.continuation = {
+      action: continuation.action,
+      allowRiskIncrease: continuation.allowRiskIncrease,
+      reasonCodes: continuation.reasonCodes,
+    };
+    // Attempted regardless of both gates, so a refusal is observed rather than assumed.
     report.postGateSubmit = summarize(await coordinator.submit(intentFor(2, "R")));
     report.finalStatuses = statuses(durable.registry);
     report.latchBlocked = latch.blocked;
@@ -213,6 +230,7 @@ async function run(command: Phase3EWorkerCommand): Promise<void> {
     throw new Error("PHASE3E_WORKER_GATE_BLOCKED");
   }
   if (command.mode === "PRE_TRANSPORT_KILL") {
+    await grant(coordinator);
     setLeasePreCallbackHookForTests(() => {
       writeFileSync(command.readyPath as string, "prepared\n");
       hangForever();
@@ -221,6 +239,7 @@ async function run(command: Phase3EWorkerCommand): Promise<void> {
     return;
   }
   if (command.mode === "IN_TRANSPORT_KILL") {
+    await grant(coordinator);
     await coordinator.submit(intentFor(1, "B"));
     return;
   }
@@ -232,6 +251,8 @@ async function run(command: Phase3EWorkerCommand): Promise<void> {
   const submitNext = async () => {
     inFlight = true;
     placed += 1;
+    // A denied gate leaves the submit to be refused and recorded like any other outcome.
+    await coordinator.evaluateContinuation("epoch-1");
     const result = await coordinator.submit(intentFor(placed, "B"));
     appendEvent(venueDirectory, {
       label: command.label,

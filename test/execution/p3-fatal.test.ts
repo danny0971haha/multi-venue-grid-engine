@@ -319,6 +319,9 @@ describe("Phase 3E process death around the send (F-03, F-04)", () => {
       });
       assert.equal(report.gate?.allowRiskIncrease, false);
       assert.ok(report.gate?.reasonCodes.includes("UNRESOLVED_INTENT"));
+      assert.equal(report.continuation?.action, "HALT");
+      assert.equal(report.continuation?.allowRiskIncrease, false);
+      assert.ok(report.continuation?.reasonCodes.includes("UNRESOLVED_INTENT"));
       assert.deepEqual(report.postGateSubmit, {
         disposition: "REFUSED",
         status: null,
@@ -338,6 +341,7 @@ describe("Phase 3E process death around the send (F-03, F-04)", () => {
       assert.deepEqual(second.report.statusesBefore, { B1: "UNKNOWN" });
       assert.deepEqual(second.report.recovery?.items, []);
       assert.equal(second.report.gate?.allowRiskIncrease, false);
+      assert.equal(second.report.continuation?.allowRiskIncrease, false);
       assert.equal(second.report.postGateSubmit?.disposition, "REFUSED");
       assert.ok(!types(eventsOf(root, "restart2")).includes("PLACE"));
 
@@ -347,8 +351,9 @@ describe("Phase 3E process death around the send (F-03, F-04)", () => {
         name,
         method:
           "SIGKILL of a child hanging in the lease pre-callback hook after PREPARED is durable",
-        expected: "restart: PREPARED->UNKNOWN durable, reserved, risk increase refused, no PLACE",
-        observed: `restart: ${JSON.stringify(report.finalStatuses)}, gate ${report.gate?.reasonCodes.join("|")}, second restart ${JSON.stringify(second.report.statusesBefore)}`,
+        expected:
+          "restart: PREPARED->UNKNOWN durable, reserved, continuation HALT, risk increase refused, no PLACE",
+        observed: `restart: ${JSON.stringify(report.finalStatuses)}, gate ${report.gate?.reasonCodes.join("|")}, continuation ${report.continuation?.action}, second restart ${JSON.stringify(second.report.statusesBefore)}`,
         exitCode: `SIGKILL then ${String(first.outcome.exitCode)}`,
       });
     });
@@ -384,6 +389,8 @@ describe("Phase 3E process death around the send (F-03, F-04)", () => {
         reasonCodes: [],
         recordedExecutions: [],
       });
+      assert.equal(report.continuation?.action, "CONTINUE");
+      assert.equal(report.continuation?.allowRiskIncrease, true);
       assert.deepEqual(report.postGateSubmit, {
         disposition: "RECORDED",
         status: "LINKED",
@@ -410,8 +417,8 @@ describe("Phase 3E process death around the send (F-03, F-04)", () => {
         id: "F-04",
         name,
         method: "SIGKILL of a child hanging inside placeOrder after the venue stored the order",
-        expected: "restart: UNKNOWN reserved, lookup links B1, no resend, gate then allows",
-        observed: `restart: ${JSON.stringify(report.finalStatuses)}, venue orders for B1 ${String(open.filter((order) => order.clientOrderId === clientOrderId).length)}`,
+        expected: "restart: UNKNOWN reserved, lookup links B1, no resend, both gates then allow",
+        observed: `restart: ${JSON.stringify(report.finalStatuses)}, continuation ${report.continuation?.action}, venue orders for B1 ${String(open.filter((order) => order.clientOrderId === clientOrderId).length)}`,
         exitCode: `SIGKILL then ${String(outcome.exitCode)}`,
       });
     });
@@ -457,6 +464,8 @@ describe("Phase 3E supervisor restart after a fatal error (F-05)", () => {
         reasonCodes: [],
         recordedExecutions: ["sim-exec-1"],
       });
+      assert.equal(report.continuation?.action, "CONTINUE");
+      assert.equal(report.continuation?.allowRiskIncrease, true);
       assert.equal(report.finalStatuses?.B1, "FILLED");
       assert.deepEqual(report.postGateSubmit, {
         disposition: "RECORDED",
@@ -478,7 +487,7 @@ describe("Phase 3E supervisor restart after a fatal error (F-05)", () => {
         name,
         method: "child exits 70 on an injected uncaught exception; restarts in fresh processes",
         expected: "early restart lease-blocked; takeover scans and replays before the first PLACE",
-        observed: `early ${earlyReport.lease.disposition}; takeover gate ${String(report.gate?.allowRiskIncrease)} executions ${report.gate?.recordedExecutions.join("|")} B1 ${report.finalStatuses?.B1}`,
+        observed: `early ${earlyReport.lease.disposition}; takeover gate ${String(report.gate?.allowRiskIncrease)} executions ${report.gate?.recordedExecutions.join("|")} continuation ${report.continuation?.action} B1 ${report.finalStatuses?.B1}`,
         exitCode: `${String(fatal.exitCode)} then ${String(outcome.exitCode)}`,
       });
     });
@@ -500,6 +509,9 @@ describe("Phase 3E supervisor restart after a fatal error (F-05)", () => {
       const { outcome, report } = await restart(root, "restart1", AFTER_LEASE_EXPIRY);
       assert.equal(report.gate?.allowRiskIncrease, false);
       assert.ok(report.gate?.reasonCodes.includes("UNOWNED_OPEN_ORDER"));
+      assert.equal(report.continuation?.action, "HALT");
+      assert.equal(report.continuation?.allowRiskIncrease, false);
+      assert.ok(report.continuation?.reasonCodes.includes("UNOWNED_OPEN_ORDER"));
       assert.deepEqual(report.postGateSubmit, {
         disposition: "REFUSED",
         status: null,
@@ -512,8 +524,9 @@ describe("Phase 3E supervisor restart after a fatal error (F-05)", () => {
         id: "F-05-UNOWNED",
         name,
         method: "child exits 70; a foreign order is added to the venue before the restart",
-        expected: "gate blocked UNOWNED_OPEN_ORDER, post-gate submit refused, no PLACE",
-        observed: `gate ${report.gate?.reasonCodes.join("|")}, post ${report.postGateSubmit?.disposition}`,
+        expected:
+          "gate blocked UNOWNED_OPEN_ORDER, continuation HALT, post-gate submit refused, no PLACE",
+        observed: `gate ${report.gate?.reasonCodes.join("|")}, continuation ${report.continuation?.action}, post ${report.postGateSubmit?.disposition}`,
         exitCode: `${String(fatal.exitCode)} then ${String(outcome.exitCode)}`,
       });
     });

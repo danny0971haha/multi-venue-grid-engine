@@ -9,6 +9,7 @@ import type {
   OrderIntent,
   VenueWriteResult,
 } from "../domain/types.js";
+import type { RiskInput } from "../risk/risk-types.js";
 import type { IntentRegistryState } from "./intent-registry.js";
 
 // Fresh read result for one deterministic client order ID. A rejected promise means the read
@@ -60,6 +61,34 @@ export type ExposureInputs = {
 
 export type ExposureInputSource = {
   read(): Promise<ExposureInputs>;
+};
+
+// The account, market, freshness and authority inputs of one risk evaluation. The coordinator
+// supplies its own working orders and reservations, and never proposes a batch or halt
+// authority through it.
+export type RiskAccountInputs = Omit<
+  RiskInput,
+  "ownedActiveOrders" | "unknownReservations" | "proposedBatch" | "haltAuthorityClear"
+>;
+
+// Fresh risk inputs for the coordinator's scope. A rejected promise means the inputs are
+// missing; anything that is not exactly a RiskAccountInputs fails the evaluation closed.
+export type RiskInputSource = {
+  read(): Promise<RiskAccountInputs>;
+};
+
+// What the durable halt authority says about continuing, as inspectHaltContinuation reports
+// it. Only a proven RUNNING record that allows risk increase lets the gate continue.
+export type HaltAuthorityView = {
+  durableStatus: string;
+  allowRiskIncrease: boolean;
+  reasonCodes: string[];
+};
+
+// Read-only inspection of the durable halt record, lease, latch and process fence. A
+// rejected promise means the halt authority is unavailable.
+export type HaltAuthorityPort = {
+  inspect(): Promise<HaltAuthorityView>;
 };
 
 export type FenceOutcome = "SENT" | "NOT_SENT" | "UNKNOWN";

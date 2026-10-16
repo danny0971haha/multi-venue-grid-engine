@@ -8,10 +8,13 @@ import {
   type ExecutionVenuePort,
   type ExposureInputSource,
   type FenceResult,
+  type HaltAuthorityPort,
   type IntentJournal,
   IntentRegistry,
   type IntentRegistryState,
   type MutationFence,
+  type RiskAccountInputs,
+  type RiskInputSource,
 } from "../../src/execution/index.js";
 import { SimulatedVenue } from "../../src/simulator/venue.js";
 
@@ -146,6 +149,61 @@ export function flatExposure(): ExposureInputSource {
   return { read: async () => ({ signedPosition: "0", markOrMidPrice: "100" }) };
 }
 
+// A fresh flat account at mark 100 inside a 97-103 grid, with proven persistence and lease.
+export function freshRiskInputs(): RiskAccountInputs {
+  const now = "1000000";
+  return {
+    signedPosition: "0",
+    markOrMidPrice: "100",
+    equity: "100",
+    startingEquity: "100",
+    highWaterEquity: "100",
+    realizedTradingPnl: "0",
+    fees: "0",
+    funding: "0",
+    fundingConvention: "RECEIVED_POSITIVE",
+    gridLower: "97",
+    gridUpper: "103",
+    freshness: {
+      evaluatedAt: now,
+      maxStaleMs: "1000",
+      positionObservedAt: now,
+      equityObservedAt: now,
+      markObservedAt: now,
+      pnlObservedAt: now,
+    },
+    reconciliation: { unresolved: false },
+    lease: { proven: true, expired: false, lost: false },
+    latchBlocked: false,
+    durableInspection: { pairAuthorityProven: true },
+    boundedReduction: { possible: true, ambiguous: false, cancelOnly: false, snapshotFresh: true },
+  };
+}
+
+export function riskSource(inputs: RiskAccountInputs = freshRiskInputs()): RiskInputSource {
+  return { read: async () => structuredClone(inputs) };
+}
+
+// A durable halt record that is RUNNING and allows risk increase.
+export function runningHaltAuthority(): HaltAuthorityPort {
+  return {
+    inspect: async () => ({
+      durableStatus: "RUNNING",
+      allowRiskIncrease: true,
+      reasonCodes: ["DURABLE_HALT_RUNNING"],
+    }),
+  };
+}
+
+// Runs the continuation gate and fails unless it grants the next risk-increasing operation.
+export async function grant(coordinator: ExecutionCoordinator, anchorEpoch = "epoch-1") {
+  const decision = await coordinator.evaluateContinuation(anchorEpoch);
+  if (!decision.allowRiskIncrease) {
+    throw new Error(`CONTINUATION_DENIED: ${decision.reasonCodes.join(",")}`);
+  }
+  return decision;
+}
+
 export type Harness = {
   venue: SimulatedVenue;
   journal: MemoryJournal;
@@ -167,6 +225,8 @@ export async function createHarness(
     executionCursor?: ExecutionCursor | null;
     fence?: MutationFence;
     exposure?: ExposureInputSource;
+    riskInputs?: RiskInputSource;
+    haltAuthority?: HaltAuthorityPort;
     writeBudgetPerCycle?: number;
     replay?: boolean;
     scan?: boolean;
@@ -191,6 +251,8 @@ export async function createHarness(
     checkpoints,
     executionCursor:
       options.executionCursor === undefined ? checkpoints.latest() : options.executionCursor,
+    riskInputs: options.riskInputs ?? riskSource(),
+    haltAuthority: options.haltAuthority ?? runningHaltAuthority(),
   });
   if (options.replay ?? true) {
     await coordinator.replayExecutions();
