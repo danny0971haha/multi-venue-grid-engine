@@ -255,13 +255,7 @@ export async function applyRiskDecision(
     });
   }
   if (decision.action === "REDUCE") {
-    return executeBoundedReduce(
-      context,
-      loaded.record,
-      loaded.inspection,
-      loaded.generation,
-      loaded.envelopeSha256,
-    );
+    return executeBoundedReduce(context, loaded, decision);
   }
   return authorizeCurrentRunningContinuation(context, loaded);
 }
@@ -270,16 +264,31 @@ export async function executeHardHalt(
   context: HaltRuntimeContext,
   args: { haltReasons: readonly string[]; lastRiskEvaluationAt: string | null },
 ): Promise<HaltOperationResult> {
+  return runHardHalt(context, args, null);
+}
+
+// `carried` is the trace of a bounded reduction that is being escalated: its mutations and
+// any reserved exposure stay part of the halt instead of being reset by it.
+async function runHardHalt(
+  context: HaltRuntimeContext,
+  args: { haltReasons: readonly string[]; lastRiskEvaluationAt: string | null },
+  carried: MutationTrace | null,
+): Promise<HaltOperationResult> {
+  const carriedCodes = carried === null ? [] : carried.reasonCodes;
+  const carriedExtras = carried === null ? {} : { mutation: carried };
   context.processFence.trip();
   const lease = await proveLease(context);
   if (!lease.ok) {
-    return failClosed(context, ["LEASE_UNCERTAIN", "RISK_INCREASE_FENCED", ...lease.reasonCodes], {
-      runtimeDisposition: "FAIL_CLOSED",
-    });
+    return failClosed(
+      context,
+      ["LEASE_UNCERTAIN", "RISK_INCREASE_FENCED", ...carriedCodes, ...lease.reasonCodes],
+      { runtimeDisposition: "FAIL_CLOSED", ...carriedExtras },
+    );
   }
   if (context.latch.blocked) {
-    return failClosed(context, ["LATCH_ALREADY_BLOCKED", "RISK_INCREASE_FENCED"], {
+    return failClosed(context, ["LATCH_ALREADY_BLOCKED", "RISK_INCREASE_FENCED", ...carriedCodes], {
       runtimeDisposition: "FAIL_CLOSED",
+      ...carriedExtras,
     });
   }
   const loaded = await loadHaltAuthority({
@@ -287,36 +296,47 @@ export async function executeHardHalt(
     scopeKey: context.scopeKey,
   });
   if (!loaded.ok) {
-    return failClosed(context, loaded.reasonCodes, {
+    return failClosed(context, [...loaded.reasonCodes, ...carriedCodes], {
       inspection: loaded.inspection,
       runtimeDisposition: "FAIL_CLOSED",
+      ...carriedExtras,
     });
   }
   if (isNonRunningHaltStatus(loaded.record.status)) {
-    return successFromRecord(
+    return resultFromCommitted(
       context,
       loaded.record,
       loaded.inspection,
       { committedGeneration: loaded.generation, committedEnvelopeSha256: loaded.envelopeSha256 },
-      ["RISK_INCREASE_FENCED"],
+      ["RISK_INCREASE_FENCED", ...carriedCodes],
+      carried ?? emptyMutation(),
+      false,
       { runtimeDisposition: dispositionFromStatus(loaded.record.status) },
     );
   }
 
   const haltId = context.haltIdSource.nextHaltId();
   if (!isWellFormedHaltId(haltId)) {
-    return failClosed(context, ["INVALID_HALT_ID", "RISK_INCREASE_FENCED"], {
+    return failClosed(context, ["INVALID_HALT_ID", "RISK_INCREASE_FENCED", ...carriedCodes], {
       inspection: loaded.inspection,
       runtimeDisposition: "FAIL_CLOSED",
+      ...carriedExtras,
     });
   }
   const nextIncident = incrementCanonicalGeneration(loaded.record.incidentGeneration);
   if (!nextIncident.ok) {
-    return failClosed(context, ["INVALID_HALT_RECORD", "RISK_INCREASE_FENCED"], {
+    return failClosed(context, ["INVALID_HALT_RECORD", "RISK_INCREASE_FENCED", ...carriedCodes], {
       inspection: loaded.inspection,
       runtimeDisposition: "FAIL_CLOSED",
+      ...carriedExtras,
     });
   }
+  // A reservation already on the durable record is never cleared by entering the halt. An
+  // escalated reduction replaces its own in-flight reservation with the outcome it observed.
+  const inheritedUnresolved =
+    carried === null
+      ? loaded.record.unresolvedPossibleExposure
+      : carried.unresolvedPossibleExposure;
 
   const haltingRecord = makeHaltRecord({
     ...loaded.record,
@@ -329,7 +349,7 @@ export async function executeHardHalt(
     predecessorStatus: loaded.record.status,
     incidentGeneration: nextIncident.generation,
     acknowledgement: null,
-    unresolvedPossibleExposure: false,
+    unresolvedPossibleExposure: inheritedUnresolved,
     flatnessProven: false,
     snapshotFresh: false,
     snapshotObservedAt: null,
@@ -339,10 +359,11 @@ export async function executeHardHalt(
 
   const relock = await proveLease(context);
   if (!relock.ok) {
-    return failClosed(context, ["LEASE_UNCERTAIN", "RISK_INCREASE_FENCED", ...relock.reasonCodes], {
-      inspection: loaded.inspection,
-      runtimeDisposition: "FAIL_CLOSED",
-    });
+    return failClosed(
+      context,
+      ["LEASE_UNCERTAIN", "RISK_INCREASE_FENCED", ...carriedCodes, ...relock.reasonCodes],
+      { inspection: loaded.inspection, runtimeDisposition: "FAIL_CLOSED", ...carriedExtras },
+    );
   }
   const haltingPersist = await persistHaltTransition({
     directory: context.directory,
@@ -355,17 +376,23 @@ export async function executeHardHalt(
   if (haltingPersist.disposition !== "REQUESTED_STATE_COMMITTED" || haltingPersist.state === null) {
     return failClosed(
       context,
-      ["FINAL_PAIR_UNPROVEN", "RISK_INCREASE_FENCED", ...haltingPersist.reasonCodes],
+      [
+        "FINAL_PAIR_UNPROVEN",
+        "RISK_INCREASE_FENCED",
+        ...carriedCodes,
+        ...haltingPersist.reasonCodes,
+      ],
       {
         inspection: haltingPersist.inspection,
         runtimeDisposition: "FAIL_CLOSED",
+        ...carriedExtras,
       },
     );
   }
 
-  let mutation: MutationTrace;
+  let remediated: MutationTrace;
   try {
-    mutation = await remediateAfterHalting(context);
+    remediated = await remediateAfterHalting(context);
   } catch {
     return resultFromCommitted(
       context,
@@ -380,10 +407,12 @@ export async function executeHardHalt(
         "UNRESOLVED_UNKNOWN",
         "RECONCILIATION_REQUIRED",
         "RISK_INCREASE_FENCED",
+        ...carriedCodes,
       ],
-      emptyMutation(),
+      carried ?? emptyMutation(),
     );
   }
+  const mutation = mergeEscalatedTrace(remediated, carried, inheritedUnresolved);
   const terminalStatus = decideTerminalStatus(mutation);
   const terminalRecord = makeHaltRecord({
     ...haltingPersist.state,
@@ -708,61 +737,347 @@ function emptyMutation(): MutationTrace {
   };
 }
 
+// Actual exposure above the cap: stop new risk durably, cancel proven-owned risk-increasing
+// orders, request one bounded reduction and prove it with a fresh authoritative snapshot.
+// Anything short of that proof escalates to the hard halt and its flatten policy.
 async function executeBoundedReduce(
   context: HaltRuntimeContext,
-  record: DurableHaltRecord,
-  inspection: PairInspection,
-  generation: string,
-  envelopeSha256: string,
+  loaded: {
+    record: DurableHaltRecord;
+    inspection: PairInspection;
+    generation: string;
+    envelopeSha256: string;
+  },
+  decision: RiskDecision,
 ): Promise<HaltOperationResult> {
+  const trace = emptyMutation();
+  const escalate = (): Promise<HaltOperationResult> =>
+    runHardHalt(
+      context,
+      {
+        haltReasons: [...decision.reasonCodes, ...trace.reasonCodes],
+        lastRiskEvaluationAt: decision.evaluatedAt,
+      },
+      trace,
+    );
+
+  if (loaded.record.unresolvedPossibleExposure) {
+    trace.unresolvedPossibleExposure = true;
+    trace.reasonCodes.push("UNRESOLVED_UNKNOWN", "RECONCILIATION_REQUIRED");
+    return escalate();
+  }
   const lease = await proveLease(context);
   if (!lease.ok) {
+    trace.reasonCodes.push("REDUCE_FAILED", "MUTATION_NOT_SENT", ...lease.reasonCodes);
+    return escalate();
+  }
+  // The reservation blocks continuation in this process and in any restarted one until a
+  // verified reduction clears it.
+  const reserved = await persistHaltTransition({
+    directory: context.directory,
+    scopeKey: context.scopeKey,
+    expectedGeneration: loaded.generation,
+    expectedPredecessorEnvelopeSha256: loaded.envelopeSha256,
+    payload: makeHaltRecord({
+      ...loaded.record,
+      unresolvedPossibleExposure: true,
+      lastRiskEvaluationAt: decision.evaluatedAt,
+      updatedAt: context.haltClock.nowIso(),
+    }),
+    latch: context.latch,
+  });
+  if (reserved.disposition !== "REQUESTED_STATE_COMMITTED" || reserved.state === null) {
+    trace.reasonCodes.push(
+      "REDUCE_FAILED",
+      "FINAL_PAIR_UNPROVEN",
+      "MUTATION_NOT_SENT",
+      ...reserved.reasonCodes,
+    );
+    return escalate();
+  }
+
+  let evidence: HaltAuthoritativeSnapshot | null;
+  try {
+    evidence = await reduceAndVerify(context, trace);
+  } catch {
+    trace.unresolvedPossibleExposure = true;
+    trace.reasonCodes.push("REDUCE_NOT_VERIFIED", "UNRESOLVED_UNKNOWN", "RECONCILIATION_REQUIRED");
+    evidence = null;
+  }
+  if (evidence === null) {
+    return escalate();
+  }
+
+  const reservedPersist = {
+    committedGeneration: reserved.committedGeneration,
+    committedEnvelopeSha256: reserved.committedEnvelopeSha256,
+  };
+  // Without a durable verified record the reservation stays and keeps new risk blocked.
+  const settleLease = await proveLease(context);
+  if (!settleLease.ok) {
+    context.processFence.trip();
     return resultFromCommitted(
       context,
-      record,
-      inspection,
-      { committedGeneration: generation, committedEnvelopeSha256: envelopeSha256 },
+      reserved.state,
+      reserved.inspection,
+      reservedPersist,
       [
         "LEASE_UNCERTAIN",
         "REDUCE_DISTINCT_FROM_HALT",
         "RISK_INCREASE_FENCED",
-        ...lease.reasonCodes,
+        ...trace.reasonCodes,
+        ...settleLease.reasonCodes,
       ],
-      emptyMutation(),
+      trace,
+      false,
+      { runtimeDisposition: "FAIL_CLOSED", forceRiskBlocked: true },
     );
   }
-  const fenced = await runLeaseFencedMutation({
+  const reloaded = await loadHaltAuthority({
     directory: context.directory,
     scopeKey: context.scopeKey,
-    authority: context.leaseAuthority,
-    latch: context.latch,
-    clock: context.leaseClock,
-    mutation: () => context.transport.reduce(),
   });
-  const trace = emptyMutation();
-  if (fenced.callbackCount > 0) {
-    trace.reduceInvoked = true;
-  }
-  if (fenced.outcome !== "SENT" || fenced.value === null) {
-    trace.unresolvedPossibleExposure = fenced.outcome === "UNKNOWN";
-    trace.reasonCodes.push(
-      "REDUCE_DISTINCT_FROM_HALT",
-      "RISK_INCREASE_FENCED",
-      "MUTATION_NOT_SENT",
+  if (!reloaded.ok) {
+    context.processFence.trip();
+    return resultFromCommitted(
+      context,
+      reserved.state,
+      reloaded.inspection,
+      reservedPersist,
+      [
+        "FINAL_PAIR_UNPROVEN",
+        "REDUCE_DISTINCT_FROM_HALT",
+        "RISK_INCREASE_FENCED",
+        ...trace.reasonCodes,
+        ...reloaded.reasonCodes,
+      ],
+      trace,
+      false,
+      { runtimeDisposition: "FAIL_CLOSED", forceRiskBlocked: true },
     );
-  } else {
-    trace.reasonCodes.push("REDUCE_DISTINCT_FROM_HALT", "RISK_INCREASE_FENCED");
+  }
+  const settled = await persistHaltTransition({
+    directory: context.directory,
+    scopeKey: context.scopeKey,
+    expectedGeneration: reloaded.generation,
+    expectedPredecessorEnvelopeSha256: reloaded.envelopeSha256,
+    payload: makeHaltRecord({
+      ...reserved.state,
+      unresolvedPossibleExposure: false,
+      snapshotFresh: true,
+      snapshotObservedAt: evidence.observedAt,
+      updatedAt: context.haltClock.nowIso(),
+    }),
+    latch: context.latch,
+  });
+  if (settled.disposition !== "REQUESTED_STATE_COMMITTED" || settled.state === null) {
+    context.processFence.trip();
+    return resultFromCommitted(
+      context,
+      reserved.state,
+      settled.inspection,
+      reservedPersist,
+      [
+        "FINAL_PAIR_UNPROVEN",
+        "REDUCE_DISTINCT_FROM_HALT",
+        "RISK_INCREASE_FENCED",
+        ...trace.reasonCodes,
+        ...settled.reasonCodes,
+      ],
+      trace,
+      false,
+      { runtimeDisposition: "FAIL_CLOSED", forceRiskBlocked: true },
+    );
   }
   return resultFromCommitted(
     context,
-    record,
-    inspection,
-    { committedGeneration: generation, committedEnvelopeSha256: envelopeSha256 },
-    trace.reasonCodes,
+    settled.state,
+    settled.inspection,
+    {
+      committedGeneration: settled.committedGeneration,
+      committedEnvelopeSha256: settled.committedEnvelopeSha256,
+    },
+    ["REDUCE_DISTINCT_FROM_HALT", "REDUCE_VERIFIED", "RISK_INCREASE_FENCED", ...trace.reasonCodes],
     trace,
     false,
     { runtimeDisposition: "REDUCING", forceRiskBlocked: true },
   );
+}
+
+// Returns the fresh snapshot that proves the reduction, or null after recording on the trace
+// why the reduction is failed, unknown or unproven.
+async function reduceAndVerify(
+  context: HaltRuntimeContext,
+  trace: MutationTrace,
+): Promise<HaltAuthoritativeSnapshot | null> {
+  const listed = await runFencedTransport(context, () => context.transport.listOpenOrders());
+  if (listed.outcome !== "SENT" || listed.value === null) {
+    trace.unresolvedPossibleExposure = true;
+    trace.reasonCodes.push(
+      "LIST_OPEN_ORDERS_UNKNOWN",
+      "UNRESOLVED_UNKNOWN",
+      "RECONCILIATION_REQUIRED",
+    );
+    return null;
+  }
+  const orders = listed.value;
+  if (orders.some((order) => order.ownership === "UNOWNED")) {
+    trace.reasonCodes.push("UNOWNED_CANCEL_REFUSED");
+  }
+  if (orders.some((order) => order.ownership === "AMBIGUOUS")) {
+    trace.reasonCodes.push("AMBIGUOUS_ORDERS_PRESENT");
+  }
+  if (orders.some((order) => order.ownership === "AMBIGUOUS" && order.riskIncreasing)) {
+    trace.unresolvedPossibleExposure = true;
+    trace.reasonCodes.push("RECONCILIATION_REQUIRED");
+    return null;
+  }
+
+  for (const order of orders) {
+    if (order.ownership !== "OWNED" || !order.riskIncreasing) {
+      continue;
+    }
+    const cancelLease = await proveLease(context);
+    if (!cancelLease.ok) {
+      trace.cancelFailed = true;
+      trace.reasonCodes.push("LEASE_UNCERTAIN", "CANCEL_FAILED", ...cancelLease.reasonCodes);
+      return null;
+    }
+    const cancelled = await runFencedTransport(context, () =>
+      context.transport.cancel(order.exchangeOrderId),
+    );
+    if (cancelled.callbackCount > 0) {
+      trace.cancelInvoked = true;
+    }
+    const cancelKind = writeKind(cancelled.outcome, cancelled.value?.kind);
+    if (cancelKind === "UNKNOWN") {
+      trace.cancelUnknown = true;
+      trace.unresolvedPossibleExposure = true;
+      trace.reasonCodes.push("CANCEL_UNKNOWN", "UNRESOLVED_UNKNOWN", "RECONCILIATION_REQUIRED");
+    } else if (cancelKind !== "ACK") {
+      trace.cancelFailed = true;
+      trace.reasonCodes.push("CANCEL_FAILED");
+    }
+  }
+  if (trace.cancelUnknown || trace.cancelFailed) {
+    return null;
+  }
+
+  const reduceLease = await proveLease(context);
+  if (!reduceLease.ok) {
+    trace.reasonCodes.push("REDUCE_FAILED", "MUTATION_NOT_SENT", ...reduceLease.reasonCodes);
+    return null;
+  }
+  const reduced = await runFencedTransport(context, () => context.transport.reduce());
+  if (reduced.callbackCount > 0) {
+    trace.reduceInvoked = true;
+  }
+  const reduceKind = writeKind(reduced.outcome, reduced.value?.kind);
+  if (reduceKind === "REJECTED" || reduceKind === "NOT_SENT") {
+    trace.reasonCodes.push("REDUCE_FAILED");
+    return null;
+  }
+  if (reduceKind !== "ACK") {
+    // UNKNOWN, a thrown or rejected callback, or a kind outside the transport contract.
+    trace.unresolvedPossibleExposure = true;
+    trace.reasonCodes.push("REDUCE_UNKNOWN", "UNRESOLVED_UNKNOWN", "RECONCILIATION_REQUIRED");
+    return null;
+  }
+
+  // An ACK is only a request outcome; the reduction is proven by a fresh snapshot.
+  const snapshotLease = await proveLease(context);
+  if (!snapshotLease.ok) {
+    trace.reasonCodes.push("REDUCE_NOT_VERIFIED", "LEASE_UNCERTAIN", ...snapshotLease.reasonCodes);
+    return null;
+  }
+  const observed = await runFencedTransport(context, () => context.transport.freshSnapshot());
+  if (observed.outcome !== "SENT" || observed.value === null) {
+    trace.reasonCodes.push("REDUCE_NOT_VERIFIED", "STALE_SNAPSHOT", "SNAPSHOT_NOT_AUTHORITATIVE");
+    return null;
+  }
+  const evidence = observed.value;
+  const problems = reductionEvidenceProblems(context, evidence);
+  if (problems.length > 0) {
+    if (evidence.unknownReservations.length > 0) {
+      trace.unresolvedPossibleExposure = true;
+    }
+    trace.reasonCodes.push("REDUCE_NOT_VERIFIED", ...problems);
+    return null;
+  }
+  return evidence;
+}
+
+function reductionEvidenceProblems(
+  context: HaltRuntimeContext,
+  snapshot: HaltAuthoritativeSnapshot,
+): string[] {
+  const codes: string[] = [];
+  const observation = classifySnapshotObservedAt(snapshot.observedAt, context.haltClock);
+  if (observation.kind === "future") {
+    codes.push("SNAPSHOT_OBSERVED_AT_FUTURE", "STALE_SNAPSHOT");
+  }
+  if (observation.kind === "malformed") {
+    codes.push("SNAPSHOT_OBSERVED_AT_MALFORMED", "STALE_SNAPSHOT");
+  }
+  if (observation.kind === "stale" || snapshot.fresh !== true) {
+    codes.push("STALE_SNAPSHOT");
+  }
+  if (snapshot.authoritative !== true) {
+    codes.push("SNAPSHOT_NOT_AUTHORITATIVE");
+  }
+  if (snapshot.sourceId !== context.expectedSnapshotSourceId || snapshot.sourceId === "") {
+    codes.push("SNAPSHOT_SOURCE_UNPROVEN", "SNAPSHOT_NOT_AUTHORITATIVE");
+  }
+  if (snapshot.leaseGeneration !== context.leaseAuthority.generation) {
+    codes.push("SNAPSHOT_LEASE_MISMATCH");
+  }
+  if (snapshot.ownedRiskIncreasingRemaining) {
+    codes.push("OWNED_RISK_INCREASING_REMAINING");
+  }
+  if (snapshot.unknownReservations.length > 0) {
+    codes.push("UNRESOLVED_UNKNOWN");
+  }
+  // The safe target for an actual-exposure reduction is the frozen gross notional cap.
+  let notionalProven = false;
+  let withinCap = false;
+  if (snapshot.actualGrossNotional !== null) {
+    try {
+      const computed = exactMul(decimalAbs(snapshot.signedPosition), snapshot.markOrMidPrice);
+      notionalProven = decimalCmp(snapshot.actualGrossNotional, computed) === 0;
+      withinCap = decimalCmp(snapshot.actualGrossNotional, FROZEN_PLANNED_GROSS_NOTIONAL_USDT) <= 0;
+    } catch {
+      notionalProven = false;
+    }
+  }
+  if (!notionalProven) {
+    codes.push("SNAPSHOT_RISK_MISMATCH");
+  } else if (!withinCap) {
+    codes.push("ACTUAL_EXPOSURE_UNSAFE");
+  }
+  return codes;
+}
+
+function mergeEscalatedTrace(
+  remediated: MutationTrace,
+  carried: MutationTrace | null,
+  inheritedUnresolved: boolean,
+): MutationTrace {
+  if (carried === null && !inheritedUnresolved) {
+    return remediated;
+  }
+  const unresolved = inheritedUnresolved || remediated.unresolvedPossibleExposure;
+  const reasonCodes = [...(carried?.reasonCodes ?? []), ...remediated.reasonCodes];
+  if (inheritedUnresolved) {
+    reasonCodes.push("UNRESOLVED_UNKNOWN", "RECONCILIATION_REQUIRED");
+  }
+  return {
+    ...remediated,
+    cancelInvoked: remediated.cancelInvoked || carried?.cancelInvoked === true,
+    reduceInvoked: remediated.reduceInvoked || carried?.reduceInvoked === true,
+    unresolvedPossibleExposure: unresolved,
+    flatnessProven: unresolved ? false : remediated.flatnessProven,
+    reasonCodes,
+  };
 }
 
 async function remediateAfterHalting(context: HaltRuntimeContext): Promise<MutationTrace> {
