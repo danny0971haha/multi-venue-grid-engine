@@ -17,6 +17,7 @@ import {
   hasExactKeys,
   isIsoTimestamp,
   isPlainRecord,
+  matchesSecretValuePattern,
   TELEMETRY_FILE_MODE,
   writeAllBytes,
 } from "./io.js";
@@ -115,16 +116,6 @@ const PAYLOAD_LIMITS = {
 
 const SECRET_KEY_PATTERN =
   /secret|password|passphrase|token|apikey|api[_-]?key|private[_-]?key|credential|authorization|bearer|mnemonic|seed[_-]?phrase/i;
-// Value patterns catch well-known credential shapes only. A bare 0x-prefixed 64-hex signing key
-// is indistinguishable from a transaction hash, so adapters must never hand signing material to
-// telemetry in the first place.
-const SECRET_VALUE_PATTERNS = [
-  /-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/,
-  /gh[pousr]_[A-Za-z0-9]{20,}/,
-  /AKIA[0-9A-Z]{16}/,
-  /xox[baprs]-[A-Za-z0-9-]{20,}/,
-  /\bbearer\s+[A-Za-z0-9._~+/=-]{16,}/i,
-];
 
 export function telemetryEventsPath(directory: string): string {
   return path.join(directory, TELEMETRY_EVENTS_FILE_NAME);
@@ -345,6 +336,11 @@ export class TelemetryLog {
       return fail(violation);
     }
     const bytes = Buffer.concat([canonicalSerialize(line), Buffer.from("\n")]);
+    // The whole line is checked, so source and every other persisted string share the payload
+    // policy rather than only the payload.
+    if (matchesSecretValuePattern(bytes.toString("utf8"))) {
+      return fail("TELEMETRY_SECRET_PROHIBITED");
+    }
     if (bytes.length > MAX_EVENT_LINE_BYTES) {
       return fail("TELEMETRY_PAYLOAD_REJECTED");
     }
@@ -410,7 +406,7 @@ function provenanceViolation(line: TelemetryEventLine, manifest: RunManifest): s
 }
 
 function containsSecret(payload: unknown, payloadText: string): boolean {
-  if (SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(payloadText))) {
+  if (matchesSecretValuePattern(payloadText)) {
     return true;
   }
   const pending: unknown[] = [payload];

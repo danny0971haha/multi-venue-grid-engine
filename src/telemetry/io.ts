@@ -95,3 +95,18 @@ export function isIsoTimestamp(value: unknown): value is string {
   const parsed = new Date(value);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
 }
+
+// Value patterns catch well-known credential shapes only. A bare 0x-prefixed 64-hex signing key
+// is indistinguishable from a transaction hash, so adapters must never hand signing material to
+// telemetry in the first place.
+const SECRET_VALUE_PATTERNS = [
+  /-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/,
+  /gh[pousr]_[A-Za-z0-9]{20,}/,
+  /AKIA[0-9A-Z]{16}/,
+  /xox[baprs]-[A-Za-z0-9-]{20,}/,
+  /\bbearer\s+[A-Za-z0-9._~+/=-]{16,}/i,
+];
+
+export function matchesSecretValuePattern(text: string): boolean {
+  return SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(text));
+}

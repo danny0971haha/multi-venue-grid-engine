@@ -17,6 +17,7 @@ import {
   hasExactKeys,
   isIsoTimestamp,
   isPlainRecord,
+  matchesSecretValuePattern,
   TELEMETRY_FILE_MODE,
   writeAllBytes,
 } from "./io.js";
@@ -206,22 +207,26 @@ function buildManifest(
   if (!envelopeBytes.equals(FROZEN_ENVELOPE_BYTES)) {
     return fail("MANIFEST_ENVELOPE_MISMATCH");
   }
-  return {
-    ok: true,
-    manifest: {
-      schemaVersion: RUN_MANIFEST_SCHEMA_VERSION,
-      specVersion: EXPERIMENT_SPEC_VERSION,
-      experimentId: input.experimentId,
-      runId: input.runId,
-      commitSha: input.commitSha,
-      mode: input.mode,
-      scopeKey: input.scopeKey,
-      venue: scope.venue,
-      market: scope.market,
-      envelope: { ...V01_EXPERIMENT_CONFIG },
-      startedAt: input.startedAt,
-    },
+  const manifest: RunManifest = {
+    schemaVersion: RUN_MANIFEST_SCHEMA_VERSION,
+    specVersion: EXPERIMENT_SPEC_VERSION,
+    experimentId: input.experimentId,
+    runId: input.runId,
+    commitSha: input.commitSha,
+    mode: input.mode,
+    scopeKey: input.scopeKey,
+    venue: scope.venue,
+    market: scope.market,
+    envelope: { ...V01_EXPERIMENT_CONFIG },
+    startedAt: input.startedAt,
   };
+  // Shared by write and load, so a secret-shaped identity is neither written nor trusted.
+  for (const value of Object.values(manifest)) {
+    if (typeof value === "string" && matchesSecretValuePattern(value)) {
+      return fail("MANIFEST_SECRET_PROHIBITED");
+    }
+  }
+  return { ok: true, manifest };
 }
 
 function canonicalManifestBytes(manifest: RunManifest): Buffer {
