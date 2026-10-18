@@ -289,6 +289,12 @@ Main findings:
 
 The audit recommends `CANARY_ELIGIBLE=BLOCKED`. Open blockers: account-scoped read-only evidence and order evidence are missing; API-wallet withdrawal incapability is not provable from the documentation; server time is unproven; and it is unknown whether a reduce-only order below the minimum order value can close a residual. The envelope-currency blocker was resolved by the owner's Q1 decision (see the authorization boundary below). Gate 4A also needs a read-only adapter and its conformance tests. Independent review: `NOT_PERFORMED`.
 
+## Review correctives (2026-10-18)
+
+On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) and the Phase 4.1 audit (issue #27) returned REJECT. Each finding is corrected in its own PR, and the reviewer re-reviews afterwards.
+
+- Lease final clock check (Gate 2 F2, Gate 3 F5). `runLeaseFencedMutation` applied the PHASE_2C_CONTRACT §8 clock rules only at its first boundary. A final clock read 2000 ms behind the lease heartbeat therefore still invoked the callback. The final synchronous check now applies the same rules (regression beyond 1000 ms, forward jump beyond 24 h) before its expiry check. A failure blocks the latch, fences the token and returns `NOT_SENT` with no callback. A forward jump at the final read used to be reported as `LEASE_EXPIRED` without blocking the latch; it is now `CLOCK_FORWARD_JUMP` and blocks the latch. Tests: `test/persistence/runtime-lease-corrective-3.test.ts`, including the Phase 3 `createLeaseMutationFence` bridge.
+
 ## Process reset (2026-10-11)
 
 Between 2026-09-01 and 2026-09-12 no runtime behavior changed; effort went to rebinding exact SHAs, trees, byte hashes and test counts after every change. The integration line retires that machinery (all of it remains in git history):
