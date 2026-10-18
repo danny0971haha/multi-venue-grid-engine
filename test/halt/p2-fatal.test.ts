@@ -248,20 +248,21 @@ describe("Phase 2 fatal process errors (F-01, F-02)", () => {
 });
 
 describe("Phase 2 supervisor restart after a fatal error (F-05)", () => {
-  test("F-05 restart after a fatal exit needs the lease, the halt pair and a fresh risk decision before any place", async (t) => {
+  test("F-05 restart after a fatal exit needs the halt pair, the lease and a fresh risk decision before any place", async (t) => {
     await withRoot(async (root) => {
       const fatal = await fatalRun(root);
 
       // An immediate restart cannot take over the lease of the process that just died.
       const early = await restart(root, "early", T0 + 1000);
       assert.deepEqual(early.report, {
+        pair: { ok: true, status: "RUNNING", generation: "1" },
         lease: {
           disposition: "BLOCKED",
           reasonCodes: ["LEASE_BLOCKED", "LEASE_HELD_BY_OTHER", "LEASE_NOT_EXPIRED"],
           generation: null,
         },
       });
-      assert.deepEqual(types(eventsOf(root, "early")), ["LEASE"]);
+      assert.deepEqual(types(eventsOf(root, "early")), ["PAIR", "LEASE"]);
 
       const { outcome, report } = await restart(root, "restart1", AFTER_LEASE_EXPIRY);
       assert.deepEqual(report.lease, {
@@ -280,7 +281,7 @@ describe("Phase 2 supervisor restart after a fatal error (F-05)", () => {
       assert.equal(report.place?.outcome, "SENT");
       assert.equal(report.place?.callbackCount, 1);
       const restartEvents = eventsOf(root, "restart1");
-      assert.deepEqual(types(restartEvents), ["LEASE", "PAIR", "RISK", "PLACE"]);
+      assert.deepEqual(types(restartEvents), ["PAIR", "LEASE", "RISK", "PLACE"]);
       assert.equal(restartEvents.at(-1)?.leaseGeneration, "2");
 
       const name = "F-05 supervisor restart after fatal";
@@ -289,8 +290,8 @@ describe("Phase 2 supervisor restart after a fatal error (F-05)", () => {
         name,
         method: "child exits 70 on an injected uncaught exception; restarts in fresh processes",
         expected:
-          "early restart lease-blocked, no PLACE; takeover gen 2 proves pair RUNNING and risk CONTINUE before its one PLACE",
-        observed: `early ${early.report.lease.disposition}; takeover gen ${report.lease.generation} events ${types(restartEvents).join("|")}`,
+          "early restart lease-blocked, no PLACE; takeover proves pair RUNNING, takes gen 2 and gets risk CONTINUE before its one PLACE",
+        observed: `early ${early.report.lease?.disposition}; takeover gen ${report.lease?.generation} events ${types(restartEvents).join("|")}`,
         exitCode: `${String(fatal.exitCode)} then ${String(early.outcome.exitCode)} then ${String(outcome.exitCode)}`,
       });
     });
@@ -301,7 +302,7 @@ describe("Phase 2 supervisor restart after a fatal error (F-05)", () => {
       const fatal = await fatalRun(root);
 
       const breach = await restart(root, "restart1", AFTER_LEASE_EXPIRY, "DAILY_LOSS");
-      assert.equal(breach.report.lease.generation, "2");
+      assert.equal(breach.report.lease?.generation, "2");
       assert.deepEqual(breach.report.pair, { ok: true, status: "RUNNING", generation: "1" });
       assert.equal(breach.report.risk?.durableStatus, "HALTED_FLAT");
       assert.equal(breach.report.risk?.systemAllowRiskIncrease, false);
@@ -310,7 +311,7 @@ describe("Phase 2 supervisor restart after a fatal error (F-05)", () => {
 
       // Clean input cannot restart trading over the durable halt.
       const later = await restart(root, "restart2", AFTER_LEASE_EXPIRY + 31_000);
-      assert.equal(later.report.lease.generation, "3");
+      assert.equal(later.report.lease?.generation, "3");
       assert.equal(later.report.pair?.status, "HALTED_FLAT");
       assert.equal(later.report.risk?.systemAllowRiskIncrease, false);
       assert.ok(later.report.risk?.reasonCodes.includes("CONTINUE_CANNOT_OVERRIDE_HALT"));
@@ -338,8 +339,8 @@ describe("Phase 2 supervisor restart after a fatal error (F-05)", () => {
       await writeFile(path.join(state, `${HALT_STATE_NAME}.json.bak`), "corrupt", "utf8");
 
       const { outcome, report } = await restart(root, "restart1", AFTER_LEASE_EXPIRY);
-      assert.equal(report.lease.generation, "2");
       assert.deepEqual(report.pair, { ok: false, status: null, generation: null });
+      assert.equal(report.lease?.generation, "2");
       assert.equal(report.risk?.runtimeDisposition, "FAIL_CLOSED");
       assert.equal(report.risk?.systemAllowRiskIncrease, false);
       assert.ok(report.risk?.reasonCodes.includes("HALT_PAIR_UNPROVEN"));

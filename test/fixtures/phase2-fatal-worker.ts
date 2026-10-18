@@ -27,9 +27,10 @@ import { baselineRiskInput, EXPERIMENT_ID, SCOPE_KEY, snapshot } from "../halt/h
 // FATAL_LOOP: a stand-in strategy loop. On every idle tick it asks the halt engine for a risk
 // decision and, only when that decision allows risk increase, places one spy order through
 // the lease fence. It then injects a fatal fault while idle.
-// RESTART: a fresh process that takes the lease, reads the durable halt pair, asks for a risk
-// decision on input observed at its own clock and places one spy order only if the decision
-// allows it. It reports what it saw on stdout.
+// RESTART: a fresh process that follows the RISK_PERSISTENCE_CONTRACT §22 order for the parts
+// Phase 2 owns: it reads the durable halt pair, takes the lease, asks for a risk decision on
+// input observed at its own clock and places one spy order only if the decision allows it. It
+// reports what it saw on stdout.
 export type Phase2WorkerCommand = {
   mode: "FATAL_LOOP" | "RESTART";
   root: string;
@@ -44,8 +45,8 @@ export type Phase2WorkerCommand = {
 export type Phase2WorkerEvent = { label: string; type: string; [field: string]: unknown };
 
 export type Phase2RestartReport = {
-  lease: { disposition: string; reasonCodes: string[]; generation: string | null };
-  pair?: { ok: boolean; status: string | null; generation: string | null };
+  pair: { ok: boolean; status: string | null; generation: string | null };
+  lease?: { disposition: string; reasonCodes: string[]; generation: string | null };
   risk?: {
     durableStatus: string;
     runtimeDisposition: string;
@@ -137,6 +138,15 @@ async function run(command: Phase2WorkerCommand): Promise<void> {
 
   if (command.mode === "RESTART") {
     installFatalProcessGuard(latch, processFence);
+    // A read-only proof; the engine proves the pair again under the lease below.
+    const loaded = await loadHaltAuthority({ directory, scopeKey: SCOPE_KEY });
+    const report: Phase2RestartReport = {
+      pair: loaded.ok
+        ? { ok: true, status: loaded.record.status, generation: loaded.generation }
+        : { ok: false, status: null, generation: null },
+    };
+    appendEvent(root, { label, type: "PAIR", ...report.pair });
+
     const acquired = await acquireRuntimeLease({
       directory,
       scopeKey: SCOPE_KEY,
@@ -145,27 +155,20 @@ async function run(command: Phase2WorkerCommand): Promise<void> {
       latch,
       clock: fixedLeaseClock(BigInt(command.clockMs)),
     });
-    const report: Phase2RestartReport = {
-      lease: {
-        disposition: acquired.disposition,
-        reasonCodes: acquired.reasonCodes,
-        generation: acquired.authority?.generation ?? null,
-      },
+    report.lease = {
+      disposition: acquired.disposition,
+      reasonCodes: acquired.reasonCodes,
+      generation: acquired.authority?.generation ?? null,
     };
     appendEvent(root, { label, type: "LEASE", ...report.lease });
     if (acquired.disposition !== "ACQUIRED" || acquired.authority === null) {
-      // Without the lease this process reads no halt state and sends nothing.
+      // Without the lease this process asks for no risk decision and sends nothing.
       process.stdout.write(`${JSON.stringify(report)}\n`);
       return;
     }
 
-    const loaded = await loadHaltAuthority({ directory, scopeKey: SCOPE_KEY });
-    report.pair = loaded.ok
-      ? { ok: true, status: loaded.record.status, generation: loaded.generation }
-      : { ok: false, status: null, generation: null };
-    appendEvent(root, { label, type: "PAIR", ...report.pair });
-
-    // The decision is asked for even when the pair is unproven, so its refusal is observed.
+    // The decision is asked for even when the pair is unproven, so the engine's own refusal
+    // is observed.
     const context = haltContext({
       directory,
       label,
