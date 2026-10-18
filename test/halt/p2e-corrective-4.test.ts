@@ -88,4 +88,17 @@ describe("Phase 2E runtime corrective 4 exact risk arithmetic", { concurrency: 1
     assert.notEqual(acked.runtimeDisposition, "RUNNING");
     assert.equal(acked.allowRiskIncrease, false);
   });
+
+  test("P2E-C4-04 an actual position notional just above 150 does not keep the runtime RUNNING", async () => {
+    await withTempDir(async (directory) => {
+      const { context } = await seedHaltContext(directory, {});
+      const result = await applyRiskDecision(
+        context,
+        baselineRiskInput({ signedPosition: `1.5${"0".repeat(40)}1`, markOrMidPrice: "100" }),
+      );
+      assert.notEqual(result.runtimeDisposition, "RUNNING");
+      assert.equal(result.allowRiskIncrease, false);
+      assert.equal(result.systemAllowRiskIncrease, false);
+    });
+  });
 });
