@@ -1,11 +1,11 @@
 import type { DecimalString } from "../math/decimal.js";
 import {
+  InvalidDecimalError,
   decimalAbs,
-  decimalAdd,
   decimalCmp,
-  decimalMul,
   isCanonicalDecimalString,
 } from "../math/decimal.js";
+import { exactAdd, exactMul } from "../math/exact-decimal.js";
 import type { RiskProposedIntent, RiskUnknownReservation, RiskWorkingOrder } from "./risk-types.js";
 import { FROZEN_PLANNED_GROSS_NOTIONAL_USDT } from "./risk-types.js";
 import {
@@ -61,7 +61,7 @@ export function computeExposure(args: {
   if (decimalCmp(mark, "0") <= 0) {
     return emptyExposure(["INVALID_DECIMAL", "STALE_OR_MISSING_INPUT"]);
   }
-  const actualGrossNotional = decimalMul(decimalAbs(position), mark);
+  const actualGrossNotional = exactMul(decimalAbs(position), mark);
 
   let worstLongNotional = longPositionNotional(position, mark);
   let worstShortNotional = shortPositionNotional(position, mark);
@@ -88,9 +88,9 @@ export function computeExposure(args: {
       continue;
     }
     if (order.side === "BUY") {
-      worstLongNotional = decimalAdd(worstLongNotional, notional);
+      worstLongNotional = exactAdd(worstLongNotional, notional);
     } else {
-      worstShortNotional = decimalAdd(worstShortNotional, notional);
+      worstShortNotional = exactAdd(worstShortNotional, notional);
     }
   }
 
@@ -116,9 +116,9 @@ export function computeExposure(args: {
       continue;
     }
     if (reservation.side === "BUY") {
-      worstLongNotional = decimalAdd(worstLongNotional, notional);
+      worstLongNotional = exactAdd(worstLongNotional, notional);
     } else {
-      worstShortNotional = decimalAdd(worstShortNotional, notional);
+      worstShortNotional = exactAdd(worstShortNotional, notional);
     }
   }
 
@@ -151,9 +151,9 @@ export function computeExposure(args: {
       continue;
     }
     if (intent.side === "BUY") {
-      worstLongNotional = decimalAdd(worstLongNotional, notional);
+      worstLongNotional = exactAdd(worstLongNotional, notional);
     } else {
-      worstShortNotional = decimalAdd(worstShortNotional, notional);
+      worstShortNotional = exactAdd(worstShortNotional, notional);
     }
   }
 
@@ -190,7 +190,8 @@ export type PlannedExposureDecision = {
 // Pre-send gate for one whole risk-increasing batch: the worst directional scenario over the
 // position, owned working orders, possibly-live unknown submissions and the batch must be
 // bounded and within the frozen planned gross notional cap. computeExposure skips invalid
-// entries, so any invalid entry denies here instead of being left out of the sum.
+// entries, so any invalid entry denies here instead of being left out of the sum. Exposure
+// whose exact result could exceed the exact digit bound is unbounded and denies.
 export function plannedExposureDecision(
   args: Parameters<typeof computeExposure>[0],
 ): PlannedExposureDecision {
@@ -204,7 +205,19 @@ export function plannedExposureDecision(
   if (invalid.length > 0) {
     return { allowed: false, plannedGrossNotional: null, reasonCodes: [...new Set(invalid)] };
   }
-  const exposure = computeExposure(args);
+  let exposure: ExposureComputation;
+  try {
+    exposure = computeExposure(args);
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    return {
+      allowed: false,
+      plannedGrossNotional: null,
+      reasonCodes: ["UNBOUNDED_EXPOSURE", "INVALID_DECIMAL", "PLANNED_NOTIONAL"],
+    };
+  }
   const reasonCodes = [...exposure.reasonCodes];
   const planned = exposure.plannedGrossNotional;
   if (
@@ -237,13 +250,13 @@ function parseNotional(quantity: string, price: string): DecimalString | null {
   if (decimalCmp(quantity, "0") < 0 || decimalCmp(price, "0") <= 0) {
     return null;
   }
-  return decimalMul(quantity, price);
+  return exactMul(quantity, price);
 }
 
 function longPositionNotional(signed: DecimalString, mark: DecimalString): DecimalString {
-  return decimalCmp(signed, "0") > 0 ? decimalMul(signed, mark) : "0";
+  return decimalCmp(signed, "0") > 0 ? exactMul(signed, mark) : "0";
 }
 
 function shortPositionNotional(signed: DecimalString, mark: DecimalString): DecimalString {
-  return decimalCmp(signed, "0") < 0 ? decimalMul(decimalAbs(signed), mark) : "0";
+  return decimalCmp(signed, "0") < 0 ? exactMul(decimalAbs(signed), mark) : "0";
 }
