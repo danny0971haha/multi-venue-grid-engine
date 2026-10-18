@@ -1,11 +1,6 @@
 import type { DecimalString } from "../math/decimal.js";
-import {
-  decimalAdd,
-  decimalCmp,
-  decimalMul,
-  decimalSub,
-  isCanonicalDecimalString,
-} from "../math/decimal.js";
+import { decimalCmp, isCanonicalDecimalString } from "../math/decimal.js";
+import { exactAdd, exactMul, exactSub } from "../math/exact-decimal.js";
 import { computeExposure } from "./exposure.js";
 import { freshnessFailures } from "./freshness.js";
 import {
@@ -308,7 +303,7 @@ function computeDailyPnl(input: RiskInput): {
   const realized = input.realizedTradingPnl as DecimalString;
   const fees = input.fees as DecimalString;
   const funding = normalizeFunding(input.funding as DecimalString, input.fundingConvention);
-  const netDailyPnl = decimalAdd(decimalSub(realized, fees), funding);
+  const netDailyPnl = exactAdd(exactSub(realized, fees), funding);
   if (decimalCmp(netDailyPnl, FROZEN_DAILY_NET_LOSS_USDT) <= 0) {
     return { netDailyPnl, reasonCodes: ["DAILY_LOSS"] };
   }
@@ -320,7 +315,7 @@ function normalizeFunding(
   convention: RiskInput["fundingConvention"],
 ): DecimalString {
   if (convention === "PAID_POSITIVE") {
-    return decimalMul(funding, "-1");
+    return exactMul(funding, "-1");
   }
   return funding;
 }
@@ -337,7 +332,7 @@ function computeStartDrawdown(input: RiskInput): {
   ) {
     return { startDrawdown: null, reasonCodes: ["STALE_OR_MISSING_INPUT"] };
   }
-  const startDrawdown = decimalSub(input.startingEquity, input.equity);
+  const startDrawdown = exactSub(input.startingEquity, input.equity);
   if (decimalCmp(startDrawdown, FROZEN_START_DRAWDOWN_USDT) >= 0) {
     return { startDrawdown, reasonCodes: ["START_DRAWDOWN"] };
   }
@@ -365,8 +360,8 @@ function computeBoundary(input: RiskInput): { reasonCodes: string[] } {
   ) {
     return { reasonCodes: ["INVALID_DECIMAL", "STALE_OR_MISSING_INPUT"] };
   }
-  const longFloor = decimalMul(input.gridLower, "0.99");
-  const shortCeiling = decimalMul(input.gridUpper, "1.01");
+  const longFloor = exactMul(input.gridLower, "0.99");
+  const shortCeiling = exactMul(input.gridUpper, "1.01");
   if (
     decimalCmp(input.signedPosition, "0") > 0 &&
     decimalCmp(input.markOrMidPrice, longFloor) < 0

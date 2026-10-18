@@ -1,5 +1,6 @@
 import type { WriteOutcomeKind } from "../domain/enums.js";
-import { decimalAbs, decimalCmp, decimalMul } from "../math/decimal.js";
+import { decimalAbs, decimalCmp } from "../math/decimal.js";
+import { exactMul } from "../math/exact-decimal.js";
 import { incrementCanonicalGeneration } from "../persistence/atomic-pair-store.js";
 import type { PairInspection } from "../persistence/exact-pair-inspection.js";
 import { sortReasonCodes } from "../persistence/exact-pair-inspection.js";
@@ -1227,7 +1228,7 @@ function authoritativeSnapshotMismatchesRisk(
   if (decimalCmp(snapshot.actualGrossNotional, riskDecision.metrics.actualGrossNotional) !== 0) {
     return true;
   }
-  const computed = decimalMul(decimalAbs(snapshot.signedPosition), snapshot.markOrMidPrice);
+  const computed = exactMul(decimalAbs(snapshot.signedPosition), snapshot.markOrMidPrice);
   return decimalCmp(snapshot.actualGrossNotional, computed) !== 0;
 }
 
