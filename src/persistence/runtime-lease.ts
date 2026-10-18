@@ -1095,6 +1095,10 @@ function synchronousFenceCheck(
         blockLatch: false,
       };
     }
+    const clockCodes = clockReadCodes(record.record, nowMs);
+    if (clockCodes !== null) {
+      return { ok: false, reasonCodes: clockCodes, blockLatch: true };
+    }
     if (isExpired(record.record, nowMs)) {
       return { ok: false, reasonCodes: ["LEASE_EXPIRED", "STALE_LEASE_TOKEN"], blockLatch: false };
     }
