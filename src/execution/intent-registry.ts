@@ -175,6 +175,17 @@ export function intentFingerprint(intent: OrderIntent): string {
   return sha256Hex(canonicalSerializeToUtf8(intent));
 }
 
+// Takes a frozen copy of exactly the intent fields, reading each once, and validates the copy.
+// Nothing the caller still holds can then change what is checked, recorded and sent. Returns
+// the copy, or the first reason it is not a placeable order intent.
+export function detachPlaceIntent(value: unknown): OrderIntent | string {
+  if (!isPlainObject(value) || !hasExactKeys(value, INTENT_KEYS)) {
+    return "INVALID_INTENT_FIELDS";
+  }
+  const copy = Object.fromEntries(INTENT_KEYS.map((key) => [key, value[key]]));
+  return placeIntentProblem(copy) ?? Object.freeze(copy as OrderIntent);
+}
+
 // Returns the first reason a value is not a placeable order intent with a deterministic
 // client order ID, or null when it is.
 export function placeIntentProblem(value: unknown): string | null {
