@@ -25,6 +25,8 @@ import type {
 import { buildDurableEnvelope } from "../../src/persistence/durable-envelope.js";
 import { formatPairInspectionDiagnostic } from "../../src/persistence/exact-pair-inspection.js";
 import { RuntimePersistenceLatch } from "../../src/persistence/runtime-persistence-latch.js";
+import type { CrashReloadClassification } from "../fixtures/phase2b-crash-classifier.js";
+import { classifyCrashReload } from "../fixtures/phase2b-crash-classifier.js";
 import type { CrashWorkerInspectResult } from "../fixtures/phase2b-crash-worker.js";
 import {
   CANONICAL_ENVELOPE_HASH_INPUT_BYTES,
@@ -255,20 +257,6 @@ function forceKill(child: ChildProcess): void {
   }
 }
 
-function classifyFreshReload(
-  inspection: CrashWorkerInspectResult,
-  oldHash: string,
-  newHash: string,
-): "OLD_EXACT_PAIR" | "NEW_EXACT_PAIR" | "PAIR_UNPROVEN" {
-  if (inspection.pairAuthorityProven && inspection.envelopeSha256 === oldHash) {
-    return "OLD_EXACT_PAIR";
-  }
-  if (inspection.pairAuthorityProven && inspection.envelopeSha256 === newHash) {
-    return "NEW_EXACT_PAIR";
-  }
-  return "PAIR_UNPROVEN";
-}
-
 async function inspectViaFreshProcess(directory: string): Promise<CrashWorkerInspectResult> {
   const child = spawnWorker({
     mode: "inspect",
@@ -312,7 +300,7 @@ async function runSigkillTransition(args: {
   target: AtomicWriteTarget;
   hook: AtomicWriteHook;
 }): Promise<{
-  classification: "OLD_EXACT_PAIR" | "NEW_EXACT_PAIR" | "PAIR_UNPROVEN";
+  classification: CrashReloadClassification;
   inspection: CrashWorkerInspectResult;
   oldHash: string;
   newHash: string;
@@ -326,6 +314,15 @@ async function runSigkillTransition(args: {
     assert.equal(seeded.disposition, "REQUESTED_STATE_COMMITTED");
     assert.ok(seeded.committedEnvelopeSha256 !== null);
     assert.equal(seeded.committedGeneration, "1");
+    const old = buildDurableEnvelope({
+      schemaVersion: FIXTURE_SCHEMA_VERSION,
+      kind: FIXTURE_KIND,
+      scopeKey: FIXTURE_SCOPE_KEY,
+      storeGeneration: "1",
+      previousEnvelopeSha256: null,
+      payload: payload("phase2b-crash-old"),
+    });
+    assert.equal(old.envelope.envelopeSha256, seeded.committedEnvelopeSha256);
     const nextPayload = payload("phase2b-crash-new");
     const next = buildDurableEnvelope({
       schemaVersion: FIXTURE_SCHEMA_VERSION,
@@ -376,10 +373,19 @@ async function runSigkillTransition(args: {
     }
     const inspection = await inspectViaFreshProcess(directory);
     assert.equal(inspection.allowRiskIncrease, false);
-    const classification = classifyFreshReload(
-      inspection,
-      seeded.committedEnvelopeSha256,
-      next.envelope.envelopeSha256,
+    const pair = await snapshotPair(directory);
+    const classification = classifyCrashReload(
+      { inspection, primary: pair.primary, backup: pair.backup },
+      {
+        generation: "1",
+        envelopeSha256: seeded.committedEnvelopeSha256,
+        fullEnvelopeBytes: old.fullEnvelopeBytes,
+      },
+      {
+        generation: "2",
+        envelopeSha256: next.envelope.envelopeSha256,
+        fullEnvelopeBytes: next.fullEnvelopeBytes,
+      },
     );
     assert.ok(
       classification === "OLD_EXACT_PAIR" ||
