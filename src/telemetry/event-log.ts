@@ -213,8 +213,11 @@ export function parseTelemetryEventBytes(
 }
 
 export class TelemetryLog {
-  readonly manifest: RunManifest;
-  readonly manifestSha256: string;
+  // A frozen private copy of the validated manifest. Callers only ever receive fresh copies, so
+  // nothing they mutate can change the identity written into lines or which provenance a line
+  // may carry.
+  readonly #manifest: RunManifest;
+  readonly #manifestSha256: string;
   readonly #filePath: string;
   readonly #clock: () => string;
   #byteLength: number;
@@ -233,12 +236,22 @@ export class TelemetryLog {
     clock: () => string;
   }) {
     this.#filePath = state.filePath;
-    this.manifest = state.manifest;
-    this.manifestSha256 = state.manifestSha256;
+    const manifest = structuredClone(state.manifest);
+    Object.freeze(manifest.envelope);
+    this.#manifest = Object.freeze(manifest);
+    this.#manifestSha256 = state.manifestSha256;
     this.#byteLength = state.byteLength;
     this.#lineCount = state.lineCount;
     this.#lastEventSha256 = state.lastEventSha256;
     this.#clock = state.clock;
+  }
+
+  get manifest(): RunManifest {
+    return structuredClone(this.#manifest);
+  }
+
+  get manifestSha256(): string {
+    return this.#manifestSha256;
   }
 
   get failed(): boolean {
@@ -317,8 +330,8 @@ export class TelemetryLog {
     }
     const unsigned = {
       schemaVersion: TELEMETRY_EVENT_SCHEMA_VERSION,
-      runId: this.manifest.runId,
-      manifestSha256: this.manifestSha256,
+      runId: this.#manifest.runId,
+      manifestSha256: this.#manifestSha256,
       sequence: String(this.#lineCount + 1),
       eventType: event.eventType,
       provenance: event.provenance,
@@ -331,7 +344,7 @@ export class TelemetryLog {
       ...unsigned,
       eventSha256: sha256HexBytes(canonicalSerialize(unsigned)),
     };
-    const violation = provenanceViolation(line, this.manifest);
+    const violation = provenanceViolation(line, this.#manifest);
     if (violation !== null) {
       return fail(violation);
     }
