@@ -311,6 +311,38 @@ export async function appendLeaseWitnessLine(request: {
     return loaded;
   }
   const lastLine = loaded.lines.length === 0 ? undefined : loaded.lines[loaded.lines.length - 1];
+  if (lastLine !== undefined) {
+    // A retry of the last line is rebuilt on that line's own predecessor, before any new entry is
+    // chained, so its bytes equal the durable line exactly when every request field is identical.
+    const last = lastLine;
+    const lastBuilt = buildWitnessLine({
+      scopeKey: last.scopeKey,
+      operation: last.operation,
+      fencingGeneration: last.fencingGeneration,
+      leaseStoreGeneration: last.leaseStoreGeneration,
+      targetEnvelopeSha256: last.targetEnvelopeSha256,
+      ownerId: last.ownerId,
+      processInstanceId: last.processInstanceId,
+      status: last.status,
+      previousWitnessSha256: last.previousWitnessSha256,
+      createdAt: last.createdAt,
+    });
+    const retried = buildWitnessLine({
+      scopeKey: request.scopeKey,
+      operation: request.operation,
+      fencingGeneration: request.fencingGeneration,
+      leaseStoreGeneration: request.leaseStoreGeneration,
+      targetEnvelopeSha256: request.targetEnvelopeSha256,
+      ownerId: request.ownerId,
+      processInstanceId: request.processInstanceId,
+      status: request.status,
+      previousWitnessSha256: last.previousWitnessSha256,
+      createdAt: request.createdAt,
+    });
+    if (lastBuilt.ok && retried.ok && lastBuilt.bytes.equals(retried.bytes)) {
+      return { ok: true, line: last, idempotent: true };
+    }
+  }
   const previousWitnessSha256 =
     lastLine === undefined ? GENESIS_WITNESS_SHA256 : lastLine.witnessSha256;
   const built = buildWitnessLine({
@@ -327,24 +359,6 @@ export async function appendLeaseWitnessLine(request: {
   });
   if (!built.ok) {
     return built;
-  }
-  if (lastLine !== undefined) {
-    const last = lastLine;
-    const lastBuilt = buildWitnessLine({
-      scopeKey: last.scopeKey,
-      operation: last.operation,
-      fencingGeneration: last.fencingGeneration,
-      leaseStoreGeneration: last.leaseStoreGeneration,
-      targetEnvelopeSha256: last.targetEnvelopeSha256,
-      ownerId: last.ownerId,
-      processInstanceId: last.processInstanceId,
-      status: last.status,
-      previousWitnessSha256: last.previousWitnessSha256,
-      createdAt: last.createdAt,
-    });
-    if (lastBuilt.ok && lastBuilt.bytes.equals(built.bytes)) {
-      return { ok: true, line: last, idempotent: true };
-    }
   }
   const identity = witnessIdentityKey(built.line);
   for (const existing of loaded.lines) {
