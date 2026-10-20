@@ -42,6 +42,7 @@ import {
 } from "./continuation.js";
 import {
   type CancelResolution,
+  type ExecutionContradiction,
   type IntentLink,
   type IntentRecord,
   type IntentRegistry,
@@ -183,6 +184,8 @@ type ExecutionFacts = Pick<RecordedExecution, "exchangeOrderId" | "quantity" | "
 
 type ExecutionPlan = {
   problem: string | null;
+  // The observed executions that raised the problem, kept as contradictions.
+  evidence: ExecutionObservation[];
   additions: Map<IntentId, RecordedExecution[]>;
 };
 
@@ -253,7 +256,7 @@ export class ExecutionCoordinator {
   // Every reason this coordinator's own state blocks risk increase, sorted; empty only when
   // nothing blocks. The continuation grant is not one of them.
   riskIncreaseBlockers(): string[] {
-    const blockers = new Set<string>([...this.openOrderBlockers, ...this.executionBlockers]);
+    const blockers = new Set<string>([...this.openOrderBlockers, ...this.executionBlockerCodes()]);
     if (this.journalFailed) {
       blockers.add("JOURNAL_LATCHED");
     }
@@ -268,8 +271,13 @@ export class ExecutionCoordinator {
     return this.cursor === null ? null : copyCursor(this.cursor);
   }
 
+  // The replay and stream blockers of this process, plus the persisted contradictions.
   executionBlockerCodes(): string[] {
-    return [...this.executionBlockers].sort(compareStrings);
+    const codes = new Set<string>(this.executionBlockers);
+    for (const entry of this.registry.executionContradictions()) {
+      codes.add(entry.reasonCode);
+    }
+    return [...codes].sort(compareStrings);
   }
 
   // Starts a new write-budget cycle and revokes any continuation grant. Refused while an
@@ -699,7 +707,7 @@ export class ExecutionCoordinator {
     if (this.openOrderBlockers.length > 0 && isRiskIncreasing(intent)) {
       return "OPEN_ORDER_SCAN_BLOCKS_RISK_INCREASE";
     }
-    if (this.executionBlockers.size > 0 && isRiskIncreasing(intent)) {
+    if (this.executionBlockerCodes().length > 0 && isRiskIncreasing(intent)) {
       return "EXECUTION_REPLAY_BLOCKS_RISK_INCREASE";
     }
     if (!this.continuationGranted && isRiskIncreasing(intent)) {
@@ -714,7 +722,7 @@ export class ExecutionCoordinator {
   private revokedRiskIncrease(intent: OrderIntent): string[] | null {
     if (
       !isRiskIncreasing(intent) ||
-      (this.continuationGranted && this.executionBlockers.size === 0)
+      (this.continuationGranted && this.executionBlockerCodes().length === 0)
     ) {
       return null;
     }
@@ -1107,7 +1115,8 @@ export class ExecutionCoordinator {
       return { reasonCodes: ["JOURNAL_LATCHED"], recorded: [] };
     }
     // This replay re-proves or clears earlier problems; stream blockers raised while it runs
-    // stay, because it may have read past their events before they were raised.
+    // stay, because it may have read past their events before they were raised. Persisted
+    // contradictions are not cleared here: a replay past their evidence cannot see it again.
     this.executionBlockers = new Set(["EXECUTION_REPLAY_INCOMPLETE"]);
     const recorded: ExecutionId[] = [];
     for (let pages = 0; pages < MAX_REPLAY_PAGES; pages += 1) {
@@ -1124,6 +1133,9 @@ export class ExecutionCoordinator {
       }
       const plan = this.planExecutions(page.executions);
       if (plan.problem !== null) {
+        if (!(await this.recordProblem(plan))) {
+          return this.replayStopped("JOURNAL_WRITE_FAILED", recorded);
+        }
         return this.replayStopped(plan.problem, recorded);
       }
       const added = this.applyPlan(plan.additions);
@@ -1158,8 +1170,11 @@ export class ExecutionCoordinator {
   ): Promise<ExecutionReplayResult> {
     const plan = this.planExecutions([execution]);
     if (plan.problem !== null) {
-      this.executionBlockers.add(plan.problem);
-      return { reasonCodes: [...reasonCodes, plan.problem], recorded: [] };
+      const durable = await this.recordProblem(plan);
+      return {
+        reasonCodes: [...reasonCodes, plan.problem, ...(durable ? [] : ["JOURNAL_WRITE_FAILED"])],
+        recorded: [],
+      };
     }
     const recorded = this.applyPlan(plan.additions);
     if (recorded.length > 0 && !(await this.persist())) {
@@ -1201,8 +1216,9 @@ export class ExecutionCoordinator {
     const { venue, market } = parseScopeKey(this.config.scopeKey);
     const additions = new Map<IntentId, RecordedExecution[]>();
     const seen = new Map<ExecutionId, ExecutionObservation>();
-    const problem = (reasonCode: string): ExecutionPlan => ({
+    const problem = (reasonCode: string, evidence: ExecutionObservation[] = []): ExecutionPlan => ({
       problem: reasonCode,
+      evidence,
       additions: new Map(),
     });
     for (const raw of observed) {
@@ -1212,34 +1228,34 @@ export class ExecutionCoordinator {
       const execution = raw;
       const intentId = this.registry.intentIdForExchangeOrderId(execution.exchangeOrderId);
       if (intentId === null) {
-        return problem(this.unattributedProblem(execution));
+        return problem(this.unattributedProblem(execution), [execution]);
       }
       const record = this.registry.get(intentId) as IntentRecord;
       if (!executionMatchesIntent(execution, record.intent, venue, market)) {
-        return problem("EXECUTION_MISMATCH");
+        return problem("EXECUTION_MISMATCH", [execution]);
       }
       const owner = this.registry.intentIdForExecutionId(execution.executionId);
       if (owner !== null) {
         if (owner !== intentId) {
-          return problem("EXECUTION_ID_COLLISION");
+          return problem("EXECUTION_ID_COLLISION", [execution]);
         }
         const recorded = record.executions.find(
           (item) => item.executionId === execution.executionId,
         );
         if (recorded === undefined || !sameExecution(recorded, execution)) {
-          return problem("EXECUTION_CONFLICT");
+          return problem("EXECUTION_CONFLICT", [execution]);
         }
         continue;
       }
       const earlier = seen.get(execution.executionId);
       if (earlier !== undefined) {
         if (!sameExecution(earlier, execution)) {
-          return problem("EXECUTION_CONFLICT");
+          return problem("EXECUTION_CONFLICT", [earlier, execution]);
         }
         continue;
       }
       if (!WORKING_STATUSES.has(record.status)) {
-        return problem("EXECUTION_AFTER_CLOSE");
+        return problem("EXECUTION_AFTER_CLOSE", [execution]);
       }
       seen.set(execution.executionId, execution);
       additions.set(intentId, [...(additions.get(intentId) ?? []), toRecorded(execution)]);
@@ -1251,10 +1267,13 @@ export class ExecutionCoordinator {
         record.executedQuantity,
       );
       if (decimalCmp(executed, record.intent.quantity) > 0) {
-        return problem("EXECUTION_OVERFILL");
+        return problem(
+          "EXECUTION_OVERFILL",
+          executions.map((item) => seen.get(item.executionId) as ExecutionObservation),
+        );
       }
     }
-    return { problem: null, additions };
+    return { problem: null, evidence: [], additions };
   }
 
   // No record links the execution's order. It may belong to an intent whose ack was lost,
@@ -1268,6 +1287,16 @@ export class ExecutionCoordinator {
     }
     const record = this.registry.get(intentId) as IntentRecord;
     return record.exchangeOrderId === null ? "EXECUTION_FOR_UNLINKED_INTENT" : "EXECUTION_MISMATCH";
+  }
+
+  // Blocks on the plan's problem and keeps its evidence durable. Returns false only when the
+  // evidence changed the registry but the journal write failed.
+  private async recordProblem(plan: ExecutionPlan): Promise<boolean> {
+    this.executionBlockers.add(plan.problem as string);
+    const entries = plan.evidence.map((execution) =>
+      toContradiction(plan.problem as string, execution),
+    );
+    return !this.registry.recordContradictions(entries) || (await this.persist());
   }
 
   // Applies a checked plan in intent ID order and returns the recorded execution IDs, sorted.
@@ -1290,6 +1319,23 @@ export class ExecutionCoordinator {
       return false;
     }
   }
+}
+
+// Reads each observed field once. A field that is not a string is kept as null.
+function toContradiction(
+  reasonCode: string,
+  execution: ExecutionObservation,
+): ExecutionContradiction {
+  const { executionId, exchangeOrderId, clientOrderId, side, quantity, price } = execution;
+  return {
+    reasonCode,
+    executionId,
+    exchangeOrderId,
+    clientOrderId: typeof clientOrderId === "string" ? clientOrderId : null,
+    side: typeof side === "string" ? side : null,
+    quantity: typeof quantity === "string" ? quantity : null,
+    price: typeof price === "string" ? price : null,
+  };
 }
 
 function refused(reasonCode: string): SubmitResult {

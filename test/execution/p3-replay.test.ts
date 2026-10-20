@@ -258,12 +258,14 @@ describe("P3-E13 replay conflicts fail closed", () => {
       assert.equal(h.coordinator.canIncreaseRisk(), false);
     }
 
+    // A later read that agrees with the record cannot clear a conflict the venue reported.
     h.edit((page) => page);
     assert.deepEqual(await h.coordinator.replayExecutions(), {
-      reasonCodes: [],
+      reasonCodes: ["EXECUTION_CONFLICT"],
       recorded: ["sim-exec-2"],
     });
     assert.equal(recordOf(h, intent).executedQuantity, "0.007");
+    assert.equal(h.coordinator.canIncreaseRisk(), false);
   });
 
   test("an execution ID already recorded for another order is a collision", async () => {
@@ -305,10 +307,24 @@ describe("P3-E13 replay conflicts fail closed", () => {
 
     h.edit(withExecutions([execution, structuredClone(execution)]));
     assert.deepEqual(await h.coordinator.replayExecutions(), {
-      reasonCodes: [],
+      reasonCodes: ["EXECUTION_CONFLICT"],
       recorded: ["sim-exec-1"],
     });
     assert.equal(recordOf(h, intent).executedQuantity, "0.004");
+    assert.equal(h.coordinator.canIncreaseRisk(), false);
+    // Both reported versions stay as evidence; recording one of them explains neither.
+    assert.deepEqual(
+      h.registry.executionContradictions(),
+      ["0.003", "0.004"].map((quantity) => ({
+        reasonCode: "EXECUTION_CONFLICT",
+        executionId: "sim-exec-1",
+        exchangeOrderId: "sim-order-1",
+        clientOrderId: clientIdOf(intent),
+        side: "BUY",
+        quantity,
+        price: "100",
+      })),
+    );
   });
 
   test("executions that would overfill an order block without recording", async () => {
