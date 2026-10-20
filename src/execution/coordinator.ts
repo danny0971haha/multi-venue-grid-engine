@@ -47,8 +47,8 @@ import {
   type IntentRegistry,
   type IntentStatus,
   type RecordedExecution,
+  detachPlaceIntent,
   intentFingerprint,
-  placeIntentProblem,
 } from "./intent-registry.js";
 import type {
   ClientOrderLookup,
@@ -506,13 +506,15 @@ export class ExecutionCoordinator {
     });
   }
 
-  private async submitExclusive(intent: OrderIntent): Promise<SubmitResult> {
+  private async submitExclusive(input: OrderIntent): Promise<SubmitResult> {
     if (this.journalFailed) {
       return refused("JOURNAL_LATCHED");
     }
-    const problem = placeIntentProblem(intent);
-    if (problem !== null) {
-      return refused(problem);
+    // Only this snapshot is read from here on; the caller's object is never consulted again,
+    // so every check, the record and the send describe the same request.
+    const intent = detachPlaceIntent(input);
+    if (typeof intent === "string") {
+      return refused(intent);
     }
     const existing = this.registry.get(intent.intentId);
     if (existing !== null) {
@@ -540,21 +542,27 @@ export class ExecutionCoordinator {
     return { disposition: "RECORDED", ...sent };
   }
 
-  private async submitBatchExclusive(intents: readonly OrderIntent[]): Promise<BatchResult> {
+  private async submitBatchExclusive(input: readonly OrderIntent[]): Promise<BatchResult> {
     if (this.journalFailed) {
       return batchRefused(["JOURNAL_LATCHED"]);
     }
-    if (!Array.isArray(intents) || intents.length === 0) {
+    if (!Array.isArray(input) || input.length === 0) {
       return batchRefused(["EMPTY_BATCH"]);
     }
+    // The batch is this array of detached snapshots; neither the caller's array nor its
+    // intents are consulted again.
+    const intents: OrderIntent[] = [];
     const identities = new Set<string>();
     const slots = new Set<string>();
-    for (const intent of intents) {
+    for (const element of input) {
+      const intent = detachPlaceIntent(element);
+      if (typeof intent === "string") {
+        return batchRefused([intent]);
+      }
       const problem =
-        placeIntentProblem(intent) ??
-        (this.registry.get(intent.intentId) !== null
+        this.registry.get(intent.intentId) !== null
           ? "INTENT_ALREADY_RECORDED"
-          : this.admissionProblem(intent));
+          : this.admissionProblem(intent);
       if (problem !== null) {
         return batchRefused([problem]);
       }
@@ -568,6 +576,7 @@ export class ExecutionCoordinator {
       }
       identities.add(intent.intentId).add(clientOrderId);
       slots.add(slotKey(intent));
+      intents.push(intent);
     }
     if (!this.budgetAllows(intents.length)) {
       return batchRefused(["WRITE_BUDGET_EXHAUSTED"]);
