@@ -1,10 +1,10 @@
 # Current status
 
-Snapshot: 2026-10-16. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-20. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
-`integration/v0.1-reset-20261011` is the single integration line. It merges `origin/main` (`22665d7`) into the most advanced runtime line (`fix/multi-ci-native-log-retention-20260908` at `d85478a`), so it contains every earlier product commit. Resolve its own identity with `git rev-parse HEAD HEAD^{tree}`.
+`main` is the integration line. The former integration branch `integration/v0.1-reset-20261011` merged `origin/main` (`22665d7`) into the most advanced runtime line (`fix/multi-ci-native-log-retention-20260908` at `d85478a`), so it contained every earlier product commit. The owner merged it into `main` through PR #16 on 2026-10-12 (`240cb37`). Later work reaches `main` only through pull requests that the owner merges. Resolve the current identity with `git rev-parse HEAD HEAD^{tree}`.
 
 Historical identities, unchanged and retained for reference:
 
@@ -12,13 +12,13 @@ Historical identities, unchanged and retained for reference:
 | --- | --- | --- |
 | Frozen Phase 2D baseline | `experiment/v0.1-phase2` | `7f196d367e39640eee9517f742b0d61424f9d4cc` |
 | Phase 2E runtime Corrective 3 candidate | `experiment/v0.1-phase2e-halt-ack` | `704afa2dd858c52dad06aa22941d463aa5ce4d69` |
-| Runtime line used for this integration | `fix/multi-ci-native-log-retention-20260908` | `d85478a7e1edbf85fa95f7ad3091ad1561a8d61d` |
+| Runtime line used for the PR #16 integration | `fix/multi-ci-native-log-retention-20260908` | `d85478a7e1edbf85fa95f7ad3091ad1561a8d61d` |
 
 ## Implemented vs reviewed
 
 Implemented: pinned toolchain and dry-run bootstrap (Phase 0); decimal math, domain, grid geometry and simulator (Phase 1); exact-pair durable envelopes, atomic persistence, host-local runtime leases, fail-closed risk calculations (Phase 2A-2D); halt/kill-switch behavior, durable halt ACK and process fence (Phase 2E); run manifest and append-only telemetry as a library (Phase 2F, see below); execution coordinator place path as a library (Phase 3A, see below); execution coordinator cancel path as a library (Phase 3B, see below); open-order ownership scan, owned-duplicate cleanup, whole-batch exposure gate and per-cycle write budget as a library (Phase 3C, see below); execution cursor, checkpoint and overlap-safe replay as a library (Phase 3D, see below); fatal process guard, durable intent journal and execution checkpoint, restart recovery and restart gate as a library (Phase 3E, see below); continuation gate (CONTINUE/REDUCE/HALT) and single-use risk-increase grant as a library (Phase 3F, see below); a fake-only offline integration harness.
 
-[PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records Phase 2E independent review as `NOT_PERFORMED`. Phase 2F, Phase 3A, Phase 3B, Phase 3C, Phase 3D, Phase 3E and Phase 3F independent review are also `NOT_PERFORMED`. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
+No separate phase review was performed for Phase 2E ([PHASE_2E_EVIDENCE.md](PHASE_2E_EVIDENCE.md) records `NOT_PERFORMED`), Phase 2F or Phases 3A-3F. Their bytes were inside the gate reviews of 2026-10-18: Gate 2 at `8381085` (Phases 2A-2F and the process reset) and Gate 3 at `3f9cff3` (Phases 3A-3F). Both returned REJECT; see "Review correctives" below. Earlier review records in [IMPLEMENTATION_CONTRACT.md](IMPLEMENTATION_CONTRACT.md) and [ACCEPTANCE_GATES.md](ACCEPTANCE_GATES.md) have their own dates and scopes and are not blanket acceptance.
 
 Not implemented: runtime wiring of telemetry and of the Phase 3 execution library (including the continuation gate), execution of the REDUCE and HALT actions by a supervisor, any venue adapter, integrated dry-run.
 
@@ -36,7 +36,7 @@ Not implemented: runtime wiring of telemetry and of the Phase 3 execution librar
 Known limitations:
 
 1. Not wired into `src/index.ts` or any coordinator. Phase 3 must call `gateRiskIncreaseOnEvidence` before every risk-increasing step.
-2. Secret detection is pattern-based. A bare hex signing key under an innocuous key name is not detected; adapters must never pass signing material to telemetry.
+2. Secret detection is pattern-based. A bare hex signing key under an innocuous key name is not detected; adapters must never pass signing material to telemetry. Since corrective G2-C5, the value patterns apply to the whole serialized event line and to every manifest string, not only the payload.
 3. The hash chain has no external anchor. A consistent rewrite of the last line, truncation at a line boundary, or a manifest field changed to another valid value before any event cannot be detected from the files alone.
 4. A line whose fsync failed, or whose process died before fsync, may persist. A line records an attempted step, not its completion.
 5. A torn tail permanently blocks that run directory. Recovery is an operator decision to start a new run ID and directory.
@@ -87,7 +87,7 @@ Known limitations:
 3. Place reconciliation (3A) still links an order regardless of its observed status; a later cancel then resolves it.
 4. `PREPARED`/`UNKNOWN` intents cannot be cancelled by client order ID; only linked orders can. Cancelling another run's orders is 3C/3E.
 5. A reverted cancel replaces the `LINKED` record's previous reason codes.
-6. The registry schema version is unchanged (`phase3-intent-registry-1`); the status set and import checks grew. There is no durable journal yet (3E).
+6. The registry schema version is unchanged (`phase3-intent-registry-1`); the status set and import checks grew. There is no durable journal yet (3E). Since corrective G3-C3, the schema is `phase3-intent-registry-2`, which adds persisted execution contradictions; a version 1 journal is refused.
 7. Not wired into `src/index.ts`, telemetry, the risk gate or halt flatten paths.
 8. If the fence itself throws, the record stays `CANCEL_PREPARED` and the exception propagates (3E fatal matrix). Since 3E, restart recovery turns it `CANCEL_UNVERIFIED`.
 
@@ -178,8 +178,8 @@ Known limitations:
 Known limitations:
 
 1. Unattributed or foreign executions, and executions of `REJECTED`/`NOT_SENT` records, block risk increase and pin the cursor until an operator path exists (3E+). `EXECUTION_FOR_UNLINKED_INTENT` for a `PREPARED`/`UNKNOWN` record clears after `reconcileUnresolved` links the order and a replay re-reads it; for a `REJECTED`/`NOT_SENT` record it stays.
-2. An execution problem is reported, not resolved. An `EXECUTION_CONFLICT` or `EXECUTION_ID_COLLISION` raised by a stream event for an execution older than the cursor is cleared by the next completed replay without re-reading it.
-3. Blockers live in memory only. A restart starts from `EXECUTION_REPLAY_INCOMPLETE` and forgets the reason for an earlier block (3E).
+2. An execution problem is reported, not resolved. An `EXECUTION_CONFLICT` or `EXECUTION_ID_COLLISION` raised by a stream event for an execution older than the cursor is cleared by the next completed replay without re-reading it. Since corrective G3-C3, the evidence of every execution problem is persisted and a completed replay no longer clears it. Only `UNATTRIBUTED_EXECUTION` and `EXECUTION_FOR_UNLINKED_INTENT` clear, once a record holds the same execution with the same facts; the others stay until an operator path exists (none yet).
+3. Blockers live in memory only. A restart starts from `EXECUTION_REPLAY_INCOMPLETE` and forgets the reason for an earlier block (3E). Since corrective G3-C3, persisted execution problems survive a restart; the other replay and stream blockers are still in memory.
 4. Stream events with a null sequence (the simulator, until an adapter provides one) always block until a replay.
 5. A stream that keeps filling while replays run can keep risk increase blocked through dropped events.
 6. REST lag: a replay can clear stream blockers before the REST history shows a streamed event. The event was already recorded from the stream, so nothing is lost, but the clear rests on the adapter's history being current.
@@ -200,7 +200,7 @@ Phase 3E implements the durable `UNKNOWN` state and restart reconciliation of IM
   2. It writes only `{"event":"FATAL_PROCESS_ERROR","reasonCode":...}` to stderr, never the error itself.
   3. It exits with `FATAL_EXIT_CODE` (70).
 
-  A second install throws `FATAL_GUARD_ALREADY_INSTALLED`. A test fails if any other file in `src/` registers a process-level error handler.
+  A second install throws `FATAL_GUARD_ALREADY_INSTALLED`. A test fails if any other file in `src/` registers a process-level error handler. Since corrective G2-C4, `installFatalProcessGuard(latch, processFence?)` also takes the runtime's Phase 2E halt process fence and trips it before step 1.
 - `openDurableExecutionState({ directory, scopeKey, latch })` (`src/execution/journal-store.ts`) loads two Phase 2B exact pairs: the intent journal (`intent-journal`) and the execution checkpoint (`execution-checkpoint`, schema `phase3-execution-checkpoint-1`). It returns a registry, a start cursor, and an `IntentJournal` and `ExecutionCheckpointStore` backed by those pairs. It fails closed when:
   - a pair is not a proven exact pair with a `VALID` primary (`INTENT_JOURNAL_UNPROVEN` / `EXECUTION_CHECKPOINT_UNPROVEN`, plus the inspection codes);
   - a checkpoint exists without a journal (`EXECUTION_CHECKPOINT_WITHOUT_JOURNAL`);
@@ -232,7 +232,7 @@ Known limitations:
 4. The restart gate's result covers coordinator blockers only. The latch and lease are enforced at send time by the fence, and by the journal writers. Since 3F, a risk-increasing submit also needs a grant from `evaluateContinuation`.
 5. Opening a fresh directory writes the empty journal with the Phase 2B non-live bootstrap authorization; live bootstrap is not provided.
 6. Open treats a corrupt primary as unproven even when the pair store could recover it from `.bak` (stricter; recovery is an operator decision).
-7. Scan and replay blockers are still in memory. A restart recomputes them; only `UNKNOWN`/`CANCEL_UNVERIFIED` records carry a block across restarts.
+7. Scan and replay blockers are still in memory. A restart recomputes them; only `UNKNOWN`/`CANCEL_UNVERIFIED` records carry a block across restarts. Since corrective G3-C3, persisted execution problems also carry a block across restarts.
 8. With a lost journal, an engine-shaped order already open at the restart scan is `AMBIGUOUS_OPEN_ORDER` and blocks risk increase until an operator resolves it.
 9. Every journal write stores the whole registry; there is no compaction.
 
@@ -266,7 +266,7 @@ Known limitations:
 
 1. The gate only decides. `REDUCE` and `HALT` do not run the 2E hard-halt sequence or a bounded reduction; a supervisor must act on them (not implemented).
 2. Every coordinator blocker is reported as `RECONCILIATION_REQUIRED`, so a transient blocker, such as a reconnect, yields `HALT` rather than a softer action. A busy coordinator also yields `HALT` (`COORDINATOR_BUSY`, not evaluated).
-3. A grant is bounded by use and by the next operation, not by a clock. Venue changes between the gate and the submit are seen only by the submit's own checks.
+3. A grant is bounded by use and by the next operation, not by a clock. Venue changes between the gate and the submit are seen only by the submit's own checks. Since corrective G3-C2, one of those checks runs inside the fenced callback just before the venue call: a risk-increasing place whose grant was revoked, or that meets an execution blocker, is withheld (`RISK_INCREASE_REVOKED_BEFORE_SEND`).
 4. A halt recorded between the gate and the submit is not seen by the coordinator; the fence and the halt process fence must stop the send. Halt and submit must be serialized by the supervisor.
 5. `haltAuthorityClear` is always `false` in the 2D input, so `DURABLE_HALT_OR_ACK_UNAVAILABLE` appears in every decision; the halt authority is checked through the port instead.
 6. Denying a grant for `BOUNDARY_SEED_BLOCKED` (flat position outside the grid band) is a fail-closed reading of PHASE_2D_CONTRACT ("It may block seeding"), RISK_PERSISTENCE_CONTRACT and TEST_FAULT_MATRIX P2-R15, flagged for the reviewer.
@@ -291,9 +291,21 @@ The audit recommends `CANARY_ELIGIBLE=BLOCKED`. Open blockers: account-scoped re
 
 ## Review correctives (2026-10-18)
 
-On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) and the Phase 4.1 audit (issue #27) returned REJECT. Each finding is corrected in its own PR, and the reviewer re-reviews afterwards.
+On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) and the Phase 4.1 audit (issue #27) returned REJECT. Each finding is corrected in its own PR, and the reviewer re-reviews afterwards. Corrective IDs below are the reviewer's: G2 is Gate 2, G3 is Gate 3. None of these PRs is reviewed yet.
 
-- Lease final clock check (Gate 2 F2, Gate 3 F5). `runLeaseFencedMutation` applied the PHASE_2C_CONTRACT §8 clock rules only at its first boundary. A final clock read 2000 ms behind the lease heartbeat therefore still invoked the callback. The final synchronous check now applies the same rules (regression beyond 1000 ms, forward jump beyond 24 h) before its expiry check. A failure blocks the latch, fences the token and returns `NOT_SENT` with no callback. A forward jump at the final read used to be reported as `LEASE_EXPIRED` without blocking the latch; it is now `CLOCK_FORWARD_JUMP` and blocks the latch. Tests: `test/persistence/runtime-lease-corrective-3.test.ts`, including the Phase 3 `createLeaseMutationFence` bridge.
+- Lease final clock check (Gate 2 F2, Gate 3 F5). `runLeaseFencedMutation` applied the PHASE_2C_CONTRACT §8 clock rules only at its first boundary. A final clock read 2000 ms behind the lease heartbeat therefore still invoked the callback. The final synchronous check now applies the same rules (regression beyond 1000 ms, forward jump beyond 24 h) before its expiry check. A failure blocks the latch, fences the token and returns `NOT_SENT` with no callback. A forward jump at the final read used to be reported as `LEASE_EXPIRED` without blocking the latch; it is now `CLOCK_FORWARD_JUMP` and blocks the latch. Tests: `test/persistence/runtime-lease-corrective-3.test.ts`, including the Phase 3 `createLeaseMutationFence` bridge. PR #28.
+- Exact risk arithmetic (G2-F3/C3, G3-F4). Risk and exposure sums used the 40-significant-digit rounding helpers, so a value just above a frozen limit could round onto it and pass. `src/math/exact-decimal.ts` adds `exactAdd`, `exactSub` and `exactMul`; each fails closed (`EXACT_PRECISION_EXCEEDED`) before any result above 1024 digits instead of rounding. They are used for planned and actual notional, net daily PnL, funding, drawdown, the grid boundary products and the halt acknowledgement snapshot check. `src/math/decimal.ts` is unchanged. Tests: `test/math/exact-decimal.test.ts`, `test/risk/risk-engine-corrective-5.test.ts`, `test/halt/p2e-corrective-4.test.ts`, `test/execution/p3-exposure-precision.test.ts`. PR #29.
+- Actual-exposure reduction (G2-F1/C1). A `REDUCE` decision now durably reserves the possible exposure before any mutation, cancels proven-owned risk-increasing orders, classifies every cancel and reduce outcome, and proves the result with a fresh snapshot at or below 150 gross notional. A failed, unknown or unproven step escalates to the hard halt and its flatten policy. Tests: `test/halt/p2e-corrective-5.test.ts`. PR #30.
+- Phase 2 fatal path (G2-F4/C4). See the Phase 3E note above: the guard now trips the halt process fence. Real child-process F-01/F-02 (with a lease-fenced mutation spy and log-and-ignore negative controls) and F-05 fresh restarts for the Phase 2 loop. Tests: `test/halt/p2-fatal.test.ts`, `test/fixtures/phase2-fatal-worker.ts`. PR #31.
+- Telemetry secret policy (G2-F5/C5). See Phase 2F limitation 2. A secret-shaped run identity or scope key fails with `MANIFEST_SECRET_PROHIBITED`. Remaining: event-line parsing on open is structural and does not re-run the secret patterns. Tests: `test/telemetry/telemetry-corrective-1.test.ts` (synthetic values only). PR #32.
+- Immutable manifest (G2-F6/C6). `TelemetryLog` builds every line from a frozen private copy of the validated manifest; the public `manifest` getter returns a fresh copy. Remaining: the exported constructor does not validate its arguments. Tests: `test/telemetry/telemetry-corrective-2.test.ts`. PR #33.
+- Lease witness retry (G2-F7/C7). An exact retry of the last witness line is rebuilt on that line's predecessor and accepted without new bytes; conflicting duplicates are still rejected. Tests: `test/persistence/runtime-lease-corrective-4.test.ts`. PR #34.
+- Crash classifier (G2-F9/C9), test-only. The normal-transition SIGKILL tests now require `pairAuthorityProven === false` for an unproven pair and an exact old or new byte match for an authoritative one. Assertions in `test/persistence/atomic-pair-store.test.ts` were strengthened (disclosed under REVIEW_CHANGE_PROTOCOL §14). Tests: `test/persistence/atomic-pair-store-corrective-1.test.ts`. PR #35.
+- Detached intent snapshot (G3-F1/C1). `submit` and `submitBatch` copy, validate and freeze each intent before any await; checks, journal and transport use that one snapshot. Tests: `test/execution/p3-coordinator-corrective-1.test.ts`. PR #36.
+- Send-time revalidation (G3-F2/C2). See Phase 3F limitation 3. A withheld place is recorded `NOT_SENT`; in a batch the later items stop. Reduce-only exits are still sent. Tests: `test/execution/p3-coordinator-corrective-2.test.ts`. PR #37.
+- Persisted execution contradictions (G3-F3/C3). See Phase 3B limitation 6 and Phase 3D limitations 2-3. Two `p3-replay` expectations were strengthened: a later agreeing read no longer clears a reported conflict. Remaining: an `EXECUTION_STREAM_EVENT_DROPPED` event is not inspected, so its evidence cannot be persisted, and no operator resolution path exists. Tests: `test/execution/p3-coordinator-corrective-3.test.ts`. PR #38.
+- Evidence machinery (G2-F8/C8). [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) asks the reviewer to retire the PHASE_2D_CONTRACT §11 evidence requirement through a contract amendment and to record truthful status flags in the contracts. Status: `PROPOSED`. No contract text changes until the reviewer approves it; until then F8 stays open.
+- Phase 4.1 audit (issue #27): not yet corrected.
 
 ## Process reset (2026-10-11)
 
@@ -306,18 +318,29 @@ Between 2026-09-01 and 2026-09-12 no runtime behavior changed; effort went to re
 
 No product source, risk, persistence, halt or test assertion changed in the reset. `npm test` now runs every product suite; see [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md).
 
+This section does not amend PHASE_2D_CONTRACT §11 (Gate 2 F8). The retirement of the Phase 2D Corrective 4 evidence machinery is proposed in [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) and awaits the reviewer.
+
 On 2026-10-11 the owner removed `trusted-phase2d-freeze-gate` from the `main` branch-protection required checks (its workflow no longer exists). The CI job name `Clean install, static checks, tests, secret scan, and dry-run` is unchanged.
 
 ## Present authorization boundary
 
 ```text
 PHASE_2E_AUTHORIZED=NO
+PHASE_2E_STARTED=YES
+GATE_2=REJECT
+GATE_3=REJECT
+PHASE_4_1_AUDIT=REJECT
 LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
 DEPLOYMENT_AUTHORIZED=NO
-MERGE_AUTHORIZED=PR16_PR17_BY_OWNER_ONLY
+MERGE_AUTHORIZED=PER_PR_BY_OWNER
 ```
 
-On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. On 2026-10-12 the owner authorized Phase 3 implementation without a Gate 2 PASS (a recorded deviation from ACCEPTANCE_GATES), and authorized merging PR #16 and PR #17 and closing superseded PRs; those merges are performed by the owner, not by this record. On 2026-10-16 the owner authorized the Gate 3 review request (issue #24) and Phase 4 together; Phase 4.1 therefore started without a Gate 3 PASS (a recorded deviation). Later Phase 4 steps and later phases still require an explicit owner decision.
+- `PHASE_2E_AUTHORIZED=NO`: no Phase 2E authorization record exists, and none is granted retrospectively. Phase 2E implementation began on 2026-08-27 on `experiment/v0.1-phase2e-halt-ack` and reached `main` when the owner merged PR #16 on 2026-10-12. A merge is not an authorization or a gate ruling.
+- `GATE_2`, `GATE_3`, `PHASE_4_1_AUDIT`: independent reviews of 2026-10-18 at `8381085` (issue #26), `3f9cff3` (issue #24) and `49e6594` (issue #27).
+- `MERGE_AUTHORIZED=PER_PR_BY_OWNER`: the owner performs each merge; no merge authority is delegated. This replaces the earlier `PR16_PR17_BY_OWNER_ONLY`, which later merges (PR #18 to PR #38) had outgrown.
+- The contract headers in PHASE_2D_CONTRACT, IMPLEMENTATION_CONTRACT and ACCEPTANCE_GATES still carry their August 2026 flags (for example `PHASE_2E_STARTED=NO`). They outrank this record; the proposed correction is section 4 of CR-2026-10-20-G2-C8.
+
+On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. On 2026-10-12 the owner authorized Phase 3 implementation without a Gate 2 PASS (a recorded deviation from ACCEPTANCE_GATES), and authorized merging PR #16 and PR #17 and closing superseded PRs; those merges are performed by the owner, not by this record. On 2026-10-16 the owner authorized the Gate 3 review request (issue #24) and Phase 4 together; Phase 4.1 therefore started without a Gate 3 PASS (a recorded deviation). Later Phase 4 steps and later phases still require an explicit owner decision. On 2026-10-18 the owner directed the correctives above, including the change request. Phase 4.2 has not started.
 
 Owner answers of 2026-10-16 to the Phase 4.1 audit questions (audit section 8):
 
