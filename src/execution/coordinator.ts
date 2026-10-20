@@ -186,6 +186,16 @@ type ExecutionPlan = {
   additions: Map<IntentId, RecordedExecution[]>;
 };
 
+// A place the fenced callback withheld without calling the venue, because authority to
+// increase risk was revoked after admission. Module-private, so no venue result can be one.
+class WithheldPlace {
+  readonly reasonCodes: string[];
+
+  constructor(reasonCodes: string[]) {
+    this.reasonCodes = reasonCodes;
+  }
+}
+
 // Owns intent identity, place/cancel outcomes and execution replay for one experiment scope.
 // One operation runs at a time; any unresolved intent, journal failure, open-order scan
 // blocker or execution blocker blocks risk increase. A new coordinator starts with its open
@@ -623,7 +633,17 @@ export class ExecutionCoordinator {
     }
 
     this.writesThisCycle += 1;
-    const fenced = await this.fence.run(() => this.venue.placeOrder(structuredClone(intent)));
+    // Authority to increase risk may be revoked while this send waits on exposure, the journal
+    // or the fence, so the callback checks it again immediately before transmission.
+    const fenced = await this.fence.run(
+      async (): Promise<VenueWriteResult<OrderAck> | WithheldPlace> => {
+        const revoked = this.revokedRiskIncrease(intent);
+        if (revoked !== null) {
+          return new WithheldPlace(revoked);
+        }
+        return this.venue.placeOrder(structuredClone(intent));
+      },
+    );
     const reasonCodes = this.applyPlaceOutcome(intent, fenced);
     if (!(await this.persist())) {
       reasonCodes.push("JOURNAL_WRITE_FAILED");
@@ -688,9 +708,22 @@ export class ExecutionCoordinator {
     return null;
   }
 
+  // Why an admitted risk-increasing place may no longer be sent, or null. A stream reconnect
+  // or event can arrive during any wait after admission; it revokes the continuation grant and
+  // leaves an execution blocker. Reduce-only exits never needed that authority.
+  private revokedRiskIncrease(intent: OrderIntent): string[] | null {
+    if (
+      !isRiskIncreasing(intent) ||
+      (this.continuationGranted && this.executionBlockers.size === 0)
+    ) {
+      return null;
+    }
+    return ["RISK_INCREASE_REVOKED_BEFORE_SEND", ...this.executionBlockerCodes()];
+  }
+
   private applyPlaceOutcome(
     intent: OrderIntent,
-    fenced: FenceResult<VenueWriteResult<OrderAck>>,
+    fenced: FenceResult<VenueWriteResult<OrderAck> | WithheldPlace>,
   ): string[] {
     const intentId = intent.intentId;
     if (fenced.outcome === "NOT_SENT") {
@@ -704,6 +737,9 @@ export class ExecutionCoordinator {
         "TRANSPORT_OUTCOME_UNKNOWN",
         ...fenced.reasonCodes,
       ]).reasonCodes;
+    }
+    if (result instanceof WithheldPlace) {
+      return this.registry.markNotSent(intentId, result.reasonCodes).reasonCodes;
     }
     switch (result.kind) {
       case "ACK":
