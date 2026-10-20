@@ -24,6 +24,7 @@ export { createHaltAuthorityPort, decideContinuation } from "./continuation.js";
 export { FATAL_EXIT_CODE, installFatalProcessGuard } from "./fatal-guard.js";
 export type {
   CancelResolution,
+  ExecutionContradiction,
   IntentAuthority,
   IntentLink,
   IntentRecord,

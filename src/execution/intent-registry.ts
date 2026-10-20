@@ -11,7 +11,7 @@ import {
 import { canonicalSerializeToUtf8 } from "../persistence/canonical-json.js";
 import { isCanonicalGenerationString } from "../persistence/durable-envelope.js";
 
-export const INTENT_REGISTRY_SCHEMA_VERSION = "phase3-intent-registry-1";
+export const INTENT_REGISTRY_SCHEMA_VERSION = "phase3-intent-registry-2";
 
 // PREPARED: durable write-ahead record exists; the send may or may not have happened.
 // UNKNOWN: the send may have reached the venue. Both block until reconciled with evidence.
@@ -51,9 +51,23 @@ export type IntentRecord = {
   reasonCodes: string[];
 };
 
+// Observed execution evidence that contradicts the records, or that no linked intent explains.
+// It blocks risk increase until resolved, so it is kept with the records: a replay that starts
+// past the evidence cannot observe it again. Observed values that were not strings are null.
+export type ExecutionContradiction = {
+  reasonCode: string;
+  executionId: ExecutionId;
+  exchangeOrderId: ExchangeOrderId;
+  clientOrderId: string | null;
+  side: string | null;
+  quantity: string | null;
+  price: string | null;
+};
+
 export type IntentRegistryState = {
   schemaVersion: typeof INTENT_REGISTRY_SCHEMA_VERSION;
   records: IntentRecord[];
+  executionContradictions: ExecutionContradiction[];
 };
 
 export type IntentLink = {
@@ -136,8 +150,22 @@ const SIDES = new Set<string>(["BUY", "SELL"]);
 const ORDER_TYPES = new Set<string>(["LIMIT", "MARKET"]);
 const TIME_IN_FORCES = new Set<string>(["GTC", "IOC", "FOK", "POST_ONLY"]);
 const AUTHORITY_SOURCES = new Set<string>(["ACK", "AUTHORITATIVE_OBSERVATION"]);
+// Contradictions a record can later explain: the execution was only not yet attributable.
+const ATTRIBUTION_CODES = new Set<string>([
+  "UNATTRIBUTED_EXECUTION",
+  "EXECUTION_FOR_UNLINKED_INTENT",
+]);
+// The others contradict recorded facts and never clear on their own.
+const CONTRADICTION_CODES = new Set<string>([
+  ...ATTRIBUTION_CODES,
+  "EXECUTION_AFTER_CLOSE",
+  "EXECUTION_CONFLICT",
+  "EXECUTION_ID_COLLISION",
+  "EXECUTION_MISMATCH",
+  "EXECUTION_OVERFILL",
+]);
 
-const STATE_KEYS = ["records", "schemaVersion"];
+const STATE_KEYS = ["executionContradictions", "records", "schemaVersion"];
 const RECORD_KEYS = [
   "authority",
   "exchangeOrderId",
@@ -168,6 +196,15 @@ const INTENT_KEYS = [
 ];
 const AUTHORITY_KEYS = ["evidenceId", "source"];
 const EXECUTION_KEYS = ["exchangeOrderId", "executionId", "price", "quantity"];
+const CONTRADICTION_KEYS = [
+  "clientOrderId",
+  "exchangeOrderId",
+  "executionId",
+  "price",
+  "quantity",
+  "reasonCode",
+  "side",
+];
 
 // Fingerprint over every intent field, so a resubmission under the same intent ID with
 // different content is detectable.
@@ -257,6 +294,8 @@ export class IntentRegistry {
   private readonly byClientOrderId = new Map<ClientOrderId, IntentId>();
   private readonly byExchangeOrderId = new Map<ExchangeOrderId, IntentId>();
   private readonly byExecutionId = new Map<ExecutionId, IntentId>();
+  // Keyed by canonical bytes, so an exact repeat is stored once.
+  private readonly contradictions = new Map<string, ExecutionContradiction>();
 
   get(intentId: IntentId): IntentRecord | null {
     const record = this.records.get(intentId);
@@ -283,6 +322,31 @@ export class IntentRegistry {
 
   intentIdForExecutionId(executionId: ExecutionId): IntentId | null {
     return this.byExecutionId.get(executionId) ?? null;
+  }
+
+  executionContradictions(): ExecutionContradiction[] {
+    return [...this.contradictions.keys()]
+      .sort(compareStrings)
+      .map((key) => ({ ...(this.contradictions.get(key) as ExecutionContradiction) }));
+  }
+
+  // Keeps contradictions until a record explains them. Exact repeats and entries a record
+  // already explains are not added. Returns whether the exported state changed.
+  recordContradictions(entries: readonly ExecutionContradiction[]): boolean {
+    const parsed = entries.map((entry) => {
+      const copy = parseContradiction(entry);
+      if (copy === null) {
+        throw new IntentRegistryError("INVALID_EXECUTION_CONTRADICTION");
+      }
+      return copy;
+    });
+    const before = this.contradictions.size;
+    for (const entry of parsed) {
+      if (!this.isExplained(entry)) {
+        this.contradictions.set(canonicalSerializeToUtf8(entry), entry);
+      }
+    }
+    return this.contradictions.size !== before;
   }
 
   prepare(intent: OrderIntent): IntentRecord {
@@ -359,6 +423,7 @@ export class IntentRegistry {
     for (const execution of executions) {
       this.byExecutionId.set(execution.executionId, intentId);
     }
+    this.dropExplainedContradictions();
     return structuredClone(record);
   }
 
@@ -408,6 +473,7 @@ export class IntentRegistry {
     for (const execution of added) {
       this.byExecutionId.set(execution.executionId, intentId);
     }
+    this.dropExplainedContradictions();
     return structuredClone(record);
   }
 
@@ -452,11 +518,16 @@ export class IntentRegistry {
     for (const execution of executions) {
       this.byExecutionId.set(execution.executionId, intentId);
     }
+    this.dropExplainedContradictions();
     return structuredClone(record);
   }
 
   exportState(): IntentRegistryState {
-    return { schemaVersion: INTENT_REGISTRY_SCHEMA_VERSION, records: this.list() };
+    return {
+      schemaVersion: INTENT_REGISTRY_SCHEMA_VERSION,
+      records: this.list(),
+      executionContradictions: this.executionContradictions(),
+    };
   }
 
   // Strict import: any structural or cross-record inconsistency throws, never repairs.
@@ -467,7 +538,7 @@ export class IntentRegistry {
     if (value.schemaVersion !== INTENT_REGISTRY_SCHEMA_VERSION) {
       throw new IntentRegistryError("IMPORT_SCHEMA_VERSION_MISMATCH");
     }
-    if (!Array.isArray(value.records)) {
+    if (!Array.isArray(value.records) || !Array.isArray(value.executionContradictions)) {
       throw new IntentRegistryError("IMPORT_INVALID_STATE");
     }
     const registry = new IntentRegistry();
@@ -480,6 +551,23 @@ export class IntentRegistry {
       }
       previousIntentId = intentId;
       registry.adopt(record);
+    }
+    let previousKey: string | null = null;
+    for (const raw of value.executionContradictions) {
+      const entry = parseContradiction(raw);
+      if (entry === null) {
+        throw new IntentRegistryError("IMPORT_INVALID_CONTRADICTION");
+      }
+      const key = canonicalSerializeToUtf8(entry);
+      if (previousKey !== null && compareStrings(previousKey, key) >= 0) {
+        throw new IntentRegistryError("IMPORT_CONTRADICTIONS_NOT_SORTED");
+      }
+      previousKey = key;
+      // The registry drops an entry once a record explains it, so it never writes both.
+      if (registry.isExplained(entry)) {
+        throw new IntentRegistryError("IMPORT_CONTRADICTION_ALREADY_EXPLAINED");
+      }
+      registry.contradictions.set(key, entry);
     }
     return registry;
   }
@@ -503,6 +591,36 @@ export class IntentRegistry {
     }
     for (const execution of record.executions) {
       this.byExecutionId.set(execution.executionId, intentId);
+    }
+  }
+
+  // A record explains an attribution contradiction once it holds the same execution on the
+  // same order with the same quantity, price, side and, when reported, client order ID.
+  private isExplained(entry: ExecutionContradiction): boolean {
+    if (!ATTRIBUTION_CODES.has(entry.reasonCode)) {
+      return false;
+    }
+    const intentId = this.byExecutionId.get(entry.executionId);
+    const record = intentId === undefined ? undefined : this.records.get(intentId);
+    const recorded = record?.executions.find(
+      (execution) => execution.executionId === entry.executionId,
+    );
+    return (
+      record !== undefined &&
+      recorded !== undefined &&
+      recorded.exchangeOrderId === entry.exchangeOrderId &&
+      recorded.quantity === entry.quantity &&
+      recorded.price === entry.price &&
+      record.intent.side === entry.side &&
+      (entry.clientOrderId === null || entry.clientOrderId === record.intent.clientOrderId)
+    );
+  }
+
+  private dropExplainedContradictions(): void {
+    for (const [key, entry] of this.contradictions) {
+      if (this.isExplained(entry)) {
+        this.contradictions.delete(key);
+      }
     }
   }
 
@@ -683,6 +801,36 @@ function parseExecution(raw: unknown): RecordedExecution {
     quantity: raw.quantity,
     price: raw.price,
   };
+}
+
+// Returns a detached copy of exactly the contradiction fields, reading each once, or null.
+function parseContradiction(raw: unknown): ExecutionContradiction | null {
+  if (!isPlainObject(raw) || !hasExactKeys(raw, CONTRADICTION_KEYS)) {
+    return null;
+  }
+  const entry = {
+    reasonCode: raw.reasonCode,
+    executionId: raw.executionId,
+    exchangeOrderId: raw.exchangeOrderId,
+    clientOrderId: raw.clientOrderId,
+    side: raw.side,
+    quantity: raw.quantity,
+    price: raw.price,
+  };
+  if (
+    typeof entry.reasonCode !== "string" ||
+    !CONTRADICTION_CODES.has(entry.reasonCode) ||
+    !isNonEmptyString(entry.executionId) ||
+    !isNonEmptyString(entry.exchangeOrderId) ||
+    ![entry.clientOrderId, entry.side, entry.quantity, entry.price].every(isStringOrNull)
+  ) {
+    return null;
+  }
+  return entry as ExecutionContradiction;
+}
+
+function isStringOrNull(value: unknown): boolean {
+  return value === null || typeof value === "string";
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
