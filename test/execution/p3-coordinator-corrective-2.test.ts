@@ -9,6 +9,7 @@ import {
   createLeaseMutationFence,
   type ExecutionCoordinator,
   type ExecutionVenuePort,
+  INTENT_REGISTRY_SCHEMA_VERSION,
   IntentRegistry,
 } from "../../src/execution/index.js";
 import {
@@ -36,7 +37,8 @@ import {
 const WAITS = ["exposure", "journal", "fence"] as const;
 type Wait = (typeof WAITS)[number];
 
-// A stream execution delivered while the coordinator is busy; it is dropped, never recorded.
+// A stream execution delivered while the coordinator is busy. It is checked before the
+// operation releases the coordinator and, as no intent owns its order, kept as unattributed.
 const STREAM_EXECUTION: ExecutionObservation = {
   venue: "sim",
   market: "BTC_USDC_PERP",
@@ -61,16 +63,37 @@ const STREAM_EXECUTION: ExecutionObservation = {
 };
 
 // Stream events that may arrive during any wait; each revokes authority to increase risk and
-// leaves its execution blocker.
+// leaves its execution blocker. `after` is every blocker once the operation has ended, and
+// `snapshots` what the event alone writes to the journal.
 const EVENTS = [
   {
     name: "a stream reconnect",
     blocker: "EXECUTION_STREAM_RECONNECTED",
+    after: ["EXECUTION_STREAM_RECONNECTED"],
+    snapshots: [],
     raise: (coordinator: ExecutionCoordinator) => coordinator.executionStreamReconnected(),
   },
   {
     name: "a dropped stream event",
     blocker: "EXECUTION_STREAM_EVENT_DROPPED",
+    after: ["EXECUTION_STREAM_EVENT_DROPPED", "UNATTRIBUTED_EXECUTION"],
+    snapshots: [
+      {
+        schemaVersion: INTENT_REGISTRY_SCHEMA_VERSION,
+        records: [],
+        executionContradictions: [
+          {
+            reasonCode: "UNATTRIBUTED_EXECUTION",
+            executionId: "stream-exec-1",
+            exchangeOrderId: "stream-order-1",
+            clientOrderId: null,
+            side: "BUY",
+            quantity: "0.01",
+            price: "100",
+          },
+        ],
+      },
+    ],
     raise: (coordinator: ExecutionCoordinator) =>
       coordinator.ingestStreamExecution(structuredClone(STREAM_EXECUTION)),
   },
@@ -192,9 +215,9 @@ function assertRecords(
   }
 }
 
-function assertBlockedAfter(h: EventHarness, blocker: string): void {
+function assertBlockedAfter(h: EventHarness, blockers: readonly string[]): void {
   assert.ok(h.fired(), "the event was raised at the chosen wait");
-  assert.deepEqual(h.coordinator.riskIncreaseBlockers(), [blocker]);
+  assert.deepEqual(h.coordinator.riskIncreaseBlockers(), blockers);
   assert.equal(h.coordinator.canIncreaseRisk(), false);
 }
 
@@ -227,7 +250,7 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
           h.arm(() => event.raise(h.coordinator));
           const result = await h.coordinator.submit(intent);
 
-          assertBlockedAfter(h, event.blocker);
+          assertBlockedAfter(h, event.after);
           assert.equal(result.disposition, "RECORDED");
           assert.equal(result.record?.status, "NOT_SENT");
           assert.deepEqual(result.reasonCodes, withheld);
@@ -247,7 +270,7 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
           h.arm(() => event.raise(h.coordinator));
           const result = await h.coordinator.submitBatch([first, second]);
 
-          assertBlockedAfter(h, event.blocker);
+          assertBlockedAfter(h, event.after);
           assert.equal(result.disposition, "SUBMITTED");
           assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
           assert.deepEqual(result.items, [
@@ -276,7 +299,7 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
           );
           const result = await h.coordinator.submitBatch([first, second]);
 
-          assertBlockedAfter(h, event.blocker);
+          assertBlockedAfter(h, event.after);
           assert.equal(result.disposition, "SUBMITTED");
           assert.deepEqual(result.reasonCodes, ["BATCH_INCOMPLETE"]);
           assert.deepEqual(result.items, [
@@ -299,7 +322,7 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
           h.arm(() => event.raise(h.coordinator));
           const result = await h.coordinator.submit(exit);
 
-          assertBlockedAfter(h, event.blocker);
+          assertBlockedAfter(h, event.after);
           assert.equal(result.disposition, "RECORDED");
           assert.equal(result.record?.status, "LINKED");
           assert.deepEqual(h.sent, [exit]);
@@ -316,7 +339,7 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
         h.arm(() => event.raise(h.coordinator));
         const result = await h.coordinator.submitBatch([first, second]);
 
-        assertBlockedAfter(h, event.blocker);
+        assertBlockedAfter(h, event.after);
         const stopped = ["BATCH_STOPPED_BEFORE_SEND", "EXECUTION_REPLAY_BLOCKS_RISK_INCREASE"];
         assert.deepEqual(result.items, [
           { intentId: first.intentId, status: "NOT_SENT", reasonCodes: stopped },
@@ -324,9 +347,12 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
         ]);
         assert.deepEqual(h.sent, []);
         assert.equal(h.venue.calls.place, 0);
-        // Nothing was written ahead or recorded.
+        // Nothing was written ahead or recorded; only the event's own evidence was persisted.
         assert.deepEqual(h.registry.list(), []);
-        assert.deepEqual(h.journal.snapshots, []);
+        assert.deepEqual(
+          h.journal.snapshots.map((snapshot) => JSON.parse(snapshot)),
+          event.snapshots,
+        );
       });
     });
 
@@ -339,7 +365,7 @@ describe("Gate 3 corrective C2: risk-increase authority is checked again at send
         h.arm(() => event.raise(h.coordinator));
         const result = await h.coordinator.submitBatch([exit, entry]);
 
-        assertBlockedAfter(h, event.blocker);
+        assertBlockedAfter(h, event.after);
         assert.deepEqual(result.items, [
           { intentId: exit.intentId, status: "LINKED", reasonCodes: ["VENUE_ACK"] },
           {
