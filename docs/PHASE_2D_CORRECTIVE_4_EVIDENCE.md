@@ -1,5 +1,7 @@
 # Phase 2D Corrective 4 Evidence Packet
 
+> Historical record. The tooling described here was removed on 2026-10-11 and is retired by `docs/PHASE_2D_CONTRACT.md` §12 (CR-2026-10-20-G2-C8). It is not run and is not a gate input.
+
 Version: `0.2.0`
 
 Checkpoint: evidence-corrective-1 for frozen Corrective 4 implementation

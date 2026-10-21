@@ -1,6 +1,6 @@
 # Current status
 
-Snapshot: 2026-10-20. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
+Snapshot: 2026-10-21. This document is a navigation/status record, not independent acceptance or an instruction to begin another phase.
 
 ## Integration line
 
@@ -289,11 +289,11 @@ Main findings:
 - The price rule (5 significant figures) is not a fixed tick, which `MarketRules.priceTick` cannot express.
 - Public metadata on 2026-10-16 (E1): BTC is mainnet asset index 0 with szDecimals 5 and maxLeverage 40, and has no isolated-only or margin-mode restriction. The minimum order value is not in the metadata.
 
-The audit recommends `CANARY_ELIGIBLE=BLOCKED`. Open blockers (B1-B7): account-scoped and order evidence are missing; it is not provable from the documentation that an API wallet cannot sign an external withdrawal or transfer; server time and freshness are unproven; it is unknown whether a reduce-only order below the minimum order value can close a residual; the envelope currency needs a formal amendment (owner preference received, see the authorization boundary below); execution identity and replay completeness are unproven; and the account abstraction mode is unhandled. Gate 4A also needs a read-only adapter and its conformance tests. Independent review: `REJECT` on 2026-10-18 (issue #27, `49e6594`); the corrected audit (PR #40) is not yet reviewed.
+The audit recommends `CANARY_ELIGIBLE=BLOCKED`. Open blockers (B1-B7): account-scoped and order evidence are missing; it is not provable from the documentation that an API wallet cannot sign an external withdrawal or transfer; server time and freshness are unproven; it is unknown whether a reduce-only order below the minimum order value can close a residual; the envelope currency needs a formal amendment (owner preference received, see the authorization boundary below); execution identity and replay completeness are unproven; and the account abstraction mode is unhandled. Gate 4A also needs a read-only adapter and its conformance tests. Independent review: `REJECT` on 2026-10-18 (issue #27, `49e6594`). The corrected audit (PR #40) received `PASS` on 2026-10-21 at `be0bafe`, limited to the audit content (issue #27 comment 6317625205). B1-B7 remain open, `GATE_4A_FIRST_VENUE=NOT_REQUESTED` and `CANARY_ELIGIBLE=BLOCKED`.
 
 ## Review correctives (2026-10-18)
 
-On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) and the Phase 4.1 audit (issue #27) returned REJECT. Each finding is corrected in its own PR, and the reviewer re-reviews afterwards. Corrective IDs below are the reviewer's: G2 is Gate 2, G3 is Gate 3. None of these PRs is reviewed yet.
+On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) and the Phase 4.1 audit (issue #27) returned REJECT. Each finding is corrected in its own PR, and the reviewer re-reviews afterwards. Corrective IDs below are the reviewer's: G2 is Gate 2, G3 is Gate 3. The re-reviews of 2026-10-21, all at `be0bafe`: Gate 2 `REJECT` (issue #26 comment 6315908120; F1, F6 and F8 open, new RR2), Gate 3 `REJECT` (issue #24 comment 6317456345; F3 open, new RR2 and RR3), Phase 4.1 audit content `PASS` (issue #27 comment 6317625205). The new Gate 2 and Gate 3 correctives follow in separate PRs.
 
 - Lease final clock check (Gate 2 F2, Gate 3 F5). `runLeaseFencedMutation` applied the PHASE_2C_CONTRACT §8 clock rules only at its first boundary. A final clock read 2000 ms behind the lease heartbeat therefore still invoked the callback. The final synchronous check now applies the same rules (regression beyond 1000 ms, forward jump beyond 24 h) before its expiry check. A failure blocks the latch, fences the token and returns `NOT_SENT` with no callback. A forward jump at the final read used to be reported as `LEASE_EXPIRED` without blocking the latch; it is now `CLOCK_FORWARD_JUMP` and blocks the latch. Tests: `test/persistence/runtime-lease-corrective-3.test.ts`, including the Phase 3 `createLeaseMutationFence` bridge. PR #28.
 - Exact risk arithmetic (G2-F3/C3, G3-F4). Risk and exposure sums used the 40-significant-digit rounding helpers, so a value just above a frozen limit could round onto it and pass. `src/math/exact-decimal.ts` adds `exactAdd`, `exactSub` and `exactMul`; each fails closed (`EXACT_PRECISION_EXCEEDED`) before any result above 1024 digits instead of rounding. They are used for planned and actual notional, net daily PnL, funding, drawdown, the grid boundary products and the halt acknowledgement snapshot check. `src/math/decimal.ts` is unchanged. Tests: `test/math/exact-decimal.test.ts`, `test/risk/risk-engine-corrective-5.test.ts`, `test/halt/p2e-corrective-4.test.ts`, `test/execution/p3-exposure-precision.test.ts`. PR #29.
@@ -306,8 +306,8 @@ On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) 
 - Detached intent snapshot (G3-F1/C1). `submit` and `submitBatch` copy, validate and freeze each intent before any await; checks, journal and transport use that one snapshot. Tests: `test/execution/p3-coordinator-corrective-1.test.ts`. PR #36.
 - Send-time revalidation (G3-F2/C2). See Phase 3F limitation 3. A withheld place is recorded `NOT_SENT`; in a batch the later items stop. Reduce-only exits are still sent. Tests: `test/execution/p3-coordinator-corrective-2.test.ts`. PR #37.
 - Persisted execution contradictions (G3-F3/C3). See Phase 3B limitation 6 and Phase 3D limitations 2-3. Two `p3-replay` expectations were strengthened: a later agreeing read no longer clears a reported conflict. Remaining: an `EXECUTION_STREAM_EVENT_DROPPED` event is not inspected, so its evidence cannot be persisted, and no operator resolution path exists. Tests: `test/execution/p3-coordinator-corrective-3.test.ts`. PR #38.
-- Evidence machinery (G2-F8/C8). [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) asks the reviewer to retire the PHASE_2D_CONTRACT §11 evidence requirement through a contract amendment and to record truthful status flags in the contracts. Status: `PROPOSED`. No contract text changes until the reviewer approves it; until then F8 stays open.
-- Phase 4.1 audit (issue #27, findings 1-7). The audit is corrected in place: `expiresAfter` is an action deadline, not an order lifetime; bare `tid` is not an execution identity and `stableExecutionId` is `UNPROVEN`; the replay design has explicit bounds and completion criteria; an account-mode precondition is added; the $10 minimum cites the `MinTradeNtl` error; `WebData3.serverTime` is recorded as documented but unproven; and external withdrawals are separated from same-address collateral movement. The currency amendment is proposed separately in [change-requests/CR-2026-10-20-USDC-ENVELOPE.md](change-requests/CR-2026-10-20-USDC-ENVELOPE.md) (`PROPOSED`, with an experiment-spec version bump). No code or contract changed and no exchange request was sent. PR #40.
+- Evidence machinery (G2-F8/C8). [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) asks the reviewer to retire the PHASE_2D_CONTRACT §11 evidence requirement through a contract amendment and to record truthful status flags in the contracts. Status: `APPROVE_WITH_CHANGES` (issue #26 comment 6315908120, 2026-10-21). It is applied as PHASE_2D_CONTRACT §12 and status notes in PHASE_2D_CONTRACT, IMPLEMENTATION_CONTRACT and ACCEPTANCE_GATES. F8 stays open until the reviewer rebinds it to the applied text.
+- Phase 4.1 audit (issue #27, findings 1-7). The audit is corrected in place: `expiresAfter` is an action deadline, not an order lifetime; bare `tid` is not an execution identity and `stableExecutionId` is `UNPROVEN`; the replay design has explicit bounds and completion criteria; an account-mode precondition is added; the $10 minimum cites the `MinTradeNtl` error; `WebData3.serverTime` is recorded as documented but unproven; and external withdrawals are separated from same-address collateral movement. The currency amendment is proposed separately in [change-requests/CR-2026-10-20-USDC-ENVELOPE.md](change-requests/CR-2026-10-20-USDC-ENVELOPE.md) (with an experiment-spec version bump; `APPROVE_WITH_CHANGES` on 2026-10-21 in issue #27 comment 6317625205, not yet applied). No code or contract changed and no exchange request was sent. PR #40.
 
 ## Process reset (2026-10-11)
 
@@ -320,7 +320,7 @@ Between 2026-09-01 and 2026-09-12 no runtime behavior changed; effort went to re
 
 No product source, risk, persistence, halt or test assertion changed in the reset. `npm test` now runs every product suite; see [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md).
 
-This section does not amend PHASE_2D_CONTRACT §11 (Gate 2 F8). The retirement of the Phase 2D Corrective 4 evidence machinery is proposed in [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) and awaits the reviewer.
+This section does not amend PHASE_2D_CONTRACT §11 (Gate 2 F8). The retirement of the Phase 2D Corrective 4 evidence machinery was approved with changes in [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) and is applied as PHASE_2D_CONTRACT §12.
 
 On 2026-10-11 the owner removed `trusted-phase2d-freeze-gate` from the `main` branch-protection required checks (its workflow no longer exists). The CI job name `Clean install, static checks, tests, secret scan, and dry-run` is unchanged.
 
@@ -331,22 +331,22 @@ PHASE_2E_AUTHORIZED=NO
 PHASE_2E_STARTED=YES
 GATE_2=REJECT
 GATE_3=REJECT
-PHASE_4_1_AUDIT=REJECT
+PHASE_4_1_AUDIT=PASS
 LIVE_EXCHANGE_WRITE_AUTHORIZED=NO
 DEPLOYMENT_AUTHORIZED=NO
 MERGE_AUTHORIZED=PER_PR_BY_OWNER
 ```
 
 - `PHASE_2E_AUTHORIZED=NO`: no Phase 2E authorization record exists, and none is granted retrospectively. Phase 2E implementation began on 2026-08-27 on `experiment/v0.1-phase2e-halt-ack` and reached `main` when the owner merged PR #16 on 2026-10-12. A merge is not an authorization or a gate ruling.
-- `GATE_2`, `GATE_3`, `PHASE_4_1_AUDIT`: independent reviews of 2026-10-18 at `8381085` (issue #26), `3f9cff3` (issue #24) and `49e6594` (issue #27).
+- `GATE_2`, `GATE_3`, `PHASE_4_1_AUDIT`: independent reviews of 2026-10-18 at `8381085` (issue #26), `3f9cff3` (issue #24) and `49e6594` (issue #27), all REJECT, and re-reviews of 2026-10-21 at `be0bafe`: Gate 2 REJECT, Gate 3 REJECT, Phase 4.1 audit content PASS (see "Review correctives" above).
 - `MERGE_AUTHORIZED=PER_PR_BY_OWNER`: the owner performs each merge; no merge authority is delegated. This replaces the earlier `PR16_PR17_BY_OWNER_ONLY`, which later merges (PR #18 to PR #38) had outgrown.
-- The contract headers in PHASE_2D_CONTRACT, IMPLEMENTATION_CONTRACT and ACCEPTANCE_GATES still carry their August 2026 flags (for example `PHASE_2E_STARTED=NO`). They outrank this record; the proposed correction is section 4 of CR-2026-10-20-G2-C8.
+- The contract headers in PHASE_2D_CONTRACT, IMPLEMENTATION_CONTRACT and ACCEPTANCE_GATES keep their August 2026 flags as dated history. The CR-2026-10-20-G2-C8 status note under each supersedes the flags it names. The contracts outrank this record.
 
 On 2026-10-11 the owner authorized Phase 2F implementation and selected Hyperliquid as the first Phase 4 venue. On 2026-10-12 the owner authorized Phase 3 implementation without a Gate 2 PASS (a recorded deviation from ACCEPTANCE_GATES), and authorized merging PR #16 and PR #17 and closing superseded PRs; those merges are performed by the owner, not by this record. On 2026-10-16 the owner authorized the Gate 3 review request (issue #24) and Phase 4 together; Phase 4.1 therefore started without a Gate 3 PASS (a recorded deviation). Later Phase 4 steps and later phases still require an explicit owner decision. On 2026-10-18 the owner directed the correctives above, including the change requests. Phase 4.2 has not started.
 
 Owner answers of 2026-10-16 to the Phase 4.1 audit questions (audit section 8):
 
-- Q1: the owner prefers that on Hyperliquid the envelope's "U" is USDC, with the numbers unchanged (capital 100, margin 30, gross notional 150, daily PnL halt -5, drawdown halt 10). Owner preference received; formal amendment outstanding (issue #27 finding 4). `docs/EXPERIMENT_SPEC.md` `0.1.0` still freezes USDT and was not edited. The change request is [change-requests/CR-2026-10-20-USDC-ENVELOPE.md](change-requests/CR-2026-10-20-USDC-ENVELOPE.md) and is not approved; until it is approved and applied, nothing treats the envelope as USDC.
+- Q1: the owner prefers that on Hyperliquid the envelope's "U" is USDC, with the numbers unchanged (capital 100, margin 30, gross notional 150, daily PnL halt -5, drawdown halt 10). Owner preference received; formal amendment outstanding (issue #27 finding 4). `docs/EXPERIMENT_SPEC.md` `0.1.0` still freezes USDT and was not edited. The change request is [change-requests/CR-2026-10-20-USDC-ENVELOPE.md](change-requests/CR-2026-10-20-USDC-ENVELOPE.md). It was approved with changes on 2026-10-21 (issue #27 comment 6317625205) but is not applied; until its contract amendment is applied, nothing treats the envelope as USDC.
 - Q2: read-only networking for evidence is approved, without a chosen scope. The narrowest offered scope was applied: one public mainnet `meta` read with no account address (E1). Testnet reads and account-address reads need the owner to choose that scope.
 - Q3 and Q4: no decision; the auditor's recommendations are recorded in the audit. Q3 was corrected for issue #27 finding 7: the required evidence concerns external withdrawals and transfers, not same-address collateral movement, and no withdrawal waiver exists. Both block a live canary, not read-only work.
 
