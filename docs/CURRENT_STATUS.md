@@ -160,7 +160,7 @@ Known limitations:
 - Stream events are never trusted to be complete. Each needs a decimal string `meta.sequence` with no leading zeros, compared as a big integer. Each of these adds a blocker that only a later completed replay clears:
   - a missing or unusable sequence (`EXECUTION_STREAM_SEQUENCE_UNUSABLE`);
   - a jump past the next expected sequence (`EXECUTION_STREAM_GAP`);
-  - an event that arrives while another operation runs or after a journal latch (`EXECUTION_STREAM_EVENT_DROPPED`);
+  - an event that arrives while another operation runs or after a journal latch (`EXECUTION_STREAM_EVENT_DROPPED`). Since re-review corrective G3-RC1, an event that arrives while another operation runs is still checked before that operation ends (see "Re-review correctives" below); one that arrives after a journal latch is dropped unread;
   - any execution problem.
 
   Older or repeated sequences are accepted, because execution-ID checks make them harmless. Stream events never move the cursor.
@@ -181,7 +181,7 @@ Known limitations:
 2. An execution problem is reported, not resolved. An `EXECUTION_CONFLICT` or `EXECUTION_ID_COLLISION` raised by a stream event for an execution older than the cursor is cleared by the next completed replay without re-reading it. Since corrective G3-C3, the evidence of every execution problem is persisted and a completed replay no longer clears it. Only `UNATTRIBUTED_EXECUTION` and `EXECUTION_FOR_UNLINKED_INTENT` clear, once a record holds the same execution with the same facts; the others stay until an operator path exists (none yet).
 3. Blockers live in memory only. A restart starts from `EXECUTION_REPLAY_INCOMPLETE` and forgets the reason for an earlier block (3E). Since corrective G3-C3, persisted execution problems survive a restart; the other replay and stream blockers are still in memory.
 4. Stream events with a null sequence (the simulator, until an adapter provides one) always block until a replay.
-5. A stream that keeps filling while replays run can keep risk increase blocked through dropped events.
+5. A stream that keeps filling while replays run can keep risk increase blocked through dropped events. Since G3-RC1 each such event is still checked, and the events waiting to be checked have no bound.
 6. REST lag: a replay can clear stream blockers before the REST history shows a streamed event. The event was already recorded from the stream, so nothing is lost, but the clear rests on the adapter's history being current.
 7. `executionStreamReconnected()` must be called on every connection, including the first. Nothing enforces it.
 8. A venue cursor that never advances, such as simulator overlap at or above the page size, ends every replay at the page limit.
@@ -308,6 +308,19 @@ On 2026-10-18 the independent reviews of Gate 2 (issue #26), Gate 3 (issue #24) 
 - Persisted execution contradictions (G3-F3/C3). See Phase 3B limitation 6 and Phase 3D limitations 2-3. Two `p3-replay` expectations were strengthened: a later agreeing read no longer clears a reported conflict. Remaining: an `EXECUTION_STREAM_EVENT_DROPPED` event is not inspected, so its evidence cannot be persisted, and no operator resolution path exists. Tests: `test/execution/p3-coordinator-corrective-3.test.ts`. PR #38.
 - Evidence machinery (G2-F8/C8). [change-requests/CR-2026-10-20-G2-C8.md](change-requests/CR-2026-10-20-G2-C8.md) asks the reviewer to retire the PHASE_2D_CONTRACT §11 evidence requirement through a contract amendment and to record truthful status flags in the contracts. Status: `PROPOSED`. No contract text changes until the reviewer approves it; until then F8 stays open.
 - Phase 4.1 audit (issue #27, findings 1-7). The audit is corrected in place: `expiresAfter` is an action deadline, not an order lifetime; bare `tid` is not an execution identity and `stableExecutionId` is `UNPROVEN`; the replay design has explicit bounds and completion criteria; an account-mode precondition is added; the $10 minimum cites the `MinTradeNtl` error; `WebData3.serverTime` is recorded as documented but unproven; and external withdrawals are separated from same-address collateral movement. The currency amendment is proposed separately in [change-requests/CR-2026-10-20-USDC-ENVELOPE.md](change-requests/CR-2026-10-20-USDC-ENVELOPE.md) (`PROPOSED`, with an experiment-spec version bump). No code or contract changed and no exchange request was sent. PR #40.
+
+## Re-review correctives (2026-10-21)
+
+The re-reviews of 2026-10-21 at `be0bafe` (Gate 2: issue #26; Gate 3: issue #24 comment 6317456345) raised new findings. Each is corrected in its own PR, and the reviewer re-reviews afterwards. None of these PRs is reviewed yet.
+
+- Busy-dropped execution evidence (G3-RC1). A stream execution that arrived while another operation ran was dropped unread. A conflicting fill then left only the in-memory `EXECUTION_STREAM_EVENT_DROPPED` blocker, and the next completed replay cleared it. Now the coordinator copies such an execution on arrival and checks it, in arrival order, before the running operation releases the coordinator:
+  - a problem it shows is persisted as an execution contradiction, as for a direct ingest, so it survives replay and restart;
+  - each checked event revokes any continuation grant;
+  - while an event waits, `EXECUTION_STREAM_EVENT_DROPPED` blocks risk increase and a replay does not clear it;
+  - if the journal fails during the check, the remaining events stay queued and blocking;
+  - an event that arrives after a journal latch is still dropped unread.
+
+  This replaces the "Remaining" note on PR #38 above for events that arrive while another operation runs. The persisted schema is unchanged. `test/execution/p3-coordinator-corrective-2.test.ts` expectations were strengthened (disclosed under REVIEW_CHANGE_PROTOCOL §14): its dropped stream execution has no owning intent, so it now also leaves `UNATTRIBUTED_EXECUTION` and one journal entry. Remaining: waiting events live in memory only, so a crash before the check loses them, as a crash before a direct ingest's write does; there is no bound on waiting events; an unexpected error during the check replaces the operation's result and leaves the event queued and blocking; no operator resolution path exists. Tests: `test/execution/p3-coordinator-corrective-4.test.ts`. PR #43.
 
 ## Process reset (2026-10-11)
 
