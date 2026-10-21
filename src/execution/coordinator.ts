@@ -28,7 +28,13 @@ import type {
   OrderIntent,
   VenueWriteResult,
 } from "../domain/types.js";
-import { decimalAdd, decimalCmp, decimalSub, isCanonicalDecimalString } from "../math/decimal.js";
+import {
+  type DecimalString,
+  decimalCmp,
+  InvalidDecimalError,
+  isCanonicalDecimalString,
+} from "../math/decimal.js";
+import { exactAdd, exactSub } from "../math/exact-decimal.js";
 import { plannedExposureDecision } from "../risk/exposure.js";
 import type {
   RiskProposedIntent,
@@ -475,7 +481,7 @@ export class ExecutionCoordinator {
         continue;
       }
       if (WORKING_STATUSES.has(record.status)) {
-        const remaining = decimalSub(intent.quantity, record.executedQuantity);
+        const remaining = remainingQuantity(intent.quantity, record.executedQuantity);
         if (intent.price === null) {
           unknownReservations.push({ side: intent.side, price: null, quantity: remaining });
         } else {
@@ -1262,10 +1268,10 @@ export class ExecutionCoordinator {
     }
     for (const [intentId, executions] of additions) {
       const record = this.registry.get(intentId) as IntentRecord;
-      const executed = executions.reduce(
-        (sum, execution) => decimalAdd(sum, execution.quantity),
-        record.executedQuantity,
-      );
+      const executed = sumQuantities(record.executedQuantity, executions);
+      if (executed === null) {
+        return problem("EXECUTION_QUANTITY_UNBOUNDED");
+      }
       if (decimalCmp(executed, record.intent.quantity) > 0) {
         return problem(
           "EXECUTION_OVERFILL",
@@ -1488,7 +1494,10 @@ function evaluateLookup(
   if (unique.some((execution) => execution.exchangeOrderId !== exchangeOrderId)) {
     return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
-  const executed = unique.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
+  const executed = sumQuantities("0", unique);
+  if (executed === null) {
+    return unresolved("LOOKUP_QUANTITY_UNBOUNDED");
+  }
   if (decimalCmp(executed, intent.quantity) > 0) {
     return unresolved("LOOKUP_OVERFILL");
   }
@@ -1545,7 +1554,10 @@ function evaluateCancelLookup(
   ) {
     return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
-  const executed = unique.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
+  const executed = sumQuantities("0", unique);
+  if (executed === null) {
+    return unresolved("LOOKUP_QUANTITY_UNBOUNDED");
+  }
   const compared = decimalCmp(executed, intent.quantity);
   if (compared > 0) {
     return unresolved("LOOKUP_OVERFILL");
@@ -1587,6 +1599,36 @@ function evaluateCancelLookup(
     return resolvedCancel("LINKED", executions, "ORDER_STILL_ACTIVE");
   }
   return unresolved("ORDER_STATUS_UNPROVEN");
+}
+
+// Exact total of execution quantities from a starting total, or null when the exact total could
+// need more digits than exact arithmetic allows. A total is never rounded.
+function sumQuantities(
+  start: DecimalString,
+  executions: readonly { quantity: DecimalString }[],
+): DecimalString | null {
+  try {
+    return executions.reduce((sum, execution) => exactAdd(sum, execution.quantity), start);
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    return null;
+  }
+}
+
+// Exact quantity an order may still execute. When the exact residual could need more digits than
+// exact arithmetic allows, the full order quantity bounds it from above, so a reservation is
+// never understated.
+function remainingQuantity(quantity: DecimalString, executed: DecimalString): DecimalString {
+  try {
+    return exactSub(quantity, executed);
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    return quantity;
+  }
 }
 
 function unresolved(reasonCode: string): LookupDecision {
