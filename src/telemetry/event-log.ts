@@ -114,6 +114,12 @@ const PAYLOAD_LIMITS = {
   maxObjectKeyChars: 64,
 };
 
+// Held only by openTelemetryLog. A writer trusts its constructor state (mode, run identity,
+// manifest hash and chain position) without re-reading the disk, so that state may only come
+// from a manifest and chain verified here. Callers cannot mint this key, and it is reachable
+// neither through the class, a writer, `log.constructor`, nor a subclass.
+const OPEN_KEY = Symbol("TelemetryLog.open");
+
 const SECRET_KEY_PATTERN =
   /secret|password|passphrase|token|apikey|api[_-]?key|private[_-]?key|credential|authorization|bearer|mnemonic|seed[_-]?phrase/i;
 
@@ -165,7 +171,7 @@ export async function openTelemetryLog(
   const last = parsed.lines.at(-1);
   return {
     ok: true,
-    log: new TelemetryLog({
+    log: new TelemetryLog(OPEN_KEY, {
       filePath,
       manifest: manifest.manifest,
       manifestSha256: manifest.manifestSha256,
@@ -226,15 +232,21 @@ export class TelemetryLog {
   #failedReason: string | null = null;
   #tail: Promise<unknown> = Promise.resolve();
 
-  constructor(state: {
-    filePath: string;
-    manifest: RunManifest;
-    manifestSha256: string;
-    byteLength: number;
-    lineCount: number;
-    lastEventSha256: string;
-    clock: () => string;
-  }) {
+  constructor(
+    key: symbol,
+    state: {
+      filePath: string;
+      manifest: RunManifest;
+      manifestSha256: string;
+      byteLength: number;
+      lineCount: number;
+      lastEventSha256: string;
+      clock: () => string;
+    },
+  ) {
+    if (key !== OPEN_KEY) {
+      throw new TypeError("TelemetryLog writers are created only by openTelemetryLog");
+    }
     this.#filePath = state.filePath;
     const manifest = structuredClone(state.manifest);
     Object.freeze(manifest.envelope);
