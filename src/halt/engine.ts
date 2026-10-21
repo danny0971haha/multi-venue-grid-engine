@@ -1,5 +1,5 @@
 import type { WriteOutcomeKind } from "../domain/enums.js";
-import { decimalAbs, decimalCmp } from "../math/decimal.js";
+import { decimalAbs, decimalCmp, isCanonicalDecimalString } from "../math/decimal.js";
 import { exactMul } from "../math/exact-decimal.js";
 import { incrementCanonicalGeneration } from "../persistence/atomic-pair-store.js";
 import type { PairInspection } from "../persistence/exact-pair-inspection.js";
@@ -1037,10 +1037,16 @@ function reductionEvidenceProblems(
   if (snapshot.unknownReservations.length > 0) {
     codes.push("UNRESOLVED_UNKNOWN");
   }
+  // The product/cap proof below only means something over a canonical position, a canonical
+  // positive price and a canonical nonnegative gross notional.
+  const domainValid = reductionFinancialDomainValid(snapshot);
+  if (!domainValid) {
+    codes.push("SNAPSHOT_FINANCIAL_DOMAIN_INVALID");
+  }
   // The safe target for an actual-exposure reduction is the frozen gross notional cap.
   let notionalProven = false;
   let withinCap = false;
-  if (snapshot.actualGrossNotional !== null) {
+  if (domainValid && snapshot.actualGrossNotional !== null) {
     try {
       const computed = exactMul(decimalAbs(snapshot.signedPosition), snapshot.markOrMidPrice);
       notionalProven = decimalCmp(snapshot.actualGrossNotional, computed) === 0;
@@ -1055,6 +1061,21 @@ function reductionEvidenceProblems(
     codes.push("ACTUAL_EXPOSURE_UNSAFE");
   }
   return codes;
+}
+
+// A missing notional is not a domain failure here; it leaves the notional unproven above.
+function reductionFinancialDomainValid(snapshot: HaltAuthoritativeSnapshot): boolean {
+  const { signedPosition, markOrMidPrice, actualGrossNotional } = snapshot;
+  if (!isCanonicalDecimalString(signedPosition) || !isCanonicalDecimalString(markOrMidPrice)) {
+    return false;
+  }
+  if (decimalCmp(markOrMidPrice, "0") <= 0) {
+    return false;
+  }
+  if (actualGrossNotional === null) {
+    return true;
+  }
+  return isCanonicalDecimalString(actualGrossNotional) && decimalCmp(actualGrossNotional, "0") >= 0;
 }
 
 function mergeEscalatedTrace(
