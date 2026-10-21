@@ -1,5 +1,7 @@
 # Phase 2D Corrective 4 evidence schema
 
+> Historical record. The tooling described here was removed on 2026-10-11 and is retired by `docs/PHASE_2D_CONTRACT.md` §12 (CR-2026-10-20-G2-C8). It is not run and is not a gate input.
+
 ## Historical schema v1
 
 Schema ID: `multi-venue-phase2d-corrective4/1`
