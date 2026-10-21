@@ -28,7 +28,13 @@ import type {
   OrderIntent,
   VenueWriteResult,
 } from "../domain/types.js";
-import { decimalAdd, decimalCmp, decimalSub, isCanonicalDecimalString } from "../math/decimal.js";
+import {
+  type DecimalString,
+  decimalCmp,
+  InvalidDecimalError,
+  isCanonicalDecimalString,
+} from "../math/decimal.js";
+import { exactAdd, exactSub } from "../math/exact-decimal.js";
 import { plannedExposureDecision } from "../risk/exposure.js";
 import type {
   RiskProposedIntent,
@@ -221,6 +227,9 @@ export class ExecutionCoordinator {
   private openOrderBlockers: string[] = ["OPEN_ORDER_SCAN_REQUIRED"];
   // Cleared only by a replay that reaches the venue's current end.
   private executionBlockers = new Set<string>(["EXECUTION_REPLAY_INCOMPLETE"]);
+  // Stream executions that arrived while another operation ran, copied on arrival. They are
+  // checked in arrival order before that operation releases the coordinator.
+  private readonly deferredStream: ExecutionObservation[] = [];
   private lastStreamSequence: bigint | null = null;
   private writesThisCycle = 0;
   // Set only by a continuation gate that allowed risk increase; used up by the next operation.
@@ -271,9 +280,13 @@ export class ExecutionCoordinator {
     return this.cursor === null ? null : copyCursor(this.cursor);
   }
 
-  // The replay and stream blockers of this process, plus the persisted contradictions.
+  // The replay and stream blockers of this process, plus the persisted contradictions. A
+  // stream execution still waiting to be checked blocks as a dropped event.
   executionBlockerCodes(): string[] {
     const codes = new Set<string>(this.executionBlockers);
+    if (this.deferredStream.length > 0) {
+      codes.add("EXECUTION_STREAM_EVENT_DROPPED");
+    }
     for (const entry of this.registry.executionContradictions()) {
       codes.add(entry.reasonCode);
     }
@@ -306,7 +319,7 @@ export class ExecutionCoordinator {
       return await this.submitExclusive(intent);
     } finally {
       this.continuationGranted = false;
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -321,7 +334,7 @@ export class ExecutionCoordinator {
     try {
       return await this.cancelExclusive(intentId);
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -334,7 +347,7 @@ export class ExecutionCoordinator {
     try {
       return await this.reconcileExclusive();
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -350,7 +363,7 @@ export class ExecutionCoordinator {
       return await this.submitBatchExclusive(intents);
     } finally {
       this.continuationGranted = false;
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -365,7 +378,7 @@ export class ExecutionCoordinator {
     try {
       return await this.scanExclusive(anchorEpoch);
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -385,7 +398,7 @@ export class ExecutionCoordinator {
     try {
       return await this.cleanupExclusive(anchorEpoch);
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -402,13 +415,16 @@ export class ExecutionCoordinator {
     try {
       return await this.replayExclusive();
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
   // Records one execution pushed by the venue stream. The stream is never trusted to be
   // complete: a gap, an unusable sequence, a dropped event or any execution problem blocks
-  // risk increase until a later replay completes. It never moves the replay cursor.
+  // risk increase until a later replay completes. It never moves the replay cursor. An
+  // execution that arrives while another operation runs is not recorded by this call: it is
+  // kept and checked before that operation releases the coordinator, so a problem it shows is
+  // persisted as a direct one would be. After a journal failure it is dropped.
   async ingestStreamExecution(execution: ExecutionObservation): Promise<ExecutionReplayResult> {
     this.continuationGranted = false;
     const reasonCodes: string[] = [];
@@ -419,6 +435,9 @@ export class ExecutionCoordinator {
     }
     if (this.busy || this.journalFailed) {
       this.executionBlockers.add("EXECUTION_STREAM_EVENT_DROPPED");
+      if (!this.journalFailed) {
+        this.deferredStream.push(arrivalCopy(execution));
+      }
       reasonCodes.push(
         "EXECUTION_STREAM_EVENT_DROPPED",
         this.busy ? "COORDINATOR_BUSY" : "JOURNAL_LATCHED",
@@ -429,7 +448,7 @@ export class ExecutionCoordinator {
     try {
       return await this.ingestExclusive(execution, reasonCodes);
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -459,7 +478,7 @@ export class ExecutionCoordinator {
       this.continuationGranted = decision.allowRiskIncrease;
       return decision;
     } finally {
-      this.busy = false;
+      await this.release();
     }
   }
 
@@ -475,7 +494,7 @@ export class ExecutionCoordinator {
         continue;
       }
       if (WORKING_STATUSES.has(record.status)) {
-        const remaining = decimalSub(intent.quantity, record.executedQuantity);
+        const remaining = remainingQuantity(intent.quantity, record.executedQuantity);
         if (intent.price === null) {
           unknownReservations.push({ side: intent.side, price: null, quantity: remaining });
         } else {
@@ -1117,6 +1136,7 @@ export class ExecutionCoordinator {
     // This replay re-proves or clears earlier problems; stream blockers raised while it runs
     // stay, because it may have read past their events before they were raised. Persisted
     // contradictions are not cleared here: a replay past their evidence cannot see it again.
+    // Neither are stream executions still waiting to be checked: they block until they are.
     this.executionBlockers = new Set(["EXECUTION_REPLAY_INCOMPLETE"]);
     const recorded: ExecutionId[] = [];
     for (let pages = 0; pages < MAX_REPLAY_PAGES; pages += 1) {
@@ -1162,6 +1182,21 @@ export class ExecutionCoordinator {
   private replayStopped(reasonCode: string, recorded: ExecutionId[]): ExecutionReplayResult {
     this.executionBlockers.add(reasonCode);
     return { reasonCodes: this.executionBlockerCodes(), recorded };
+  }
+
+  // Ends the running operation. Stream executions that arrived while it ran are checked
+  // first, in arrival order, each revoking any continuation grant as a direct ingest does.
+  // After a journal failure the rest stay queued and keep risk increase blocked.
+  private async release(): Promise<void> {
+    try {
+      while (this.deferredStream.length > 0 && !this.journalFailed) {
+        this.continuationGranted = false;
+        await this.ingestExclusive(this.deferredStream[0] as ExecutionObservation, []);
+        this.deferredStream.shift();
+      }
+    } finally {
+      this.busy = false;
+    }
   }
 
   private async ingestExclusive(
@@ -1262,10 +1297,10 @@ export class ExecutionCoordinator {
     }
     for (const [intentId, executions] of additions) {
       const record = this.registry.get(intentId) as IntentRecord;
-      const executed = executions.reduce(
-        (sum, execution) => decimalAdd(sum, execution.quantity),
-        record.executedQuantity,
-      );
+      const executed = sumQuantities(record.executedQuantity, executions);
+      if (executed === null) {
+        return problem("EXECUTION_QUANTITY_UNBOUNDED");
+      }
       if (decimalCmp(executed, record.intent.quantity) > 0) {
         return problem(
           "EXECUTION_OVERFILL",
@@ -1488,7 +1523,10 @@ function evaluateLookup(
   if (unique.some((execution) => execution.exchangeOrderId !== exchangeOrderId)) {
     return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
-  const executed = unique.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
+  const executed = sumQuantities("0", unique);
+  if (executed === null) {
+    return unresolved("LOOKUP_QUANTITY_UNBOUNDED");
+  }
   if (decimalCmp(executed, intent.quantity) > 0) {
     return unresolved("LOOKUP_OVERFILL");
   }
@@ -1545,7 +1583,10 @@ function evaluateCancelLookup(
   ) {
     return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
-  const executed = unique.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
+  const executed = sumQuantities("0", unique);
+  if (executed === null) {
+    return unresolved("LOOKUP_QUANTITY_UNBOUNDED");
+  }
   const compared = decimalCmp(executed, intent.quantity);
   if (compared > 0) {
     return unresolved("LOOKUP_OVERFILL");
@@ -1589,6 +1630,36 @@ function evaluateCancelLookup(
   return unresolved("ORDER_STATUS_UNPROVEN");
 }
 
+// Exact total of execution quantities from a starting total, or null when the exact total could
+// need more digits than exact arithmetic allows. A total is never rounded.
+function sumQuantities(
+  start: DecimalString,
+  executions: readonly { quantity: DecimalString }[],
+): DecimalString | null {
+  try {
+    return executions.reduce((sum, execution) => exactAdd(sum, execution.quantity), start);
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    return null;
+  }
+}
+
+// Exact quantity an order may still execute. When the exact residual could need more digits than
+// exact arithmetic allows, the full order quantity bounds it from above, so a reservation is
+// never understated.
+function remainingQuantity(quantity: DecimalString, executed: DecimalString): DecimalString {
+  try {
+    return exactSub(quantity, executed);
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    return quantity;
+  }
+}
+
 function unresolved(reasonCode: string): LookupDecision {
   return { kind: "UNRESOLVED", reasonCode };
 }
@@ -1623,6 +1694,16 @@ function uniqueExecutions(
   return [...executions.values()].sort((left, right) =>
     left.executionId < right.executionId ? -1 : 1,
   );
+}
+
+// A copy taken on arrival, so a sender that later changes the object cannot change the
+// evidence. A value that cannot be copied is kept as given.
+function arrivalCopy(execution: ExecutionObservation): ExecutionObservation {
+  try {
+    return structuredClone(execution);
+  } catch {
+    return execution;
+  }
 }
 
 function toRecorded(execution: ExecutionObservation): RecordedExecution {

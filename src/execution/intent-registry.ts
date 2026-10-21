@@ -4,10 +4,11 @@ import { makeClientOrderId, sha256Hex } from "../domain/ids.js";
 import type { OrderIntent } from "../domain/types.js";
 import {
   type DecimalString,
-  decimalAdd,
   decimalCmp,
+  InvalidDecimalError,
   isCanonicalDecimalString,
 } from "../math/decimal.js";
+import { exactAdd } from "../math/exact-decimal.js";
 import { canonicalSerializeToUtf8 } from "../persistence/canonical-json.js";
 import { isCanonicalGenerationString } from "../persistence/durable-envelope.js";
 
@@ -679,8 +680,17 @@ function normalizeExecutions(
   return sorted;
 }
 
+// Exact total of the execution quantities. A total is never rounded: one that could need more
+// digits than exact arithmetic allows is refused.
 function sumExecutions(executions: readonly RecordedExecution[]): DecimalString {
-  return executions.reduce((sum, execution) => decimalAdd(sum, execution.quantity), "0");
+  try {
+    return executions.reduce((sum, execution) => exactAdd(sum, execution.quantity), "0");
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    throw new IntentRegistryError("EXECUTION_QUANTITY_UNBOUNDED");
+  }
 }
 
 // FILLED means fully executed; other statuses only forbid overfill.

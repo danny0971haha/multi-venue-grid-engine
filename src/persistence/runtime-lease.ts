@@ -346,13 +346,16 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
 }
 
 export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise<LeaseResult> {
-  return withLeaseCoordination(request, async (nowMs) => {
+  const result = await withLeaseCoordination(request, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     const matched = matchDurableToken(request, inspection, nowMs, {
       requireActive: true,
       requireUnexpired: true,
     });
     if (!matched.ok) {
+      if (matched.fenceCaller) {
+        fenceToken(request.directory, request.authority);
+      }
       return leaseFail(
         request,
         matched.disposition,
@@ -394,6 +397,12 @@ export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise
       extraCodes: ["LEASE_HEARTBEAT_COMMITTED"],
     });
   });
+  if (result.disposition === "HEARTBEAT_COMMITTED") {
+    return result;
+  }
+  // PHASE_2C §10 step 13: any heartbeat failure or ambiguity permanently blocks this latch.
+  request.latch.block(result.reasonCodes);
+  return { ...result, latchState: request.latch.snapshot() };
 }
 
 export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<LeaseResult> {
@@ -404,6 +413,9 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
       requireUnexpired: false,
     });
     if (!matched.ok) {
+      if (matched.fenceCaller) {
+        fenceToken(request.directory, request.authority);
+      }
       return leaseFail(
         request,
         matched.disposition,
@@ -453,6 +465,9 @@ export async function assertCurrentLease(request: LeaseTokenRequest): Promise<Le
       requireUnexpired: true,
     });
     if (!matched.ok) {
+      if (matched.fenceCaller) {
+        fenceToken(request.directory, request.authority);
+      }
       return leaseFail(
         request,
         matched.disposition,
