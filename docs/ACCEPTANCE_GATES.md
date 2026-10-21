@@ -24,6 +24,24 @@ PHASE_2A_CORRECTIVE_2=REVIEW_CANDIDATE
 PHASE_2B_AUTHORIZED=NO
 ```
 
+**Status note (CR-2026-10-20-G2-C8, `APPROVE_WITH_CHANGES` in issue #26 comment 6315908120, 2026-10-21):** The block above is the 2026-08-24 record. The flags below supersede `GATE_2`, `PHASE_2A`, `PHASE_2A_CORRECTIVE_2` and `PHASE_2B_AUTHORIZED` above and add `GATE_3`, `PHASE_2B` and `PHASE_2E_AUTHORIZED`; all other flags above are unchanged.
+
+```text
+GATE_2=REJECT
+GATE_3=REJECT
+PHASE_2A=PASS
+PHASE_2A_CORRECTIVE_2=SUPERSEDED_BY_PHASE_2A_PASS
+PHASE_2B_AUTHORIZED=YES
+PHASE_2B=PASS
+PHASE_2E_AUTHORIZED=NO
+```
+
+- `GATE_2` and `GATE_3`: independent reviews of 2026-10-18 (Gate 2 at `8381085e91a84be36deb41e0f545840b668762a7`, issue #26; Gate 3 at `3f9cff3fcab5e4bfda8abae9d60a445717a5c073`, issue #24) and re-reviews of 2026-10-21 at `be0bafe3e7b03b15f177010aed34be68358c09b4` (issue #26 comment 6315908120; issue #24 comment 6317456345). All four returned REJECT.
+- `PHASE_2A` and `PHASE_2B`: the reviewer record of 2026-08-25 in `docs/IMPLEMENTATION_CONTRACT.md` (`ACCEPTED_PHASE_2A_HEAD`, `ACCEPTED_PHASE_2B_HEAD`).
+- `PHASE_2A_CORRECTIVE_2=SUPERSEDED_BY_PHASE_2A_PASS`: the Phase 2A PASS at `ACCEPTED_PHASE_2A_HEAD=51400c0f5a43c96f691115383e565743f543c9ee` supersedes the corrective candidate status above.
+- `PHASE_2B_AUTHORIZED=YES` is historical: it is the dated Phase 2B authorization of 2026-08-24 in `docs/PHASE_2B_CONTRACT.md` §1. It is not new implementation permission.
+- `PHASE_2E_AUTHORIZED=NO`: no Phase 2E authorization is inferred; see the status note in `docs/PHASE_2D_CONTRACT.md`.
+
 Phase 2A implements only read-side canonical envelope validation and exact-pair inspection. It does not complete Gate 2. See `docs/PHASE_2A_CONTRACT.md`.
 
 ## Gate 0 — deterministic baseline
