@@ -49,6 +49,29 @@ MERGE_AUTHORIZED=NO
 DEPLOYMENT_AUTHORIZED=NO
 ```
 
+**Status note (CR-2026-10-20-G2-C8, `APPROVE_WITH_CHANGES` in issue #26 comment 6315908120, 2026-10-21):** The block above is the 2026-08-25 record. The flags below supersede the same-named flags above; all others are unchanged.
+
+```text
+AUTHORIZED_CHECKPOINT=SUPERSEDED_BY_OWNER_DECISIONS_BELOW
+PHASE_2E_AUTHORIZED=NO
+PHASE_2E_STARTED=YES
+GATE_2=REJECT
+GATE_3=REJECT
+PHASE_4_1_AUDIT=PASS
+MERGE_AUTHORIZED=PER_PR_BY_OWNER
+PHASE_2D_CORRECTIVE_4_EVIDENCE_CORRECTIVE_1=SUPERSEDED_NOT_REVIEWED
+```
+
+- `PHASE_2E_AUTHORIZED=NO` and `PHASE_2E_STARTED=YES`: see the status note in `docs/PHASE_2D_CONTRACT.md`. No authorization is granted retrospectively.
+- Independent reviews of 2026-10-18: Gate 2 REJECT at `8381085e91a84be36deb41e0f545840b668762a7` (issue #26), Gate 3 REJECT at `3f9cff3fcab5e4bfda8abae9d60a445717a5c073` (issue #24), Phase 4.1 audit REJECT at `49e6594728d9f374bb5198837485e56e31cf5c91` (issue #27).
+- Independent re-reviews of 2026-10-21, all at `be0bafe3e7b03b15f177010aed34be68358c09b4`: Gate 2 REJECT (issue #26, comment 6315908120), Gate 3 REJECT (issue #24, comment 6317456345), Phase 4.1 audit content PASS (issue #27, comment 6317625205). `PHASE_4_1_AUDIT=PASS` is limited to the audit content (`DECISION_SCOPE=PHASE_4_1_AUDIT_CONTENT`): blockers B1-B7 remain open, `GATE_4A_FIRST_VENUE=NOT_REQUESTED` and `CANARY_ELIGIBLE=BLOCKED`.
+- Reported history: the owner decisions after 2026-08-25 below are recorded by the implementation agent in `docs/CURRENT_STATUS.md` ("Process reset" and "Present authorization boundary"). They are not reviewer PASS decisions and are not verified retrospective authorization. GitHub or git records are cited where they corroborate an action:
+  - 2026-10-11: the process reset (commits `1e8dc5d5b46e92eb3234af9ad1492af49530760d` and `d83d4d406f207130bf8a1f1995f60bfb66b1be60`); Phase 2F implementation; Hyperliquid as the first Phase 4 venue.
+  - 2026-10-12: Phase 3 implementation without a Gate 2 PASS (a recorded deviation from `docs/ACCEPTANCE_GATES.md`); merge of PR #16 and PR #17 (both merged by the repository owner account on 2026-10-12, per GitHub PR metadata).
+  - 2026-10-16: the Gate 3 review request (issue #24, opened by the repository owner account on 2026-10-16) and Phase 4 without a Gate 3 PASS (a recorded deviation).
+  - 2026-10-18: correctives for the three REJECTs above, including this change request.
+- Live exchange writes, credentials and deployment remain unauthorized.
+
 Authoritative Phase 2A rules are in `docs/PHASE_2A_CONTRACT.md`. This file is not otherwise revised.
 
 ## 1. Binding inputs

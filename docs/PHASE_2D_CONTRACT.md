@@ -40,6 +40,21 @@ MERGE_AUTHORIZED=NO
 DEPLOYMENT_AUTHORIZED=NO
 ```
 
+**Status note (CR-2026-10-20-G2-C8, `APPROVE_WITH_CHANGES` in issue #26 comment 6315908120, 2026-10-21):** The status line and flags above are the 2026-08-25 record. The flags below supersede the same-named flags above; all others are unchanged.
+
+```text
+PHASE_2E_AUTHORIZED=NO
+PHASE_2E_STARTED=YES
+GATE_2=REJECT
+MERGE_AUTHORIZED=PER_PR_BY_OWNER
+PHASE_2D_CORRECTIVE_4_EVIDENCE_CORRECTIVE_1=SUPERSEDED_NOT_REVIEWED
+```
+
+- `PHASE_2E_AUTHORIZED=NO` is restated, not changed: no Phase 2E authorization record exists, and none is granted retrospectively. `PHASE_2E_STARTED=YES` rests on git and GitHub records: the earliest Phase 2E commit, `ebfc476cb0b54cea356c2425b16b2101a8c6ecf8` on `experiment/v0.1-phase2e-halt-ack`, is dated 2026-08-27, and the Phase 2E bytes reached `main` when the repository owner account merged PR #16 on 2026-10-12 (merge commit `240cb37b7db636705548a1176b8118c704a546c9`). A merge is not an authorization or a gate ruling. No separate Phase 2E review was performed (`docs/PHASE_2E_EVIDENCE.md`); the Phase 2E bytes were inside the Gate 2 review of 2026-10-18 at `8381085e91a84be36deb41e0f545840b668762a7`, which returned REJECT.
+- `GATE_2=REJECT`: independent review of 2026-10-18 at `8381085e91a84be36deb41e0f545840b668762a7` and re-review of 2026-10-21 at `be0bafe3e7b03b15f177010aed34be68358c09b4` (issue #26, comment 6315908120).
+- `MERGE_AUTHORIZED=PER_PR_BY_OWNER`: the owner performs each merge. No merge authority is delegated.
+- Evidence corrective 1: see §12.
+
 ## 1. Objective
 
 Implement project-owned risk calculations and a deterministic `CONTINUE` / `REDUCE` / `HALT` decision. `CONTINUE` is metrics-only. It is not live-write authorization.
@@ -235,3 +250,27 @@ PHASE_2D_CORRECTIVE_4_OVERALL=REVIEW_CANDIDATE
 PHASE_2D_SELF_DECLARED_PASS=NO
 ```
 
+## 12. Evidence-machinery retirement (CR-2026-10-20-G2-C8)
+
+Approved by the independent reviewer: `APPROVE_WITH_CHANGES` in issue #26 comment 6315908120, 2026-10-21.
+
+This section supersedes the evidence requirement in the second paragraph of §11. The first paragraph of §11 still applies: nothing here changes risk calculations, the frozen 100U / 5x / 30U / 150U / -5U / 10U limits, admission budgets or implementation bytes.
+
+Schemas `multi-venue-phase2d-corrective4/1` and `multi-venue-phase2d-corrective4/2` are historical. Their generator, verifier and tests were removed on 2026-10-11 (commits `1e8dc5d5b46e92eb3234af9ad1492af49530760d` and `d83d4d406f207130bf8a1f1995f60bfb66b1be60`) and remain in git history at `d85478a7e1edbf85fa95f7ad3091ad1561a8d61d`. They are not run and are not an input to any gate.
+
+Evidence for a review of this repository is:
+
+1. the CI job `Clean install, static checks, tests, secret scan, and dry-run` (`.github/workflows/ci.yml`) passing on the exact reviewed commit;
+2. the `docs/EVIDENCE_TEMPLATE.md` packet for that commit, with observed test totals;
+3. the reviewer's own inspection of those bytes (REVIEW_CHANGE_PROTOCOL §9 and §15).
+
+The retired schema-v2 verifier no longer automatically cross-checks candidate identity, the literal test command or the pinned inventory. For every review, the reviewer must verify HEAD/tree and the CI run's tested SHA, inspect package scripts and changed/deleted tests against the applicable fault matrix, and record observed totals and real command exits. REVIEW_CHANGE_PROTOCOL §§9, 14 and 15 remain binding. A review decision still binds to the exact reviewed commit (REVIEW_CHANGE_PROTOCOL §9). No tool emits a gate decision.
+
+Evidence corrective 1 was not reviewed before this retirement. The Corrective 4 implementation disposition (`ACCEPT`) is unchanged. The overall Corrective 4 disposition is left to the Gate 2 re-review.
+
+```text
+PHASE_2D_CORRECTIVE_4_EVIDENCE_MACHINERY=RETIRED
+PHASE_2D_CORRECTIVE_4_EVIDENCE_CORRECTIVE_1=SUPERSEDED_NOT_REVIEWED
+PHASE_2D_CORRECTIVE_4_IMPLEMENTATION=ACCEPT
+PHASE_2D_SELF_DECLARED_PASS=NO
+```
