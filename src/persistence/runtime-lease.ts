@@ -300,6 +300,20 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
     }
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     if (inspection.pairStatus === "BOTH_ABSENT") {
+      // This process already committed a lease for this scope and process instance, here or
+      // in another directory. That is historical evidence, so the pair is not a clean
+      // BOTH_ABSENT, and a first-generation initialization must not replace the last commit.
+      if (
+        lastCommitByProcessInstance.has(lastCommitKey(request.scopeKey, request.processInstanceId))
+      ) {
+        return leaseFail(
+          request,
+          "AUTHORITY_UNPROVEN",
+          ["LEASE_RECORD_DIVERGED", "LEASE_AUTHORITY_UNPROVEN"],
+          inspection,
+          true,
+        );
+      }
       const gated = await gateWitness(request, inspection, null, true);
       if (!gated.ok) {
         return gated.result;

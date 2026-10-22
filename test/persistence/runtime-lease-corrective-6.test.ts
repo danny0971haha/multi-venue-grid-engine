@@ -461,15 +461,28 @@ describe("Gate 2 re-review RC5: lease identity across directory spellings", {
       });
       clock.set(RETURNED_MS);
 
-      // Same scope, owner and process in a fresh directory: the same lease identity, so the
-      // new first-generation token is the fenced one and nothing is sent.
+      // Same scope, owner and process in a fresh directory: the same lease identity, so this
+      // process's lease history refuses a new first-generation lease there (Gate 2 RC6), and
+      // the fenced token sends nothing there.
       const sameScopeDirectory = path.join(root, "same-scope");
       await mkdir(sameScopeDirectory);
-      const sameScope = await acquireAs(sameScopeDirectory, clock);
-      assert.equal(sameScope.generation, authority.generation);
+      const sameScopeLatch = new RuntimePersistenceLatch();
+      const sameScope = await acquireRuntimeLease({
+        directory: sameScopeDirectory,
+        scopeKey: SCOPE_KEY,
+        ownerId: "ownerA",
+        processInstanceId: "procA",
+        latch: sameScopeLatch,
+        clock,
+      });
+      assert.equal(sameScope.disposition, "AUTHORITY_UNPROVEN");
+      assert.equal(sameScope.authority, null);
+      assert.ok(sameScope.reasonCodes.includes("LEASE_RECORD_DIVERGED"));
+      assert.equal(sameScopeLatch.blocked, true);
+      assert.equal((await directoryBytes(sameScopeDirectory)).size, 0);
       const sameScopeSent = await mutate(
         sameScopeDirectory,
-        sameScope,
+        authority,
         new RuntimePersistenceLatch(),
         clock,
       );
