@@ -191,6 +191,10 @@ const LEASE_RECORD_KEYS = [
   "updatedAt",
 ] as const;
 
+// Process-local lease memory is keyed by lease identity (scope, owner, process
+// instance, generation), never by the directory string: equivalent spellings,
+// symlink aliases and byte copies of a lease directory share one fence, one
+// observed generation and one last commit per scope.
 const observedGenerationByScope = new Map<string, string>();
 const lastCommitByProcessInstance = new Map<
   string,
@@ -319,7 +323,7 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
     if (!gated.ok) {
       return gated.result;
     }
-    if (hasObservedRegression(request.directory, request.scopeKey, parsed.record.generation)) {
+    if (hasObservedRegression(request.scopeKey, parsed.record.generation)) {
       return leaseFail(
         request,
         "AUTHORITY_UNPROVEN",
@@ -328,7 +332,7 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
         true,
       );
     }
-    observeGeneration(request.directory, request.scopeKey, parsed.record.generation);
+    observeGeneration(request.scopeKey, parsed.record.generation);
     const clockCodes = clockReadCodes(parsed.record, nowMs);
     if (clockCodes !== null) {
       return leaseFail(request, "AUTHORITY_UNPROVEN", clockCodes, inspection, true);
@@ -354,7 +358,7 @@ export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise
     });
     if (!matched.ok) {
       if (matched.fenceCaller) {
-        fenceToken(request.directory, request.authority);
+        fenceToken(request.authority);
       }
       return leaseFail(
         request,
@@ -414,7 +418,7 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
     });
     if (!matched.ok) {
       if (matched.fenceCaller) {
-        fenceToken(request.directory, request.authority);
+        fenceToken(request.authority);
       }
       return leaseFail(
         request,
@@ -451,7 +455,7 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
       extraCodes: ["LEASE_RELEASED"],
     });
     if (committed.authority !== null) {
-      fenceToken(request.directory, committed.authority);
+      fenceToken(committed.authority);
     }
     return committed;
   });
@@ -466,7 +470,7 @@ export async function assertCurrentLease(request: LeaseTokenRequest): Promise<Le
     });
     if (!matched.ok) {
       if (matched.fenceCaller) {
-        fenceToken(request.directory, request.authority);
+        fenceToken(request.authority);
       }
       return leaseFail(
         request,
@@ -505,7 +509,7 @@ export async function runLeaseFencedMutation<T>(
   if (request.latch.blocked) {
     return mutationFail(request, ["LATCH_ALREADY_BLOCKED", "MUTATION_NOT_SENT"]);
   }
-  if (isTokenFenced(request.directory, request.authority)) {
+  if (isTokenFenced(request.authority)) {
     return mutationFail(request, ["FENCED_OWNER", "STALE_LEASE_TOKEN", "MUTATION_NOT_SENT"]);
   }
 
@@ -552,7 +556,7 @@ export async function runLeaseFencedMutation<T>(
         request.latch.block(matched.reasonCodes);
       }
       if (matched.fenceCaller) {
-        fenceToken(request.directory, request.authority);
+        fenceToken(request.authority);
       }
       return mutationFail(
         request,
@@ -576,7 +580,7 @@ export async function runLeaseFencedMutation<T>(
       if (syncCheck.blockLatch) {
         request.latch.block(syncCheck.reasonCodes);
       }
-      fenceToken(request.directory, request.authority);
+      fenceToken(request.authority);
       return mutationFail(
         request,
         [...syncCheck.reasonCodes, "MUTATION_NOT_SENT"],
@@ -836,7 +840,7 @@ async function commitWitnessedLease(args: {
 }
 
 function authorityFromPersist(
-  request: { directory: string; latch: RuntimePersistenceLatch },
+  request: { latch: RuntimePersistenceLatch },
   payload: unknown,
   persist: {
     committedEnvelopeSha256: string | null;
@@ -869,8 +873,8 @@ function authorityFromPersist(
     leaseStoreGeneration: persist.committedGeneration,
     observedExpiresAt: parsed.record.expiresAt,
   };
-  rememberCommit(request.directory, authority);
-  observeGeneration(request.directory, parsed.record.scopeKey, parsed.record.generation);
+  rememberCommit(authority);
+  observeGeneration(parsed.record.scopeKey, parsed.record.generation);
   return {
     disposition,
     authority,
@@ -903,7 +907,7 @@ function matchDurableToken(
       blockLatch: boolean;
       fenceCaller: boolean;
     } {
-  if (isTokenFenced(request.directory, request.authority)) {
+  if (isTokenFenced(request.authority)) {
     return {
       ok: false,
       disposition: "BLOCKED",
@@ -931,7 +935,7 @@ function matchDurableToken(
       fenceCaller: true,
     };
   }
-  if (hasObservedRegression(request.directory, request.scopeKey, parsed.record.generation)) {
+  if (hasObservedRegression(request.scopeKey, parsed.record.generation)) {
     return {
       ok: false,
       disposition: "AUTHORITY_UNPROVEN",
@@ -940,7 +944,7 @@ function matchDurableToken(
       fenceCaller: true,
     };
   }
-  observeGeneration(request.directory, request.scopeKey, parsed.record.generation);
+  observeGeneration(request.scopeKey, parsed.record.generation);
   const clockCodes = clockReadCodes(parsed.record, nowMs);
   if (clockCodes !== null) {
     return {
@@ -952,7 +956,7 @@ function matchDurableToken(
     };
   }
   const local = lastCommitByProcessInstance.get(
-    lastCommitKey(request.directory, request.authority.processInstanceId),
+    lastCommitKey(request.scopeKey, request.authority.processInstanceId),
   );
   if (
     local !== undefined &&
@@ -1329,41 +1333,40 @@ function distributedFailure(request: { coordinationMode?: string }): string[] | 
   return ["DISTRIBUTED_FENCING_UNPROVEN"];
 }
 
-function observeGeneration(directory: string, scopeKey: string, generation: string): void {
-  const key = `${directory}\0${scopeKey}`;
-  const previous = observedGenerationByScope.get(key);
+function observeGeneration(scopeKey: string, generation: string): void {
+  const previous = observedGenerationByScope.get(scopeKey);
   if (previous === undefined || BigInt(generation) > BigInt(previous)) {
-    observedGenerationByScope.set(key, generation);
+    observedGenerationByScope.set(scopeKey, generation);
   }
 }
 
-function hasObservedRegression(directory: string, scopeKey: string, generation: string): boolean {
-  const previous = observedGenerationByScope.get(`${directory}\0${scopeKey}`);
+function hasObservedRegression(scopeKey: string, generation: string): boolean {
+  const previous = observedGenerationByScope.get(scopeKey);
   return previous !== undefined && BigInt(generation) < BigInt(previous);
 }
 
-function rememberCommit(directory: string, authority: LeaseAuthority): void {
-  lastCommitByProcessInstance.set(lastCommitKey(directory, authority.processInstanceId), {
+function rememberCommit(authority: LeaseAuthority): void {
+  lastCommitByProcessInstance.set(lastCommitKey(authority.scopeKey, authority.processInstanceId), {
     generation: authority.generation,
     envelopeSha256: authority.leaseEnvelopeSha256,
     expiresAt: authority.observedExpiresAt,
   });
 }
 
-function lastCommitKey(directory: string, processInstanceId: string): string {
-  return `${directory}\0${processInstanceId}`;
+function lastCommitKey(scopeKey: string, processInstanceId: string): string {
+  return `${scopeKey}\0${processInstanceId}`;
 }
 
-function tokenKey(directory: string, authority: LeaseAuthority): string {
-  return `${directory}\0${authority.scopeKey}\0${authority.ownerId}\0${authority.processInstanceId}\0${authority.generation}`;
+function tokenKey(authority: LeaseAuthority): string {
+  return `${authority.scopeKey}\0${authority.ownerId}\0${authority.processInstanceId}\0${authority.generation}`;
 }
 
-function fenceToken(directory: string, authority: LeaseAuthority): void {
-  fencedTokens.add(tokenKey(directory, authority));
+function fenceToken(authority: LeaseAuthority): void {
+  fencedTokens.add(tokenKey(authority));
 }
 
-function isTokenFenced(directory: string, authority: LeaseAuthority): boolean {
-  return fencedTokens.has(tokenKey(directory, authority));
+function isTokenFenced(authority: LeaseAuthority): boolean {
+  return fencedTokens.has(tokenKey(authority));
 }
 
 async function inspectLeasePair(directory: string, scopeKey: string): Promise<PairInspection> {
