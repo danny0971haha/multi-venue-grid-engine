@@ -24,6 +24,7 @@ import type {
   CancelRequest,
   ExchangeOrderObservation,
   ExecutionObservation,
+  ObservationMeta,
   OrderAck,
   OrderIntent,
   VenueWriteResult,
@@ -231,9 +232,13 @@ export class ExecutionCoordinator {
   private openOrderBlockers: string[] = ["OPEN_ORDER_SCAN_REQUIRED"];
   // Cleared only by a replay that reaches the venue's current end.
   private executionBlockers = new Set<string>(["EXECUTION_REPLAY_INCOMPLETE"]);
-  // Stream executions that arrived while another operation ran, copied on arrival. They are
-  // checked in arrival order before that operation releases the coordinator.
+  // Stream executions that arrived while another operation ran, read once on arrival into
+  // copies this coordinator owns. They are checked in arrival order before that operation
+  // releases the coordinator.
   private readonly deferredStream: ExecutionObservation[] = [];
+  // Set when such an execution could not be read into a copy. Its evidence is unknown, so no
+  // replay clears this: it blocks risk increase for the rest of this process.
+  private unreadStreamEvent = false;
   private lastStreamSequence: bigint | null = null;
   private writesThisCycle = 0;
   // Set only by a continuation gate that allowed risk increase; used up by the next operation.
@@ -285,10 +290,11 @@ export class ExecutionCoordinator {
   }
 
   // The replay and stream blockers of this process, plus the persisted contradictions. A
-  // stream execution still waiting to be checked blocks as a dropped event.
+  // stream execution still waiting to be checked, or one that could not be read, blocks as a
+  // dropped event.
   executionBlockerCodes(): string[] {
     const codes = new Set<string>(this.executionBlockers);
-    if (this.deferredStream.length > 0) {
+    if (this.deferredStream.length > 0 || this.unreadStreamEvent) {
       codes.add("EXECUTION_STREAM_EVENT_DROPPED");
     }
     for (const entry of this.registry.executionContradictions()) {
@@ -427,20 +433,28 @@ export class ExecutionCoordinator {
   // complete: a gap, an unusable sequence, a dropped event or any execution problem blocks
   // risk increase until a later replay completes. It never moves the replay cursor. An
   // execution that arrives while another operation runs is not recorded by this call: it is
-  // kept and checked before that operation releases the coordinator, so a problem it shows is
-  // persisted as a direct one would be. After a journal failure it is dropped.
+  // read once into a copy this coordinator owns, and the copy is checked before that
+  // operation releases the coordinator, so a problem it shows is persisted as a direct one
+  // would be. One that cannot be read keeps risk increase blocked for the rest of this
+  // process. After a journal failure it is dropped.
   async ingestStreamExecution(execution: ExecutionObservation): Promise<ExecutionReplayResult> {
     this.continuationGranted = false;
     const reasonCodes: string[] = [];
-    const sequenceProblem = this.observeStreamSequence(execution);
+    const deferred = this.busy && !this.journalFailed;
+    const owned = deferred ? ownedExecution(execution) : null;
+    const sequenceProblem = this.observeStreamSequence(deferred ? owned : execution);
     if (sequenceProblem !== null) {
       this.executionBlockers.add(sequenceProblem);
       reasonCodes.push(sequenceProblem);
     }
     if (this.busy || this.journalFailed) {
       this.executionBlockers.add("EXECUTION_STREAM_EVENT_DROPPED");
-      if (!this.journalFailed) {
-        this.deferredStream.push(arrivalCopy(execution));
+      if (deferred) {
+        if (owned === null) {
+          this.unreadStreamEvent = true;
+        } else {
+          this.deferredStream.push(owned);
+        }
       }
       reasonCodes.push(
         "EXECUTION_STREAM_EVENT_DROPPED",
@@ -1147,6 +1161,7 @@ export class ExecutionCoordinator {
     // stay, because it may have read past their events before they were raised. Persisted
     // contradictions are not cleared here: a replay past their evidence cannot see it again.
     // Neither are stream executions still waiting to be checked: they block until they are.
+    // Nor is one that could not be read: no replay can stand in for its check.
     this.executionBlockers = new Set(["EXECUTION_REPLAY_INCOMPLETE"]);
     const recorded: ExecutionId[] = [];
     for (let pages = 0; pages < MAX_REPLAY_PAGES; pages += 1) {
@@ -1831,14 +1846,57 @@ function screenExecutions(
   return { unique, invalid, decision: null };
 }
 
-// A copy taken on arrival, so a sender that later changes the object cannot change the
-// evidence. A value that cannot be copied is kept as given.
-function arrivalCopy(execution: ExecutionObservation): ExecutionObservation {
+// Reads each field of an execution, and of its meta when that is an object, once into values
+// this coordinator owns, so a sender that later changes or revokes its objects cannot change
+// the evidence. Other fields are not kept. Null when the execution is not an object, a read
+// throws, or a field value cannot be copied.
+function ownedExecution(execution: unknown): ExecutionObservation | null {
   try {
-    return structuredClone(execution);
+    if (typeof execution !== "object" || execution === null) {
+      return null;
+    }
+    const source = execution as ExecutionObservation;
+    const meta: unknown = source.meta;
+    return {
+      venue: ownedValue(source.venue),
+      market: ownedValue(source.market),
+      executionId: ownedValue(source.executionId),
+      exchangeOrderId: ownedValue(source.exchangeOrderId),
+      clientOrderId: ownedValue(source.clientOrderId),
+      side: ownedValue(source.side),
+      price: ownedValue(source.price),
+      quantity: ownedValue(source.quantity),
+      feeAmount: ownedValue(source.feeAmount),
+      feeAsset: ownedValue(source.feeAsset),
+      liquidity: ownedValue(source.liquidity),
+      meta:
+        typeof meta === "object" && meta !== null
+          ? ownedMeta(meta as ObservationMeta)
+          : ownedValue(meta as ObservationMeta),
+    };
   } catch {
-    return execution;
+    return null;
   }
+}
+
+function ownedMeta(meta: ObservationMeta): ObservationMeta {
+  return {
+    venue: ownedValue(meta.venue),
+    source: ownedValue(meta.source),
+    serverTime: ownedValue(meta.serverTime),
+    receivedAt: ownedValue(meta.receivedAt),
+    observedAt: ownedValue(meta.observedAt),
+    freshnessMs: ownedValue(meta.freshnessMs),
+    sequence: ownedValue(meta.sequence),
+  };
+}
+
+// A primitive as given, anything else as a structured copy. Copying throws for a function, a
+// proxy or another value that cannot be copied.
+function ownedValue<T>(value: T): T {
+  return value === null || (typeof value !== "object" && typeof value !== "function")
+    ? value
+    : structuredClone(value);
 }
 
 function toRecorded(execution: ExecutionObservation): RecordedExecution {
