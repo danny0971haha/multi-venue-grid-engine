@@ -181,8 +181,12 @@ const POSSIBLY_LIVE_STATUSES = new Set<IntentStatus>(["PREPARED", "UNKNOWN"]);
 const MAX_REPLAY_PAGES = 100;
 const STREAM_SEQUENCE_PATTERN = /^(0|[1-9][0-9]*)$/;
 
+// A material contradiction found by a lookup, kept like one found in the execution stream:
+// the reason code it is persisted under and the observed executions that prove it.
+type LookupContradiction = { reasonCode: string; evidence: ExecutionObservation[] };
+
 type LookupDecision =
-  | { kind: "UNRESOLVED"; reasonCode: string }
+  | { kind: "UNRESOLVED"; reasonCode: string; contradiction: LookupContradiction | null }
   | { kind: "LINK"; link: IntentLink }
   | { kind: "RESOLVE_CANCEL"; resolution: CancelResolution };
 
@@ -919,6 +923,8 @@ export class ExecutionCoordinator {
 
   // Resolves unresolved place and cancel intents only from venue evidence for their client
   // order ID. Absence of evidence never proves an order was not sent, cancelled or filled.
+  // A material contradiction is made durable before the next record is looked up, so a later
+  // lookup that omits it can resolve the record but never clear the contradiction.
   private async reconcileExclusive(): Promise<ReconcileResult> {
     if (this.journalFailed) {
       return { reasonCodes: ["JOURNAL_LATCHED"], items: [] };
@@ -948,6 +954,10 @@ export class ExecutionCoordinator {
           status: record.status,
           reasonCodes: [decision.reasonCode],
         });
+        const found = decision.contradiction;
+        if (found !== null && !(await this.recordProblem(found.reasonCode, found.evidence))) {
+          return { reasonCodes: ["JOURNAL_WRITE_FAILED"], items };
+        }
         continue;
       }
       const next =
@@ -1153,7 +1163,7 @@ export class ExecutionCoordinator {
       }
       const plan = this.planExecutions(page.executions);
       if (plan.problem !== null) {
-        if (!(await this.recordProblem(plan))) {
+        if (!(await this.recordProblem(plan.problem, plan.evidence))) {
           return this.replayStopped("JOURNAL_WRITE_FAILED", recorded);
         }
         return this.replayStopped(plan.problem, recorded);
@@ -1205,7 +1215,7 @@ export class ExecutionCoordinator {
   ): Promise<ExecutionReplayResult> {
     const plan = this.planExecutions([execution]);
     if (plan.problem !== null) {
-      const durable = await this.recordProblem(plan);
+      const durable = await this.recordProblem(plan.problem, plan.evidence);
       return {
         reasonCodes: [...reasonCodes, plan.problem, ...(durable ? [] : ["JOURNAL_WRITE_FAILED"])],
         recorded: [],
@@ -1297,15 +1307,14 @@ export class ExecutionCoordinator {
     }
     for (const [intentId, executions] of additions) {
       const record = this.registry.get(intentId) as IntentRecord;
-      const executed = sumQuantities(record.executedQuantity, executions);
-      if (executed === null) {
-        return problem("EXECUTION_QUANTITY_UNBOUNDED");
-      }
-      if (decimalCmp(executed, record.intent.quantity) > 0) {
+      if (exceedsLimit(record.executedQuantity, executions, record.intent.quantity)) {
         return problem(
           "EXECUTION_OVERFILL",
           executions.map((item) => seen.get(item.executionId) as ExecutionObservation),
         );
+      }
+      if (sumQuantities(record.executedQuantity, executions) === null) {
+        return problem("EXECUTION_QUANTITY_UNBOUNDED");
       }
     }
     return { problem: null, evidence: [], additions };
@@ -1324,13 +1333,14 @@ export class ExecutionCoordinator {
     return record.exchangeOrderId === null ? "EXECUTION_FOR_UNLINKED_INTENT" : "EXECUTION_MISMATCH";
   }
 
-  // Blocks on the plan's problem and keeps its evidence durable. Returns false only when the
-  // evidence changed the registry but the journal write failed.
-  private async recordProblem(plan: ExecutionPlan): Promise<boolean> {
-    this.executionBlockers.add(plan.problem as string);
-    const entries = plan.evidence.map((execution) =>
-      toContradiction(plan.problem as string, execution),
-    );
+  // Blocks on the problem and keeps its evidence durable. Returns false only when the evidence
+  // changed the registry but the journal write failed.
+  private async recordProblem(
+    reasonCode: string,
+    evidence: readonly ExecutionObservation[],
+  ): Promise<boolean> {
+    this.executionBlockers.add(reasonCode);
+    const entries = evidence.map((execution) => toContradiction(reasonCode, execution));
     return !this.registry.recordContradictions(entries) || (await this.persist());
   }
 
@@ -1501,6 +1511,9 @@ function isRiskIncreasing(intent: OrderIntent): boolean {
   return !(intent.reduceOnly && RISK_REDUCING_PURPOSES.has(intent.purpose));
 }
 
+// Decides an unresolved place from a fresh lookup. Material contradictions in the executions
+// are checked first and carry their evidence, which is kept as the execution stream keeps it.
+// Every other reason only leaves the place unresolved until a later lookup proves it.
 function evaluateLookup(
   intent: OrderIntent,
   lookup: ClientOrderLookup,
@@ -1508,33 +1521,56 @@ function evaluateLookup(
 ): LookupDecision {
   const { venue, market } = parseScopeKey(intent.scopeKey);
   const order = lookup.order;
-  if (order !== null && !orderMatchesIntent(order, intent, venue, market)) {
-    return unresolved("LOOKUP_ORDER_MISMATCH");
+  const orderMatches = order === null || orderMatchesIntent(order, intent, venue, market);
+  const screened = screenExecutions(intent, lookup.executions, venue, market);
+  if (screened.decision !== null) {
+    return screened.decision;
   }
-  const unique = uniqueExecutions(intent, lookup.executions, venue, market);
-  if (unique === null) {
-    return unresolved("LOOKUP_EXECUTION_MISMATCH");
+  const unique = screened.unique;
+  // The record is unlinked, so any owner of these executions is another intent.
+  const owned = unique.filter(
+    (execution) => registry.intentIdForExecutionId(execution.executionId) !== null,
+  );
+  if (owned.length > 0) {
+    return contradicted("EXECUTION_ID_COLLISION", "EXECUTION_ID_COLLISION", owned);
+  }
+  // Executions of this client order ID on more than one exchange order. Without a matching
+  // order to anchor them, none of them can be told apart from the others.
+  const anchor =
+    order !== null && orderMatches ? order.exchangeOrderId : (unique[0]?.exchangeOrderId ?? null);
+  const offOrder = unique.filter((execution) => execution.exchangeOrderId !== anchor);
+  if (offOrder.length > 0) {
+    return contradicted(
+      "LOOKUP_EXECUTION_MISMATCH",
+      "EXECUTION_MISMATCH",
+      order !== null && orderMatches ? offOrder : unique,
+    );
+  }
+  // Executions of this client order ID on an exchange order another record owns.
+  const first = unique[0];
+  if (first !== undefined && registry.intentIdForExchangeOrderId(first.exchangeOrderId) !== null) {
+    return contradicted("EXCHANGE_ORDER_ID_COLLISION", "EXECUTION_MISMATCH", unique);
+  }
+  if (exceedsLimit("0", unique, intent.quantity)) {
+    return contradicted("LOOKUP_OVERFILL", "EXECUTION_OVERFILL", unique);
   }
 
-  const exchangeOrderId = order?.exchangeOrderId ?? unique[0]?.exchangeOrderId ?? null;
+  if (!orderMatches) {
+    return unresolved("LOOKUP_ORDER_MISMATCH");
+  }
+  if (screened.invalid) {
+    return unresolved("LOOKUP_EXECUTION_MISMATCH");
+  }
+  const exchangeOrderId = order?.exchangeOrderId ?? first?.exchangeOrderId ?? null;
   if (exchangeOrderId === null) {
     return unresolved("NO_DEFINITIVE_EVIDENCE");
-  }
-  if (unique.some((execution) => execution.exchangeOrderId !== exchangeOrderId)) {
-    return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
   const executed = sumQuantities("0", unique);
   if (executed === null) {
     return unresolved("LOOKUP_QUANTITY_UNBOUNDED");
   }
-  if (decimalCmp(executed, intent.quantity) > 0) {
-    return unresolved("LOOKUP_OVERFILL");
-  }
   if (registry.intentIdForExchangeOrderId(exchangeOrderId) !== null) {
     return unresolved("EXCHANGE_ORDER_ID_COLLISION");
-  }
-  if (unique.some((execution) => registry.intentIdForExecutionId(execution.executionId) !== null)) {
-    return unresolved("EXECUTION_ID_COLLISION");
   }
   if (order !== null) {
     if (decimalCmp(order.executedQuantity, executed) !== 0) {
@@ -1560,7 +1596,8 @@ function evaluateLookup(
 
 // Decides a pending cancel from a fresh lookup. Execution evidence wins over the cancel: only
 // an observed order status, or executions covering the full quantity, ends it. A missing
-// order is a reconciliation case, never a cancel or a fill.
+// order is a reconciliation case, never a cancel or a fill. Material contradictions in the
+// executions are checked first and carry their evidence, as in a place lookup.
 function evaluateCancelLookup(
   record: IntentRecord,
   lookup: ClientOrderLookup,
@@ -1569,6 +1606,39 @@ function evaluateCancelLookup(
   const intent = record.intent;
   const { venue, market } = parseScopeKey(intent.scopeKey);
   const order = lookup.order;
+  const screened = screenExecutions(intent, lookup.executions, venue, market);
+  if (screened.decision !== null) {
+    return screened.decision;
+  }
+  const unique = screened.unique;
+  const offRecord = unique.filter(
+    (execution) => execution.exchangeOrderId !== record.exchangeOrderId,
+  );
+  if (offRecord.length > 0) {
+    return contradicted("LOOKUP_EXECUTION_MISMATCH", "EXECUTION_MISMATCH", offRecord);
+  }
+  const changed = unique.filter((execution) => {
+    const recorded = record.executions.find((item) => item.executionId === execution.executionId);
+    return recorded !== undefined && !sameExecution(execution, recorded);
+  });
+  if (changed.length > 0) {
+    return contradicted("LOOKUP_EXECUTION_MISMATCH", "EXECUTION_CONFLICT", changed);
+  }
+  const foreign = unique.filter((execution) => {
+    const owner = registry.intentIdForExecutionId(execution.executionId);
+    return owner !== null && owner !== intent.intentId;
+  });
+  if (foreign.length > 0) {
+    return contradicted("EXECUTION_ID_COLLISION", "EXECUTION_ID_COLLISION", foreign);
+  }
+  // Executions the record has not recorded add to what it has already executed.
+  const fresh = unique.filter(
+    (execution) => registry.intentIdForExecutionId(execution.executionId) === null,
+  );
+  if (exceedsLimit(record.executedQuantity, fresh, intent.quantity)) {
+    return contradicted("LOOKUP_OVERFILL", "EXECUTION_OVERFILL", fresh);
+  }
+
   if (
     order !== null &&
     (!orderMatchesIntent(order, intent, venue, market) ||
@@ -1576,11 +1646,7 @@ function evaluateCancelLookup(
   ) {
     return unresolved("LOOKUP_ORDER_MISMATCH");
   }
-  const unique = uniqueExecutions(intent, lookup.executions, venue, market);
-  if (
-    unique === null ||
-    unique.some((execution) => execution.exchangeOrderId !== record.exchangeOrderId)
-  ) {
+  if (screened.invalid) {
     return unresolved("LOOKUP_EXECUTION_MISMATCH");
   }
   const executed = sumQuantities("0", unique);
@@ -1589,23 +1655,13 @@ function evaluateCancelLookup(
   }
   const compared = decimalCmp(executed, intent.quantity);
   if (compared > 0) {
-    return unresolved("LOOKUP_OVERFILL");
+    // The total from the recorded quantity was too long to compute, but this one proves it.
+    return contradicted("LOOKUP_OVERFILL", "EXECUTION_OVERFILL", fresh);
   }
   for (const recorded of record.executions) {
-    const observed = unique.find((execution) => execution.executionId === recorded.executionId);
-    if (observed === undefined) {
+    if (!unique.some((execution) => execution.executionId === recorded.executionId)) {
       return unresolved("EXECUTION_EVIDENCE_MISSING");
     }
-    if (!sameExecution(observed, recorded)) {
-      return unresolved("LOOKUP_EXECUTION_MISMATCH");
-    }
-  }
-  const foreign = unique.some((execution) => {
-    const owner = registry.intentIdForExecutionId(execution.executionId);
-    return owner !== null && owner !== intent.intentId;
-  });
-  if (foreign) {
-    return unresolved("EXECUTION_ID_COLLISION");
   }
 
   const executions = unique.map(toRecorded);
@@ -1660,8 +1716,66 @@ function remainingQuantity(quantity: DecimalString, executed: DecimalString): De
   }
 }
 
+// Whether positive quantities provably take a starting total past the limit, using exact
+// arithmetic only. When the exact total needs more digits than exact arithmetic allows, the
+// room left under the limit is shrunk by each quantity, largest first; a quantity whose
+// subtraction is also too long is skipped, which only overstates the room. The total then
+// provably exceeds the limit when a quantity exceeds the room left, or when the room reaches
+// zero with a skipped quantity left out.
+function exceedsLimit(
+  start: DecimalString,
+  executions: readonly { quantity: DecimalString }[],
+  limit: DecimalString,
+): boolean {
+  const total = sumQuantities(start, executions);
+  if (total !== null) {
+    return decimalCmp(total, limit) > 0;
+  }
+  let room = differenceOrNull(limit, start);
+  if (room === null) {
+    return false;
+  }
+  let skipped = false;
+  const largestFirst = [...executions].sort((left, right) =>
+    decimalCmp(right.quantity, left.quantity),
+  );
+  for (const { quantity } of largestFirst) {
+    if (decimalCmp(quantity, room) > 0) {
+      return true;
+    }
+    const next = differenceOrNull(room, quantity);
+    if (next === null) {
+      skipped = true;
+    } else {
+      room = next;
+    }
+  }
+  return skipped && decimalCmp(room, "0") === 0;
+}
+
+// Exact difference, or null when it could need more digits than exact arithmetic allows.
+function differenceOrNull(left: DecimalString, right: DecimalString): DecimalString | null {
+  try {
+    return exactSub(left, right);
+  } catch (error) {
+    if (!(error instanceof InvalidDecimalError)) {
+      throw error;
+    }
+    return null;
+  }
+}
+
 function unresolved(reasonCode: string): LookupDecision {
-  return { kind: "UNRESOLVED", reasonCode };
+  return { kind: "UNRESOLVED", reasonCode, contradiction: null };
+}
+
+// Unresolved with a material contradiction, kept under the durable code with its evidence.
+function contradicted(
+  reasonCode: string,
+  durableCode: string,
+  evidence: ExecutionObservation[],
+): LookupDecision {
+  return { kind: "UNRESOLVED", reasonCode, contradiction: { reasonCode: durableCode, evidence } };
 }
 
 function resolvedCancel(
@@ -1672,28 +1786,49 @@ function resolvedCancel(
   return { kind: "RESOLVE_CANCEL", resolution: { status, executions, reasonCodes: [reasonCode] } };
 }
 
-// Validates and de-duplicates execution evidence for one intent, sorted by execution ID. Null
-// means an execution contradicts the intent or another report of the same execution ID.
-function uniqueExecutions(
+type ScreenedExecutions = {
+  unique: ExecutionObservation[];
+  // An execution without its own identity in this market; it cannot be kept as evidence.
+  invalid: boolean;
+  decision: LookupDecision | null;
+};
+
+// Validates and de-duplicates execution evidence for one intent, sorted by execution ID. An
+// execution that contradicts the intent, or another report of the same execution ID, is a
+// material contradiction and the first one found is the decision.
+function screenExecutions(
   intent: OrderIntent,
   observed: readonly ExecutionObservation[],
   venue: VenueId,
   market: MarketId,
-): ExecutionObservation[] | null {
+): ScreenedExecutions {
   const executions = new Map<string, ExecutionObservation>();
+  let invalid = false;
+  const stop = (decision: LookupDecision): ScreenedExecutions => ({
+    unique: [],
+    invalid,
+    decision,
+  });
   for (const execution of observed) {
+    if (!isExecutionInMarket(execution, venue, market)) {
+      invalid = true;
+      continue;
+    }
     if (!executionMatchesIntent(execution, intent, venue, market)) {
-      return null;
+      return stop(contradicted("LOOKUP_EXECUTION_MISMATCH", "EXECUTION_MISMATCH", [execution]));
     }
     const seen = executions.get(execution.executionId);
     if (seen !== undefined && !sameExecution(seen, execution)) {
-      return null;
+      return stop(
+        contradicted("LOOKUP_EXECUTION_MISMATCH", "EXECUTION_CONFLICT", [seen, execution]),
+      );
     }
     executions.set(execution.executionId, execution);
   }
-  return [...executions.values()].sort((left, right) =>
+  const unique = [...executions.values()].sort((left, right) =>
     left.executionId < right.executionId ? -1 : 1,
   );
+  return { unique, invalid, decision: null };
 }
 
 // A copy taken on arrival, so a sender that later changes the object cannot change the
