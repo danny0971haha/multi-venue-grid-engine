@@ -610,6 +610,9 @@ describe("Phase 2C corrective 1", { concurrency: 1 }, () => {
     await withTempDir(async (root) => {
       const cases = ["malformed", "truncated", "hash"] as const;
       for (const kind of cases) {
+        // Each case seeds its own lease as an independent process: one process may not
+        // initialize the same scope again in another directory (Gate 2 RC6).
+        resetLeaseProcessStateForTests();
         const directory = path.join(root, kind);
         await mkdir(directory, { recursive: true, mode: 0o700 });
         const seeded = await acquire(directory, "ownerA", "procA", NOW_MS);
