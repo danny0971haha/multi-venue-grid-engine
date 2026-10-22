@@ -201,6 +201,11 @@ const lastCommitByProcessInstance = new Map<
   { generation: string; envelopeSha256: string; expiresAt: string }
 >();
 const fencedTokens = new Set<string>();
+// Last-commit entries (scope, process instance) claimed by a lease operation that is
+// still running. The claim spans the whole asynchronous operation inside the directory
+// guard, so an operation that passed its history checks here or in another directory
+// cannot commit after, and replace, a later commit of the same entry.
+const historyEntriesInFlight = new Set<string>();
 
 let preCallbackHookForTests: (() => void) | null = null;
 
@@ -212,6 +217,7 @@ export function resetLeaseProcessStateForTests(): void {
   observedGenerationByScope.clear();
   lastCommitByProcessInstance.clear();
   fencedTokens.clear();
+  historyEntriesInFlight.clear();
 }
 
 export function systemLeaseClock(): LeaseClock {
@@ -293,7 +299,8 @@ export function formatLeaseResultDiagnostic(result: LeaseResult): string {
 }
 
 export async function acquireRuntimeLease(request: LeaseOperationRequest): Promise<LeaseResult> {
-  return withLeaseCoordination(request, async (nowMs) => {
+  const historyEntry = lastCommitKey(request.scopeKey, request.processInstanceId);
+  return withLeaseCoordination(request, historyEntry, async (nowMs) => {
     const identities = validateIdentities(request.ownerId, request.processInstanceId);
     if (identities !== null) {
       return leaseFail(request, "BLOCKED", identities);
@@ -364,7 +371,8 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
 }
 
 export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise<LeaseResult> {
-  const result = await withLeaseCoordination(request, async (nowMs) => {
+  const historyEntry = lastCommitKey(request.scopeKey, request.authority.processInstanceId);
+  const result = await withLeaseCoordination(request, historyEntry, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     const matched = matchDurableToken(request, inspection, nowMs, {
       requireActive: true,
@@ -424,7 +432,8 @@ export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise
 }
 
 export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<LeaseResult> {
-  return withLeaseCoordination(request, async (nowMs) => {
+  const historyEntry = lastCommitKey(request.scopeKey, request.authority.processInstanceId);
+  return withLeaseCoordination(request, historyEntry, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     const matched = matchDurableToken(request, inspection, nowMs, {
       requireActive: true,
@@ -476,7 +485,7 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
 }
 
 export async function assertCurrentLease(request: LeaseTokenRequest): Promise<LeaseResult> {
-  return withLeaseCoordination(request, async (nowMs) => {
+  return withLeaseCoordination(request, null, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     const matched = matchDurableToken(request, inspection, nowMs, {
       requireActive: true,
@@ -628,6 +637,8 @@ async function withLeaseCoordination(
     clock?: LeaseClock;
     coordinationMode?: string;
   },
+  // The last-commit entry this operation may write, or null for a read-only operation.
+  historyEntry: string | null,
   run: (nowMs: bigint) => Promise<LeaseResult>,
 ): Promise<LeaseResult> {
   const distributed = distributedFailure(request);
@@ -646,7 +657,26 @@ async function withLeaseCoordination(
     if (!clockRead.ok) {
       return leaseFail(request, "AUTHORITY_UNPROVEN", clockRead.reasonCodes, undefined, true);
     }
-    return await run(clockRead.nowMs);
+    if (historyEntry === null) {
+      return await run(clockRead.nowMs);
+    }
+    // Another directory's operation for the same entry is in flight. Its commit could
+    // land after ours and replace it, so this one is refused before it reads anything.
+    if (historyEntriesInFlight.has(historyEntry)) {
+      return leaseFail(
+        request,
+        "AUTHORITY_UNPROVEN",
+        ["COORDINATION_LOCK_HELD", "LEASE_AUTHORITY_UNPROVEN"],
+        undefined,
+        true,
+      );
+    }
+    historyEntriesInFlight.add(historyEntry);
+    try {
+      return await run(clockRead.nowMs);
+    } finally {
+      historyEntriesInFlight.delete(historyEntry);
+    }
   } finally {
     await guard.guard.release();
   }
