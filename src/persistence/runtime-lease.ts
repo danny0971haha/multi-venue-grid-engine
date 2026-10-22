@@ -298,7 +298,10 @@ export function formatLeaseResultDiagnostic(result: LeaseResult): string {
   });
 }
 
-export async function acquireRuntimeLease(request: LeaseOperationRequest): Promise<LeaseResult> {
+export async function acquireRuntimeLease(
+  callerRequest: LeaseOperationRequest,
+): Promise<LeaseResult> {
+  const request = ownOperationRequest(callerRequest);
   const historyEntry = lastCommitKey(request.scopeKey, request.processInstanceId);
   return withLeaseCoordination(request, historyEntry, async (nowMs) => {
     const identities = validateIdentities(request.ownerId, request.processInstanceId);
@@ -370,7 +373,10 @@ export async function acquireRuntimeLease(request: LeaseOperationRequest): Promi
   });
 }
 
-export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise<LeaseResult> {
+export async function heartbeatRuntimeLease(
+  callerRequest: LeaseTokenRequest,
+): Promise<LeaseResult> {
+  const request = ownTokenRequest(callerRequest);
   const historyEntry = lastCommitKey(request.scopeKey, request.authority.processInstanceId);
   const result = await withLeaseCoordination(request, historyEntry, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
@@ -431,7 +437,8 @@ export async function heartbeatRuntimeLease(request: LeaseTokenRequest): Promise
   return { ...result, latchState: request.latch.snapshot() };
 }
 
-export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<LeaseResult> {
+export async function releaseRuntimeLease(callerRequest: LeaseTokenRequest): Promise<LeaseResult> {
+  const request = ownTokenRequest(callerRequest);
   const historyEntry = lastCommitKey(request.scopeKey, request.authority.processInstanceId);
   return withLeaseCoordination(request, historyEntry, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
@@ -484,7 +491,8 @@ export async function releaseRuntimeLease(request: LeaseTokenRequest): Promise<L
   });
 }
 
-export async function assertCurrentLease(request: LeaseTokenRequest): Promise<LeaseResult> {
+export async function assertCurrentLease(callerRequest: LeaseTokenRequest): Promise<LeaseResult> {
+  const request = ownTokenRequest(callerRequest);
   return withLeaseCoordination(request, null, async (nowMs) => {
     const inspection = await inspectLeasePair(request.directory, request.scopeKey);
     const matched = matchDurableToken(request, inspection, nowMs, {
@@ -523,8 +531,12 @@ export async function assertCurrentLease(request: LeaseTokenRequest): Promise<Le
 }
 
 export async function runLeaseFencedMutation<T>(
-  request: LeaseTokenRequest & { mutation: () => T | Promise<T> },
+  callerRequest: LeaseTokenRequest & { mutation: () => T | Promise<T> },
 ): Promise<FencedMutationResult<T>> {
+  const request = Object.freeze({
+    ...ownTokenRequest(callerRequest),
+    mutation: callerRequest.mutation,
+  });
   const distributed = distributedFailure(request);
   if (distributed !== null) {
     return mutationFail(request, distributed);
@@ -628,6 +640,48 @@ export async function runLeaseFencedMutation<T>(
   } finally {
     await guard.guard.release();
   }
+}
+
+// The caller keeps its request object and may change it while an operation awaits. Each
+// public operation reads the request once, synchronously, into this owned frozen copy, so the
+// history entry it claims, the directory it guards, its checks, its durable write and the
+// commit it publishes all use the identity it was called with.
+function ownOperationRequest(request: LeaseOperationRequest): Readonly<LeaseOperationRequest> {
+  const { directory, scopeKey, ownerId, processInstanceId, latch, clock, coordinationMode } =
+    request;
+  return Object.freeze({
+    directory,
+    scopeKey,
+    ownerId,
+    processInstanceId,
+    latch,
+    ...(clock === undefined ? {} : { clock }),
+    ...(coordinationMode === undefined ? {} : { coordinationMode }),
+  });
+}
+
+function ownTokenRequest(request: LeaseTokenRequest): Readonly<LeaseTokenRequest> {
+  const { directory, scopeKey, authority, latch, clock, coordinationMode } = request;
+  return Object.freeze({
+    directory,
+    scopeKey,
+    authority: ownAuthority(authority),
+    latch,
+    ...(clock === undefined ? {} : { clock }),
+    ...(coordinationMode === undefined ? {} : { coordinationMode }),
+  });
+}
+
+function ownAuthority(authority: LeaseAuthority): Readonly<LeaseAuthority> {
+  return Object.freeze({
+    scopeKey: authority.scopeKey,
+    ownerId: authority.ownerId,
+    processInstanceId: authority.processInstanceId,
+    generation: authority.generation,
+    leaseEnvelopeSha256: authority.leaseEnvelopeSha256,
+    leaseStoreGeneration: authority.leaseStoreGeneration,
+    observedExpiresAt: authority.observedExpiresAt,
+  });
 }
 
 async function withLeaseCoordination(
