@@ -281,41 +281,59 @@ describe("Gate 2 re-review RC5: lease identity across directory spellings", {
 
   for (const alias of ALIASES) {
     for (const check of ["heartbeat", "assert"] as const) {
-      test(`RC5-02 Phase 3 fence via ${alias.name} after a failed ${check} via the original: NOT_SENT, no place`, async () => {
-        await withLeaseRoot(async (directory, root) => {
-          const spelled = await spellAlias(alias, directory, root);
-          const clock = mutableClock(ACQUIRED_AT_MS);
-          const authority = await acquireAs(directory, clock);
-          const latch = new RuntimePersistenceLatch();
-          await failAtExactExpiry(check, {
-            directory,
-            scopeKey: SCOPE_KEY,
-            authority,
-            latch,
-            clock,
-          });
+      for (const fenceLatch of ["the same latch", "its own latch"] as const) {
+        test(`RC5-02 Phase 3 fences built before a failed ${check}, ${alias.name}, ${fenceLatch}: NOT_SENT, no place`, async () => {
+          await withLeaseRoot(async (directory, root) => {
+            const spelled = await spellAlias(alias, directory, root);
+            const clock = mutableClock(ACQUIRED_AT_MS);
+            const authority = await acquireAs(directory, clock);
+            const latch = new RuntimePersistenceLatch();
+            // A fence with its own latch can only be denied by the process token fence.
+            const latchFor = () =>
+              fenceLatch === "the same latch" ? latch : new RuntimePersistenceLatch();
+            const viaOriginal = await createHarness({
+              fence: createLeaseMutationFence({
+                directory,
+                scopeKey: SCOPE_KEY,
+                authority,
+                latch: latchFor(),
+                clock,
+              }),
+            });
+            const viaAlias = await createHarness({
+              fence: createLeaseMutationFence({
+                directory: spelled,
+                scopeKey: SCOPE_KEY,
+                authority,
+                latch: latchFor(),
+                clock,
+              }),
+            });
+            const before = await directoryBytes(directory);
 
-          // The fence has its own latch, so only the process token fence can deny it.
-          const h = await createHarness({
-            fence: createLeaseMutationFence({
-              directory: spelled,
+            await failAtExactExpiry(check, {
+              directory,
               scopeKey: SCOPE_KEY,
               authority,
-              latch: new RuntimePersistenceLatch(),
+              latch,
               clock,
-            }),
+            });
+
+            clock.set(RETURNED_MS);
+            for (const h of [viaOriginal, viaAlias]) {
+              await grant(h.coordinator);
+              const submitted = await h.coordinator.submit(
+                buildIntent({ leaseGeneration: authority.generation }),
+              );
+              assert.equal(submitted.record?.status, "NOT_SENT");
+              assert.ok(submitted.reasonCodes.includes("FENCE_NOT_SENT"));
+              assert.ok(submitted.reasonCodes.includes("MUTATION_NOT_SENT"));
+              assert.equal(h.venue.calls.place, 0);
+            }
+            assert.deepEqual(await directoryBytes(directory), before);
           });
-          clock.set(RETURNED_MS);
-          await grant(h.coordinator);
-          const submitted = await h.coordinator.submit(
-            buildIntent({ leaseGeneration: authority.generation }),
-          );
-          assert.equal(submitted.record?.status, "NOT_SENT");
-          assert.ok(submitted.reasonCodes.includes("FENCE_NOT_SENT"));
-          assert.ok(submitted.reasonCodes.includes("MUTATION_NOT_SENT"));
-          assert.equal(h.venue.calls.place, 0);
         });
-      });
+      }
     }
   }
 
