@@ -12,7 +12,7 @@ import { exactAdd } from "../math/exact-decimal.js";
 import { canonicalSerializeToUtf8 } from "../persistence/canonical-json.js";
 import { isCanonicalGenerationString } from "../persistence/durable-envelope.js";
 
-export const INTENT_REGISTRY_SCHEMA_VERSION = "phase3-intent-registry-2";
+export const INTENT_REGISTRY_SCHEMA_VERSION = "phase3-intent-registry-3";
 
 // PREPARED: durable write-ahead record exists; the send may or may not have happened.
 // UNKNOWN: the send may have reached the venue. Both block until reconciled with evidence.
@@ -52,13 +52,15 @@ export type IntentRecord = {
   reasonCodes: string[];
 };
 
-// Observed execution evidence that contradicts the records, or that no linked intent explains.
-// It blocks risk increase until resolved, so it is kept with the records: a replay that starts
-// past the evidence cannot observe it again. Observed values that were not strings are null.
+// Observed execution evidence that contradicts the records, that no linked intent explains, or
+// that came from the stream and could not be checked. It blocks risk increase until resolved,
+// so it is kept with the records: a replay that starts past the evidence cannot observe it
+// again. Observed values that were not strings are null; the IDs can be null only for a stream
+// execution that could not be checked.
 export type ExecutionContradiction = {
   reasonCode: string;
-  executionId: ExecutionId;
-  exchangeOrderId: ExchangeOrderId;
+  executionId: ExecutionId | null;
+  exchangeOrderId: ExchangeOrderId | null;
   clientOrderId: string | null;
   side: string | null;
   quantity: string | null;
@@ -156,7 +158,10 @@ const ATTRIBUTION_CODES = new Set<string>([
   "UNATTRIBUTED_EXECUTION",
   "EXECUTION_FOR_UNLINKED_INTENT",
 ]);
-// The others contradict recorded facts and never clear on their own.
+// A stream execution that could not be checked: the stream does not send it again.
+const UNUSABLE_STREAM_EVENT = "EXECUTION_STREAM_EVENT_UNUSABLE";
+// The others contradict recorded facts, or are a stream execution that could not be checked,
+// and never clear on their own.
 const CONTRADICTION_CODES = new Set<string>([
   ...ATTRIBUTION_CODES,
   "EXECUTION_AFTER_CLOSE",
@@ -164,6 +169,7 @@ const CONTRADICTION_CODES = new Set<string>([
   "EXECUTION_ID_COLLISION",
   "EXECUTION_MISMATCH",
   "EXECUTION_OVERFILL",
+  UNUSABLE_STREAM_EVENT,
 ]);
 
 const STATE_KEYS = ["executionContradictions", "records", "schemaVersion"];
@@ -598,7 +604,7 @@ export class IntentRegistry {
   // A record explains an attribution contradiction once it holds the same execution on the
   // same order with the same quantity, price, side and, when reported, client order ID.
   private isExplained(entry: ExecutionContradiction): boolean {
-    if (!ATTRIBUTION_CODES.has(entry.reasonCode)) {
+    if (!ATTRIBUTION_CODES.has(entry.reasonCode) || entry.executionId === null) {
       return false;
     }
     const intentId = this.byExecutionId.get(entry.executionId);
@@ -827,11 +833,13 @@ function parseContradiction(raw: unknown): ExecutionContradiction | null {
     quantity: raw.quantity,
     price: raw.price,
   };
+  // A stream execution that could not be checked is kept with whatever IDs could be read.
+  const isValidId = entry.reasonCode === UNUSABLE_STREAM_EVENT ? isStringOrNull : isNonEmptyString;
   if (
     typeof entry.reasonCode !== "string" ||
     !CONTRADICTION_CODES.has(entry.reasonCode) ||
-    !isNonEmptyString(entry.executionId) ||
-    !isNonEmptyString(entry.exchangeOrderId) ||
+    !isValidId(entry.executionId) ||
+    !isValidId(entry.exchangeOrderId) ||
     ![entry.clientOrderId, entry.side, entry.quantity, entry.price].every(isStringOrNull)
   ) {
     return null;
