@@ -37,7 +37,7 @@ const BUSY_DROP: ExecutionReplayResult = {
   recorded: [],
 };
 
-// What it gets back when, in addition, it cannot be read into a copy.
+// What it gets back when, in addition, its stream sequence cannot be read.
 const UNREAD_DROP: ExecutionReplayResult = {
   reasonCodes: [
     "EXECUTION_STREAM_SEQUENCE_UNUSABLE",
@@ -199,13 +199,29 @@ const UNCLONEABLE_FORMS: SenderForm[] = [
   },
 ];
 
-// Stream reports that cannot be read into a copy.
+// The contradiction kept for a stream execution none of whose facts could be read.
+const UNUSABLE_ENTRY: ExecutionContradiction = {
+  reasonCode: "EXECUTION_STREAM_EVENT_UNUSABLE",
+  executionId: null,
+  exchangeOrderId: null,
+  clientOrderId: null,
+  side: null,
+  quantity: null,
+  price: null,
+};
+
+// Stream reports with a field or meta that cannot be read, what a busy delivery of each gets
+// back, and the contradiction kept from what could be read.
 const UNREADABLE_REPORTS: {
   name: string;
   report(execution: ExecutionObservation): ExecutionObservation;
+  delivery: ExecutionReplayResult;
+  entry(intent: OrderIntent): ExecutionContradiction;
 }[] = [
   {
     name: "a quantity getter that throws",
+    delivery: BUSY_DROP,
+    entry: (intent) => conflictEntry(intent, { reasonCode: "EXECUTION_MISMATCH", quantity: null }),
     report(execution) {
       return Object.defineProperty(streamed(execution, "0.006"), "quantity", {
         enumerable: true,
@@ -217,6 +233,8 @@ const UNREADABLE_REPORTS: {
   },
   {
     name: "a quantity that is a function",
+    delivery: BUSY_DROP,
+    entry: (intent) => conflictEntry(intent, { reasonCode: "EXECUTION_MISMATCH", quantity: null }),
     report(execution) {
       return {
         ...streamed(execution, "0.006"),
@@ -226,6 +244,8 @@ const UNREADABLE_REPORTS: {
   },
   {
     name: "a revoked proxy",
+    delivery: UNREAD_DROP,
+    entry: () => UNUSABLE_ENTRY,
     report(execution) {
       const { proxy, revoke } = Proxy.revocable(streamed(execution, "0.006"), {});
       revoke();
@@ -234,6 +254,8 @@ const UNREADABLE_REPORTS: {
   },
   {
     name: "a proxy that throws on reading meta",
+    delivery: UNREAD_DROP,
+    entry: (intent) => conflictEntry(intent),
     report(execution) {
       return new Proxy(streamed(execution, "0.006"), {
         get(target, property, receiver) {
@@ -418,7 +440,7 @@ describe("Gate 3 re-review RC5: stream executions read once into owned copies wh
   for (const unreadable of UNREADABLE_REPORTS) {
     test(`G3-RC5-5 ${unreadable.name} delivered during a scan stays blocking after empty replays`, async () => {
       const { h, held } = await heldHarness();
-      const { execution } = await linkedFill(h.coordinator, h.venue);
+      const { intent, execution } = await linkedFill(h.coordinator, h.venue);
 
       await deliverDuring(
         held,
@@ -426,27 +448,23 @@ describe("Gate 3 re-review RC5: stream executions read once into owned copies wh
         h.coordinator,
         () => h.coordinator.scanOpenOrders("epoch-1"),
         unreadable.report(execution),
-        UNREAD_DROP,
+        unreadable.delivery,
       );
       assert.ok(
         h.coordinator.riskIncreaseBlockers().includes("EXECUTION_STREAM_EVENT_DROPPED"),
         h.coordinator.riskIncreaseBlockers().join(","),
       );
-      // Nothing is known about it, so nothing is persisted, and no replay clears it.
-      assert.deepEqual(contradictionsOf(h.journal.latest()), []);
+      // What could be read is persisted under the problem it shows, and no replay clears it.
+      const entry = unreadable.entry(intent);
+      assert.deepEqual(contradictionsOf(h.journal.latest()), [entry]);
       for (let replay = 0; replay < 2; replay += 1) {
         assert.deepEqual(await h.coordinator.replayExecutions(), {
-          reasonCodes: ["EXECUTION_STREAM_EVENT_DROPPED"],
+          reasonCodes: [entry.reasonCode],
           recorded: [],
         });
       }
-      assert.deepEqual(h.coordinator.riskIncreaseBlockers(), ["EXECUTION_STREAM_EVENT_DROPPED"]);
-      const decision = await h.coordinator.evaluateContinuation("epoch-1");
-      assert.equal(decision.allowRiskIncrease, false);
-      assert.ok(
-        decision.reasonCodes.includes("EXECUTION_STREAM_EVENT_DROPPED"),
-        decision.reasonCodes.join(","),
-      );
+      assert.deepEqual(h.coordinator.riskIncreaseBlockers(), [entry.reasonCode]);
+      assertHalted(await h.coordinator.evaluateContinuation("epoch-1"), entry.reasonCode);
       assert.equal((await h.coordinator.submit(nextIntent())).disposition, "REFUSED");
       assert.equal(h.registry.get(nextIntent().intentId), null);
       assert.equal(h.venue.calls.place, 1);
@@ -474,8 +492,9 @@ describe("Gate 3 re-review RC5: stream executions read once into owned copies wh
         recorded: [],
       },
     );
+    assert.deepEqual(contradictionsOf(h.journal.latest()), [UNUSABLE_ENTRY]);
     assert.deepEqual(await h.coordinator.replayExecutions(), {
-      reasonCodes: ["EXECUTION_STREAM_EVENT_DROPPED"],
+      reasonCodes: ["EXECUTION_STREAM_EVENT_UNUSABLE"],
       recorded: [],
     });
     assert.equal((await h.coordinator.submit(nextIntent())).disposition, "REFUSED");
