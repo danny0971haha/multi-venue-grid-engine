@@ -49,9 +49,9 @@ const CHILD_TIMEOUT_MS = 20_000;
 // Old-state fixture: the last schema before contradictions were persisted.
 const V1_STATE = { schemaVersion: "phase3-intent-registry-1", records: [] };
 
-// New-state fixture: one persisted contradiction no record explains.
-const V2_STATE = {
-  schemaVersion: "phase3-intent-registry-2",
+// New-state fixture, in the current schema: one persisted contradiction no record explains.
+const NEW_STATE = {
+  schemaVersion: "phase3-intent-registry-3",
   records: [],
   executionContradictions: [
     {
@@ -478,15 +478,15 @@ describe("Gate 3 corrective C3: execution contradictions survive replay and rest
       recorded: [],
     });
     assert.equal(h.coordinator.canIncreaseRisk(), false);
-    assert.deepEqual(contradictionsOf(h.journal.latest()), V2_STATE.executionContradictions);
+    assert.deepEqual(contradictionsOf(h.journal.latest()), NEW_STATE.executionContradictions);
   });
 });
 
 describe("Gate 3 corrective C3: persisted schema (REVIEW_CHANGE_PROTOCOL §13)", () => {
-  test("G3-C3-8 the schema version is 2 and an empty registry exports no contradictions", () => {
-    assert.equal(INTENT_REGISTRY_SCHEMA_VERSION, "phase3-intent-registry-2");
+  test("G3-C3-8 the schema version is 3 and an empty registry exports no contradictions", () => {
+    assert.equal(INTENT_REGISTRY_SCHEMA_VERSION, "phase3-intent-registry-3");
     assert.deepEqual(new IntentRegistry().exportState(), {
-      schemaVersion: "phase3-intent-registry-2",
+      schemaVersion: "phase3-intent-registry-3",
       records: [],
       executionContradictions: [],
     });
@@ -504,7 +504,7 @@ describe("Gate 3 corrective C3: persisted schema (REVIEW_CHANGE_PROTOCOL §13)",
 
   test("G3-C3-10 a newer-schema journal fails closed on open", async () => {
     await withDirectory(async (directory) => {
-      await seedJournal(directory, { ...V2_STATE, schemaVersion: "phase3-intent-registry-3" });
+      await seedJournal(directory, { ...NEW_STATE, schemaVersion: "phase3-intent-registry-4" });
       assert.deepEqual(await open(directory), {
         ok: false,
         reasonCodes: ["INTENT_JOURNAL_INVALID", "IMPORT_SCHEMA_VERSION_MISMATCH"],
@@ -514,9 +514,9 @@ describe("Gate 3 corrective C3: persisted schema (REVIEW_CHANGE_PROTOCOL §13)",
 
   test("G3-C3-11 a new-schema journal round-trips and its contradiction blocks the restart gate", async () => {
     await withDirectory(async (directory) => {
-      await seedJournal(directory, V2_STATE);
+      await seedJournal(directory, NEW_STATE);
       const state = await openOk(directory);
-      assert.deepEqual(state.registry.exportState(), V2_STATE);
+      assert.deepEqual(state.registry.exportState(), NEW_STATE);
       const venue = new SimulatedVenue("sim", "BTC_USDC_PERP", OBSERVED_AT);
       const gate = await runRestartGate(coordinatorOver(state, venue), "epoch-1");
       assert.equal(gate.allowRiskIncrease, false);
@@ -525,16 +525,19 @@ describe("Gate 3 corrective C3: persisted schema (REVIEW_CHANGE_PROTOCOL §13)",
   });
 
   test("G3-C3-12 corrupt or mismatched contradictions are rejected, never repaired", async () => {
-    const entry = V2_STATE.executionContradictions[0] as ExecutionContradiction;
-    const withEntries = (entries: unknown[]) => ({ ...V2_STATE, executionContradictions: entries });
+    const entry = NEW_STATE.executionContradictions[0] as ExecutionContradiction;
+    const withEntries = (entries: unknown[]) => ({
+      ...NEW_STATE,
+      executionContradictions: entries,
+    });
     const withEntry = (patch: Record<string, unknown>) => withEntries([{ ...entry, ...patch }]);
-    const { executionContradictions: _dropped, ...withoutKey } = V2_STATE;
+    const { executionContradictions: _dropped, ...withoutKey } = NEW_STATE;
     const { price: _price, ...missingField } = entry;
     const later = { ...entry, executionId: "foreign-exec-2", exchangeOrderId: "foreign-order-2" };
     const cases: Array<[string, unknown]> = [
       ["IMPORT_INVALID_STATE", withoutKey],
-      ["IMPORT_INVALID_STATE", { ...V2_STATE, executionContradictions: null }],
-      ["IMPORT_INVALID_STATE", { ...V2_STATE, executionContradictions: {} }],
+      ["IMPORT_INVALID_STATE", { ...NEW_STATE, executionContradictions: null }],
+      ["IMPORT_INVALID_STATE", { ...NEW_STATE, executionContradictions: {} }],
       ["IMPORT_INVALID_CONTRADICTION", withEntries([null])],
       ["IMPORT_INVALID_CONTRADICTION", withEntries([[]])],
       ["IMPORT_INVALID_CONTRADICTION", withEntries([missingField])],

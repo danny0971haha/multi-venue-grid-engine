@@ -24,7 +24,6 @@ import type {
   CancelRequest,
   ExchangeOrderObservation,
   ExecutionObservation,
-  ObservationMeta,
   OrderAck,
   OrderIntent,
   VenueWriteResult,
@@ -193,10 +192,31 @@ type LookupDecision =
 
 type ExecutionFacts = Pick<RecordedExecution, "exchangeOrderId" | "quantity" | "price">;
 
+// The fields of a stream execution that decide whether and where it is recorded, each read
+// once when it arrives. A value that is not a string, or whose read throws, is null.
+type StreamFacts = {
+  venue: string | null;
+  market: string | null;
+  executionId: string | null;
+  exchangeOrderId: string | null;
+  clientOrderId: string | null;
+  side: string | null;
+  price: string | null;
+  quantity: string | null;
+};
+
+// The observed fields kept as a contradiction, from a replay page, a lookup or the stream.
+type ExecutionEvidence = Readonly<
+  Record<
+    "executionId" | "exchangeOrderId" | "clientOrderId" | "side" | "quantity" | "price",
+    unknown
+  >
+>;
+
 type ExecutionPlan = {
   problem: string | null;
   // The observed executions that raised the problem, kept as contradictions.
-  evidence: ExecutionObservation[];
+  evidence: ExecutionEvidence[];
   additions: Map<IntentId, RecordedExecution[]>;
 };
 
@@ -232,13 +252,9 @@ export class ExecutionCoordinator {
   private openOrderBlockers: string[] = ["OPEN_ORDER_SCAN_REQUIRED"];
   // Cleared only by a replay that reaches the venue's current end.
   private executionBlockers = new Set<string>(["EXECUTION_REPLAY_INCOMPLETE"]);
-  // Stream executions that arrived while another operation ran, read once on arrival into
-  // copies this coordinator owns. They are checked in arrival order before that operation
-  // releases the coordinator.
-  private readonly deferredStream: ExecutionObservation[] = [];
-  // Set when such an execution could not be read into a copy. Its evidence is unknown, so no
-  // replay clears this: it blocks risk increase for the rest of this process.
-  private unreadStreamEvent = false;
+  // The facts of stream executions that arrived while another operation ran. They are checked
+  // in arrival order before that operation releases the coordinator.
+  private readonly deferredStream: StreamFacts[] = [];
   private lastStreamSequence: bigint | null = null;
   private writesThisCycle = 0;
   // Set only by a continuation gate that allowed risk increase; used up by the next operation.
@@ -290,11 +306,10 @@ export class ExecutionCoordinator {
   }
 
   // The replay and stream blockers of this process, plus the persisted contradictions. A
-  // stream execution still waiting to be checked, or one that could not be read, blocks as a
-  // dropped event.
+  // stream execution still waiting to be checked blocks as a dropped event.
   executionBlockerCodes(): string[] {
     const codes = new Set<string>(this.executionBlockers);
-    if (this.deferredStream.length > 0 || this.unreadStreamEvent) {
+    if (this.deferredStream.length > 0) {
       codes.add("EXECUTION_STREAM_EVENT_DROPPED");
     }
     for (const entry of this.registry.executionContradictions()) {
@@ -431,30 +446,25 @@ export class ExecutionCoordinator {
 
   // Records one execution pushed by the venue stream. The stream is never trusted to be
   // complete: a gap, an unusable sequence, a dropped event or any execution problem blocks
-  // risk increase until a later replay completes. It never moves the replay cursor. An
-  // execution that arrives while another operation runs is not recorded by this call: it is
-  // read once into a copy this coordinator owns, and the copy is checked before that
-  // operation releases the coordinator, so a problem it shows is persisted as a direct one
-  // would be. One that cannot be read keeps risk increase blocked for the rest of this
-  // process. After a journal failure it is dropped.
+  // risk increase until a later replay completes. It never moves the replay cursor. Only the
+  // execution's identity, order, side, price, quantity and stream sequence are read, each
+  // once on arrival; its fee, liquidity and other meta fields cannot affect the check. One
+  // that arrives while another operation runs is checked before that operation releases the
+  // coordinator, so a problem it shows is persisted as a direct one would be. After a journal
+  // failure it is dropped.
   async ingestStreamExecution(execution: ExecutionObservation): Promise<ExecutionReplayResult> {
     this.continuationGranted = false;
     const reasonCodes: string[] = [];
-    const deferred = this.busy && !this.journalFailed;
-    const owned = deferred ? ownedExecution(execution) : null;
-    const sequenceProblem = this.observeStreamSequence(deferred ? owned : execution);
+    const { facts, sequence } = readStreamExecution(execution);
+    const sequenceProblem = this.observeStreamSequence(sequence);
     if (sequenceProblem !== null) {
       this.executionBlockers.add(sequenceProblem);
       reasonCodes.push(sequenceProblem);
     }
     if (this.busy || this.journalFailed) {
       this.executionBlockers.add("EXECUTION_STREAM_EVENT_DROPPED");
-      if (deferred) {
-        if (owned === null) {
-          this.unreadStreamEvent = true;
-        } else {
-          this.deferredStream.push(owned);
-        }
+      if (!this.journalFailed) {
+        this.deferredStream.push(facts);
       }
       reasonCodes.push(
         "EXECUTION_STREAM_EVENT_DROPPED",
@@ -464,7 +474,7 @@ export class ExecutionCoordinator {
     }
     this.busy = true;
     try {
-      return await this.ingestExclusive(execution, reasonCodes);
+      return await this.ingestExclusive(facts, reasonCodes);
     } finally {
       await this.release();
     }
@@ -1161,7 +1171,6 @@ export class ExecutionCoordinator {
     // stay, because it may have read past their events before they were raised. Persisted
     // contradictions are not cleared here: a replay past their evidence cannot see it again.
     // Neither are stream executions still waiting to be checked: they block until they are.
-    // Nor is one that could not be read: no replay can stand in for its check.
     this.executionBlockers = new Set(["EXECUTION_REPLAY_INCOMPLETE"]);
     const recorded: ExecutionId[] = [];
     for (let pages = 0; pages < MAX_REPLAY_PAGES; pages += 1) {
@@ -1216,7 +1225,7 @@ export class ExecutionCoordinator {
     try {
       while (this.deferredStream.length > 0 && !this.journalFailed) {
         this.continuationGranted = false;
-        await this.ingestExclusive(this.deferredStream[0] as ExecutionObservation, []);
+        await this.ingestExclusive(this.deferredStream[0] as StreamFacts, []);
         this.deferredStream.shift();
       }
     } finally {
@@ -1225,10 +1234,16 @@ export class ExecutionCoordinator {
   }
 
   private async ingestExclusive(
-    execution: ExecutionObservation,
+    facts: StreamFacts,
     reasonCodes: string[],
   ): Promise<ExecutionReplayResult> {
-    const plan = this.planExecutions([execution]);
+    const plan = this.planExecutions([facts]);
+    if (plan.problem === "EXECUTION_OBSERVATION_INVALID") {
+      // The stream does not send an event again, and no replay can be shown to include this
+      // one, so what could be read of it is kept as durable evidence.
+      plan.problem = "EXECUTION_STREAM_EVENT_UNUSABLE";
+      plan.evidence = [facts];
+    }
     if (plan.problem !== null) {
       const durable = await this.recordProblem(plan.problem, plan.evidence);
       return {
@@ -1245,11 +1260,11 @@ export class ExecutionCoordinator {
 
   // A sequence past the next expected one is a gap. A repeated or older one may be a
   // duplicate or a late event; the execution ID checks make either harmless.
-  private observeStreamSequence(execution: unknown): string | null {
-    const sequence = streamSequence(execution);
-    if (sequence === null) {
+  private observeStreamSequence(text: string | null): string | null {
+    if (text === null || !STREAM_SEQUENCE_PATTERN.test(text)) {
       return "EXECUTION_STREAM_SEQUENCE_UNUSABLE";
     }
+    const sequence = BigInt(text);
     const last = this.lastStreamSequence;
     if (last === null || sequence > last) {
       this.lastStreamSequence = sequence;
@@ -1276,7 +1291,7 @@ export class ExecutionCoordinator {
     const { venue, market } = parseScopeKey(this.config.scopeKey);
     const additions = new Map<IntentId, RecordedExecution[]>();
     const seen = new Map<ExecutionId, ExecutionObservation>();
-    const problem = (reasonCode: string, evidence: ExecutionObservation[] = []): ExecutionPlan => ({
+    const problem = (reasonCode: string, evidence: ExecutionEvidence[] = []): ExecutionPlan => ({
       problem: reasonCode,
       evidence,
       additions: new Map(),
@@ -1352,7 +1367,7 @@ export class ExecutionCoordinator {
   // changed the registry but the journal write failed.
   private async recordProblem(
     reasonCode: string,
-    evidence: readonly ExecutionObservation[],
+    evidence: readonly ExecutionEvidence[],
   ): Promise<boolean> {
     this.executionBlockers.add(reasonCode);
     const entries = evidence.map((execution) => toContradiction(reasonCode, execution));
@@ -1381,16 +1396,14 @@ export class ExecutionCoordinator {
   }
 }
 
-// Reads each observed field once. A field that is not a string is kept as null.
-function toContradiction(
-  reasonCode: string,
-  execution: ExecutionObservation,
-): ExecutionContradiction {
+// Reads each observed field once. A field that is not a string is kept as null; the registry
+// accepts null IDs only for a stream execution that could not be checked.
+function toContradiction(reasonCode: string, execution: ExecutionEvidence): ExecutionContradiction {
   const { executionId, exchangeOrderId, clientOrderId, side, quantity, price } = execution;
   return {
     reasonCode,
-    executionId,
-    exchangeOrderId,
+    executionId: typeof executionId === "string" ? executionId : null,
+    exchangeOrderId: typeof exchangeOrderId === "string" ? exchangeOrderId : null,
     clientOrderId: typeof clientOrderId === "string" ? clientOrderId : null,
     side: typeof side === "string" ? side : null,
     quantity: typeof quantity === "string" ? quantity : null,
@@ -1495,18 +1508,37 @@ function isExecutionInMarket(
   );
 }
 
-function streamSequence(execution: unknown): bigint | null {
-  if (typeof execution !== "object" || execution === null) {
-    return null;
+// Reads, once each, the fields of a stream execution that decide whether and where it is
+// recorded, and its meta sequence. No other field is read.
+function readStreamExecution(value: unknown): { facts: StreamFacts; sequence: string | null } {
+  const facts: StreamFacts = {
+    venue: readString(value, "venue"),
+    market: readString(value, "market"),
+    executionId: readString(value, "executionId"),
+    exchangeOrderId: readString(value, "exchangeOrderId"),
+    clientOrderId: readString(value, "clientOrderId"),
+    side: readString(value, "side"),
+    price: readString(value, "price"),
+    quantity: readString(value, "quantity"),
+  };
+  return { facts, sequence: readString(readField(value, "meta"), "sequence") };
+}
+
+// A field of an object, read once; undefined when the value is not an object or the read throws.
+function readField(value: unknown, field: string): unknown {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
   }
-  const meta = (execution as ExecutionObservation).meta;
-  if (typeof meta !== "object" || meta === null) {
-    return null;
+  try {
+    return (value as Record<string, unknown>)[field];
+  } catch {
+    return undefined;
   }
-  const sequence = meta.sequence;
-  return typeof sequence === "string" && STREAM_SEQUENCE_PATTERN.test(sequence)
-    ? BigInt(sequence)
-    : null;
+}
+
+function readString(value: unknown, field: string): string | null {
+  const read = readField(value, field);
+  return typeof read === "string" ? read : null;
 }
 
 function compareStrings(left: string, right: string): number {
@@ -1844,59 +1876,6 @@ function screenExecutions(
     left.executionId < right.executionId ? -1 : 1,
   );
   return { unique, invalid, decision: null };
-}
-
-// Reads each field of an execution, and of its meta when that is an object, once into values
-// this coordinator owns, so a sender that later changes or revokes its objects cannot change
-// the evidence. Other fields are not kept. Null when the execution is not an object, a read
-// throws, or a field value cannot be copied.
-function ownedExecution(execution: unknown): ExecutionObservation | null {
-  try {
-    if (typeof execution !== "object" || execution === null) {
-      return null;
-    }
-    const source = execution as ExecutionObservation;
-    const meta: unknown = source.meta;
-    return {
-      venue: ownedValue(source.venue),
-      market: ownedValue(source.market),
-      executionId: ownedValue(source.executionId),
-      exchangeOrderId: ownedValue(source.exchangeOrderId),
-      clientOrderId: ownedValue(source.clientOrderId),
-      side: ownedValue(source.side),
-      price: ownedValue(source.price),
-      quantity: ownedValue(source.quantity),
-      feeAmount: ownedValue(source.feeAmount),
-      feeAsset: ownedValue(source.feeAsset),
-      liquidity: ownedValue(source.liquidity),
-      meta:
-        typeof meta === "object" && meta !== null
-          ? ownedMeta(meta as ObservationMeta)
-          : ownedValue(meta as ObservationMeta),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function ownedMeta(meta: ObservationMeta): ObservationMeta {
-  return {
-    venue: ownedValue(meta.venue),
-    source: ownedValue(meta.source),
-    serverTime: ownedValue(meta.serverTime),
-    receivedAt: ownedValue(meta.receivedAt),
-    observedAt: ownedValue(meta.observedAt),
-    freshnessMs: ownedValue(meta.freshnessMs),
-    sequence: ownedValue(meta.sequence),
-  };
-}
-
-// A primitive as given, anything else as a structured copy. Copying throws for a function, a
-// proxy or another value that cannot be copied.
-function ownedValue<T>(value: T): T {
-  return value === null || (typeof value !== "object" && typeof value !== "function")
-    ? value
-    : structuredClone(value);
 }
 
 function toRecorded(execution: ExecutionObservation): RecordedExecution {
